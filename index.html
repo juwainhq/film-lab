@@ -1362,12 +1362,99 @@ body[data-mode="empty"] #previewControls { display: none !important; }
   .dropPickerBtn > small { font-size: 6px; }
 }
 
-/* Keep the empty upload landing focused; video-only editor chrome appears after media loads. */
+/* Keep the empty upload landing focused; video-only editor chrome appears after media loads.
+   Header Before / Export stay mounted but read as disabled until media is loaded. */
 body[data-mode="empty"] #app #content #timeline-module,
 body[data-mode="empty"] #app #shortcuts-bar,
-body[data-mode="empty"] #app #headerActions #hdrBeforeBtn,
-body[data-mode="empty"] #app #headerActions #hdrDownloadBtn,
 body[data-mode="photo"] #app #shortcuts-bar { display: none !important; }
+#hdrBeforeBtn:disabled,#hdrDownloadBtn:disabled { opacity: .38; cursor: not-allowed; border-bottom-color: transparent; }
+#hdrBeforeBtn:disabled:hover,#hdrDownloadBtn:disabled:hover { opacity: .38; border-bottom-color: transparent; }
+
+/* Usability pass: one photo toolbar, sheet-first phone editing, and real look previews. */
+
+/* The photo fills the stage above a single centered toolbar instead of floating inside it. */
+body[data-mode="photo"] #mainArea { padding: clamp(10px,1.4vw,22px) clamp(12px,2vw,30px); gap: 0; }
+body[data-mode="photo"] #previewStage { display: flex; flex-direction: column; min-height: 0; }
+body[data-mode="photo"] #canvasWrap { flex: 1 1 auto; height: auto; min-height: 0; padding: 13px 0 14px; }
+body[data-mode="photo"] #glCanvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+body[data-mode="photo"] #previewControls { position: relative; inset: auto; z-index: 12; display: flex; flex: 0 0 auto; flex-direction: row; align-items: center; justify-content: center; gap: 10px; width: 100%; min-width: 0; min-height: 46px; margin: 0; padding: 4px 0 2px; pointer-events: auto; }
+body[data-mode="photo"] #app #mainArea #previewControls #holdCompareBtn,
+body[data-mode="photo"] #app #mainArea.hasPhotos #previewControls #holdCompareBtn { position: relative; inset: auto; left: auto; right: auto; top: auto; bottom: auto; flex: 0 1 auto; min-width: 44px; max-width: calc(100% - 200px); min-height: 44px; margin: 0; padding: 8px 12px; transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-mode="photo"] #app #mainArea #previewControls #zoomControls { position: relative; inset: auto; right: auto; bottom: auto; display: flex; flex: none; align-items: center; opacity: 1; }
+body[data-mode="photo"] #zoomControls button { min-width: 44px; min-height: 44px; }
+body[data-mode="photo"] #zoomControls #zoomResetBtn { width: 58px; }
+
+/* The status toast anchors just below the header and never covers the canvas captions. */
+#toast { position: fixed; top: calc(var(--header-h,54px) + 8px); left: 50%; z-index: 200; max-width: min(420px,92vw); padding: 8px 12px; background: var(--bg); border: 1px solid var(--panel-border); box-shadow: 0 14px 40px var(--shadow); color: var(--text); font-size: 10px; line-height: 1.45; letter-spacing: .05em; text-align: center; opacity: 0; pointer-events: none; transform: translate(-50%,-8px); transition: opacity .25s, transform .25s; }
+#toast.show { opacity: 1; transform: translate(-50%,0); }
+body.toastActive #canvasWrap::before,
+body.toastActive #canvasWrap::after,
+body.toastActive #beforeLabel { opacity: 0; }
+
+/* Looks: no dead space above preset intensity, real photo previews on every card. */
+#looksPanel { gap: 12px; }
+#looksPanel > .panelHeading { margin-bottom: 0; }
+#looksPanel .presetIntensityControl { margin-top: 0; }
+#presetCompareBtn,#presetApplyBtn { min-height: 44px; color: var(--text); border-color: var(--border-hover); }
+#presetApplyBtn { background: var(--soft-bg); border-color: var(--border-strong); }
+#presetCompareBtn:disabled,#presetApplyBtn:disabled { opacity: .72; color: var(--text-dim); border-color: var(--panel-border); background: transparent; cursor: not-allowed; }
+#presetChips .chip .presetColorSwatch,#savedPresetChips .chip .presetColorSwatch { display: block; width: 100%; height: 46px; margin: 8px 0 0; border: 1px solid var(--panel-border); background-size: cover; background-position: center; background-repeat: no-repeat; }
+#savedPresetChips .chip .presetColorSwatch { height: 40px; }
+.presetColorSwatch.hasPreview { background-color: var(--soft-bg); }
+
+/* Adjust: one header per group, and scale labels that breathe below each track. */
+/* One header per group: a section label that just introduces an effect group whose own
+   header carries the ON toggle and chevron is redundant, while a real section header such
+   as Vignette (no effect group header of its own) stays visible. */
+#adjustPanel .adjustSectionHeading:has(+ .effectGroup) { display: none !important; }
+#adjustPanel .effectGroup { padding: 10px 0 12px; }
+#adjustPanel .subHead { min-height: 18px; }
+#adjustPanel .subControls { gap: 16px; }
+#adjustPanel .subRow { gap: 6px; }
+#adjustPanel .subScale { margin-top: 3px; padding-bottom: 1px; letter-spacing: .05em; }
+
+/* Touch devices: 44px hit areas that never change the visual size, plus no keyboard chrome. */
+@media (pointer: coarse) {
+  #shortcuts-bar { display: none !important; }
+  .zoomInstructions,#zoomControls .zoomInstructions { display: none !important; }
+  /* The hit areas are fixed 44px boxes anchored on their own control, so they can never
+     drift to another containing block and swallow taps meant for the rest of the editor. */
+  header #backToDropBtn,#carouselStrip #addPhotosBtn,#carouselStrip #removePhotoBtn,#carouselStrip #exportZipBtn,#carouselStrip #applyAllBtn,#looksPanel #resetOriginalBtn { position: relative !important; }
+  header #backToDropBtn::before,#carouselStrip #addPhotosBtn::before,#carouselStrip #removePhotoBtn::before,#carouselStrip #exportZipBtn::before,#carouselStrip #applyAllBtn::before,#looksPanel #resetOriginalBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translate(-50%,-50%); }
+  #sidebarTabs .sidebarTab { position: relative; min-height: 44px; }
+  #sidebarTabs .sidebarTab::before { content: ''; position: absolute; left: 50%; top: 50%; width: 100%; height: 44px; min-height: 100%; transform: translate(-50%,-50%); }
+}
+
+/* Phone and portrait-tablet editing: a 45% sheet with a tappable peek bar, photo above it. */
+@media (max-width: 900px), (max-width: 1024px) and (orientation: portrait) {
+  body[data-mode="photo"] { --sheet-peek: 112px; height: 100%; overflow: hidden; overscroll-behavior-y: contain; }
+  body[data-mode="photo"] #app { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: 0; }
+  body[data-mode="photo"] #content { display: flex; flex-direction: column; flex: 1 1 auto; width: 100%; min-width: 0; min-height: 0; overflow: hidden; padding-bottom: var(--sheet-peek,112px); transition: padding-bottom .28s cubic-bezier(.2,.8,.2,1); }
+  body[data-mode="photo"][data-sheet="open"] #content { padding-bottom: 45dvh; }
+  body[data-mode="photo"] #app #mainArea,
+  body[data-mode="photo"] #app #mainArea.hasPhotos { position: relative; inset: auto; order: 0; display: flex; flex: 1 1 auto; flex-direction: column; align-items: stretch; justify-content: flex-start; width: 100%; height: auto; min-width: 0; min-height: 0; padding: 8px 12px 0; overflow: hidden; }
+  body[data-mode="photo"] #previewStage { flex: 1 1 auto; width: 100%; height: auto; min-height: 0; }
+  body[data-mode="photo"] #canvasWrap { flex: 1 1 auto; width: 100%; height: auto; min-height: 0; }
+  body[data-mode="photo"] #app #carouselStrip { position: relative; inset: auto; left: auto; right: auto; bottom: auto; width: 100%; margin: auto 0 0; padding: 7px 0 0; border-top: 1px solid var(--panel-border); background: transparent; }
+  body[data-mode="photo"] #carouselStrip .stripHead { flex-direction: column; align-items: stretch; gap: 3px; margin-bottom: 6px; }
+  body[data-mode="photo"] #carouselStrip .stripActions { gap: 6px 12px; }
+  body[data-mode="photo"] #carouselStrip .stripActions button { font-size: 8px; }
+  body[data-mode="photo"] #carouselStrip .photoThumb { width: 56px; }
+  body[data-mode="photo"] #carouselStrip .photoThumb img { width: 48px; height: 48px; }
+  body[data-mode="photo"] #carouselHint { font-size: 8px; line-height: 1.45; }
+  body[data-mode="photo"] #carouselHint { margin-top: 4px; }
+  body[data-mode="photo"] #sidebar { position: fixed; z-index: 100; top: auto; right: 0; bottom: 0; left: 0; width: 100%; min-width: 0; height: 45dvh; max-height: 45dvh; padding: 0 14px max(14px,env(safe-area-inset-bottom,0px)); gap: 10px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--panel-border); border-bottom: 0; border-radius: 16px 16px 0 0; background: var(--panel); box-shadow: 0 -12px 44px rgba(0,0,0,.15); transform: translateY(calc(100% - var(--sheet-peek,108px))); transition: transform .28s cubic-bezier(.2,.8,.2,1); }
+  body[data-mode="photo"] #sidebar.mobileSheetOpen { transform: translateY(0); }
+  body[data-mode="photo"] #sidebarSheetHandle { position: sticky; top: 0; z-index: 5; display: flex; flex: 0 0 auto; align-items: center; justify-content: center; flex-direction: column; gap: 6px; width: calc(100% + 28px); min-width: 0; min-height: 48px; margin: 0 -14px; padding: 6px 14px; border: 0; border-bottom: 1px solid var(--panel-border); border-radius: 16px 16px 0 0; background: var(--panel); color: var(--text-dim); cursor: grab; touch-action: none; }
+  body[data-mode="photo"] #sidebar:not(.mobileSheetOpen) #sidebarSheetHandle { border-bottom-color: transparent; }
+  body[data-mode="photo"] #sidebarControls { gap: 10px; min-height: 0; }
+  body[data-mode="photo"] #sidebar #sidebarTabs { position: sticky; top: 48px; z-index: 4; }
+  body[data-mode="photo"] #sidebar:not(.mobileSheetOpen) .sidebarTabs { visibility: visible !important; pointer-events: auto !important; }
+  body[data-mode="photo"] #sidebar:not(.mobileSheetOpen) .sidebarViews,
+  body[data-mode="photo"] #sidebar:not(.mobileSheetOpen) #shortcuts { visibility: hidden; pointer-events: none; }
+  body[data-mode="photo"] .sidebarTab { min-height: 44px; padding: 11px 6px; }
+  body[data-mode="photo"] #sidebarViews { padding-bottom: 10px; }
+}
 </style>
 </head>
 <body data-mode="empty">
@@ -2253,6 +2340,7 @@ const MIN_PREVIEW_ZOOM=0.5, MAX_PREVIEW_ZOOM=5;
 let previewZoom=1, previewPanX=0, previewPanY=0, previewDrag=null, pinchZoom=null;
 let lastCanvasTouchTap=0, suppressTouchPickerUntil=0;
 const touchZoomPointers=new Map();
+let previewFitApplied=false, previewFitFrame=0;
 const effectEnabled={color:true,bloom:true,hallation:true,grain:true,dither:true,sharpen:true};
 let ditherScope='full';
 function effectValue(group,value,neutral=0){ return effectEnabled[group]?value:neutral; }
@@ -4524,7 +4612,26 @@ function startLoop(){
     render(isVideo ? videoEl.currentTime*1000 : t);
   }; loop(0);
 }
-function showToast(m,ms=3200){ toastEl.textContent=m; toastEl.classList.add('show'); setTimeout(()=>toastEl.classList.remove('show'),ms); }
+let toastTimer=null;
+function showToast(m,ms=3200){
+  toastEl.textContent=m; toastEl.classList.add('show');
+  // Small canvas captions step aside while the toast is anchored below the header.
+  if(document.body){ document.body.classList.add('toastActive'); syncHeaderHeight(); }
+  if(toastTimer!==null)clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>{
+    toastEl.classList.remove('show');
+    if(document.body)document.body.classList.remove('toastActive');
+    toastTimer=null;
+  },ms);
+}
+// Keep the toast anchored directly below whatever height the header currently is.
+function syncHeaderHeight(){
+  try{
+    const header=document.querySelector('#app header')||document.querySelector('header');
+    if(!header||!document.documentElement) return;
+    document.documentElement.style.setProperty('--header-h',`${Math.max(40,Math.round(header.getBoundingClientRect().height))}px`);
+  }catch(error){}
+}
 function showReadyConfirmation(){ progressText.textContent='Ready'; progressWrap.classList.add('ready'); showToast('Ready',1900); setTimeout(()=>progressWrap.classList.remove('ready'),1900); }
 
 // Background-only dithering uses an image-space subject mask. Portrait detection
@@ -5451,6 +5558,7 @@ function uploadPhoto(item,img,resetView=true){
   const rotation=((item.rotation||0)%360+360)%360, swapped=rotation===90||rotation===270;
   const w=swapped?baseH:baseW, h=swapped?baseW:baseH;
   const source=rotateCanvas(baseSource,baseW,baseH,rotation);
+  createLookPreviewSource(item,source);
   item.width=w; item.height=h; item.grainSeed=item.grainSeed||randomGrainSeed();
   if(canvas.width!==w || canvas.height!==h || !fboSharpened){ canvas.width=w; canvas.height=h; recreateFBOs(w,h); }
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sourceTexture); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
@@ -5467,6 +5575,7 @@ function uploadPhoto(item,img,resetView=true){
   restoreMaskBackgroundForPhoto(item);
   dropZone.style.display='none'; canvasWrap.style.display='flex';
   if(resetView) resetPreviewZoom(); else updatePreviewZoom();
+  schedulePreviewFit();
   $('processVideoBtn').style.display='none';
   $('downloadBtn').innerHTML='⤓ Original-size PNG';
   updateSocialUI();
@@ -5546,7 +5655,7 @@ async function handleFiles(fileList,{append=false}={}){
       const notes=[`${photos.length} photo${photos.length===1?'':'s'} ready — edits are linked`];
       if(images.length>room) notes.push('first 10 kept');
       if(failed) notes.push(`${failed} could not be decoded`);
-      showToast(notes.join(' · '),5000);
+      showToast(notes.join(' · '),3000);
     }else showToast('Could not open these photos — your current media is unchanged',5000);
   }finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); } }
 }
@@ -5745,6 +5854,54 @@ zoomOutBtn.addEventListener('click',()=>zoomAtCenter(1/1.25));
 zoomInBtn.addEventListener('click',()=>zoomAtCenter(1.25));
 zoomResetBtn.addEventListener('click',resetPreviewZoom);
 zoomControls.addEventListener('dblclick',e=>e.stopPropagation()); // retain double-click-to-upload on the picture
+
+// Fit keeps the photo filling the stage; CSS contain handles normal photos and this
+// pass also enlarges very small ones. Zoom, pan and the 100% reset keep working on top.
+function applyPreviewFit(){
+  if(!canvas||!canvasWrap) return;
+  const stage=$('previewStage'), controls=$('previewControls');
+  if(isVideo||!hasContent||!stage){
+    if(previewFitApplied){ canvas.style.width=''; canvas.style.height=''; canvasWrap.style.maxHeight=''; previewFitApplied=false; }
+    return;
+  }
+  const style=window.getComputedStyle?window.getComputedStyle(canvasWrap):null;
+  const paddingX=(parseFloat(style?.paddingLeft||'0')||0)+(parseFloat(style?.paddingRight||'0')||0);
+  const paddingY=(parseFloat(style?.paddingTop||'0')||0)+(parseFloat(style?.paddingBottom||'0')||0);
+  // Measure the stage itself, so hugging the photo to the top cannot feed back into the fit.
+  const stageBox=stage.getBoundingClientRect();
+  const controlsHeight=controls?controls.getBoundingClientRect().height:0;
+  const availableWidth=Math.max(1,stageBox.width-paddingX);
+  const availableHeight=Math.max(1,stageBox.height-controlsHeight-paddingY);
+  const pixelsW=Math.max(1,canvas.width), pixelsH=Math.max(1,canvas.height);
+  const scale=Math.min(availableWidth/pixelsW,availableHeight/pixelsH,3);
+  if(!Number.isFinite(scale)||scale<=0) return;
+  const fittedW=Math.max(1,Math.round(pixelsW*scale)), fittedH=Math.max(1,Math.round(pixelsH*scale));
+  canvas.style.width=`${fittedW}px`;
+  canvas.style.height=`${fittedH}px`;
+  // A photo limited by width leaves slack; keep the picture and its toolbar together at the top.
+  if(availableHeight-fittedH>16) canvasWrap.style.maxHeight=`${Math.round(fittedH+paddingY)}px`;
+  else if(canvasWrap.style.maxHeight) canvasWrap.style.maxHeight='';
+  previewFitApplied=true;
+}
+function schedulePreviewFit(){
+  if(previewFitFrame||typeof requestAnimationFrame!=='function') return;
+  previewFitFrame=requestAnimationFrame(()=>{
+    previewFitFrame=0;
+    applyPreviewFit();
+    updatePreviewZoom();
+  });
+}
+function installPreviewFitObserver(){
+  if(typeof ResizeObserver!=='function') return;
+  try{
+    const observer=new ResizeObserver(()=>{ syncHeaderHeight(); schedulePreviewFit(); });
+    observer.observe(canvasWrap);
+    const header=document.querySelector('#app header');
+    if(header) observer.observe(header);
+  }catch(error){}
+}
+zoomResetBtn.addEventListener('click',()=>schedulePreviewFit()); // 100% also restores the fit
+window.addEventListener('resize',()=>{ syncHeaderHeight(); schedulePreviewFit(); });
 canvasWrap.addEventListener('pointerup',e=>{
   if(e.pointerType!=='touch') return;
   const now=performance.now();
@@ -6159,7 +6316,13 @@ const igPresetNotes={
   'Terracotta':'Earthy warmth, copper highlights and soft texture',
   'Sage Green':'Muted greens and softly lifted shadows'
 };
-function presetDisplayName(name){ return name.startsWith('ig:')?name.slice(3):name; }
+function presetDisplayName(name){
+  const label=name.startsWith('ig:')?name.slice(3):name;
+  // The IG pack repeats a few legacy look names. Label the pack copy so the dropdown never
+  // lists one label twice while every distinct look stays available.
+  if(name.startsWith('ig:')&&Object.prototype.hasOwnProperty.call(builtInPresets,label)) return `${label} (IG)`;
+  return label;
+}
 
 // Keep the original six one-tap looks visible; everything else lives in the dropdown.
 const featuredPresetNames=[...Object.keys(legacyBuiltInPresets),'Noir Crunch'];
@@ -6247,6 +6410,113 @@ function presetSwatchGradient(values={}){
   const hues=[(210-shadow*.68+360)%360,(38+temp*.42+360)%360,(48+highlight*.58+360)%360,(335+tint*.72+360)%360];
   const sat=Math.max(25,Math.min(88,48+Number(values.Saturation||0)*.22));
   return `linear-gradient(90deg,${hues.map((h,i)=>`hsl(${h} ${sat+(i===2?8:0)}% ${i===0?31:i===2?67:49}%)`).join(',')})`;
+}
+// Real photo previews for the look cards. The source thumbnail is rebuilt only when a
+// photo loads; every look renders one per animation frame and caches on its preset object.
+const LOOK_PREVIEW_WIDTH=160;
+let lookPreviewSource=null, lookPreviewKey='', lookPreviewGeneration=0, lookPreviewFrame=0;
+let lookPreviewQueue=[], lookPreviewQueuedNames=new Set();
+function createLookPreviewSource(item,img){
+  lookPreviewQueue=[]; lookPreviewQueuedNames=new Set();
+  lookPreviewSource=null; lookPreviewKey='';
+  try{
+    const naturalWidth=Math.max(1,Number(img?.naturalWidth||img?.width)||0);
+    const naturalHeight=Math.max(1,Number(img?.naturalHeight||img?.height)||0);
+    const scale=Math.min(1,LOOK_PREVIEW_WIDTH/Math.max(naturalWidth,naturalHeight));
+    const source=document.createElement('canvas');
+    source.width=Math.max(1,Math.round(naturalWidth*scale));
+    source.height=Math.max(1,Math.round(naturalHeight*scale));
+    source.getContext('2d').drawImage(img,0,0,source.width,source.height);
+    lookPreviewSource=source;
+    lookPreviewKey=`${item?.id||'photo'}:${++lookPreviewGeneration}`;
+  }catch(error){
+    lookPreviewSource=null; lookPreviewKey='';
+    console.warn('Look previews are unavailable for this photo; gradient swatches stay.',error);
+  }
+  scheduleLookPreviews();
+}
+function lookPreviewCssFilter(values={}){
+  const number=id=>Number(values?.[id]??0);
+  const exposure=number('Exposure')/100, temperature=number('Temperature'), fade=number('Fade');
+  const bloom=Math.max(0,number('Bloom'))*.0012;
+  const brightness=Math.max(.5,Math.min(1.8,Math.pow(2,exposure*1.2)+bloom+Math.max(0,fade)*.0016));
+  const contrast=Math.max(.55,Math.min(1.7,(1+number('Contrast')*.0035)*(1-Math.max(0,fade)*.0016)));
+  const saturation=Math.max(0,Math.min(2,1+(number('Saturation')+number('Vibrance')*.45)*.004));
+  const sepia=Math.max(0,Math.min(.5,Math.abs(temperature)/240+Math.abs(fade)/900));
+  const parts=[`brightness(${brightness.toFixed(3)})`,`contrast(${contrast.toFixed(3)})`,`saturate(${saturation.toFixed(3)})`];
+  if(Math.abs(temperature)>6||sepia>.01){ parts.push(`sepia(${sepia.toFixed(3)})`); parts.push(`hue-rotate(${temperature<0?205:345}deg)`); }
+  return parts.join(' ');
+}
+function cachedLookPreview(values){
+  return values&&typeof values.lookPreview==='string'&&values.lookPreviewKey===lookPreviewKey?values.lookPreview:null;
+}
+function scheduleLookPreviews(){
+  if(!lookPreviewSource||!lookPreviewQueue) return;
+  for(const [name,values] of availablePresets){
+    if(!values||cachedLookPreview(values)||lookPreviewQueuedNames.has(name)) continue;
+    lookPreviewQueuedNames.add(name);
+    lookPreviewQueue.push({name,values});
+  }
+  flushLookPreviews();
+}
+function flushLookPreviews(){
+  if(lookPreviewFrame||!lookPreviewQueue.length||typeof requestAnimationFrame!=='function') return;
+  lookPreviewFrame=requestAnimationFrame(renderNextLookPreview);
+}
+function renderNextLookPreview(){
+  lookPreviewFrame=0;
+  const next=lookPreviewQueue.shift();
+  if(!next) return flushLookPreviews();
+  try{
+    const url=renderLookPreviewImage(next.values);
+    if(url){
+      try{ Object.defineProperty(next.values,'lookPreview',{value:url,enumerable:false,configurable:true,writable:true}); }
+      catch(error){ next.values.lookPreview=url; }
+      try{ next.values.lookPreviewKey=lookPreviewKey; }catch(error){}
+      applyLookPreviewToDom(next.name,url);
+    }
+  }catch(error){
+    console.warn('A look preview could not be rendered; its gradient swatch stays.',error);
+  }
+  flushLookPreviews();
+}
+function renderLookPreviewImage(values){
+  if(!lookPreviewSource) return null;
+  const thumb=document.createElement('canvas');
+  thumb.width=lookPreviewSource.width; thumb.height=lookPreviewSource.height;
+  const context=thumb.getContext('2d');
+  if(!context||!('filter' in context)) return null; // Without canvas filters the gradient reads better.
+  context.filter=lookPreviewCssFilter(values);
+  context.drawImage(lookPreviewSource,0,0);
+  context.filter='none';
+  return thumb.toDataURL('image/jpeg',0.6);
+}
+function setLookPreviewSwatch(swatch,url){
+  if(!swatch||!swatch.style) return;
+  try{
+    if(swatch.dataset){ if(swatch.dataset.lookPreview===url) return; swatch.dataset.lookPreview=url; }
+    swatch.style.backgroundImage=`url("${url}")`;
+    swatch.style.backgroundSize='cover';
+    swatch.style.backgroundPosition='center';
+    swatch.style.backgroundRepeat='no-repeat';
+    if(swatch.classList)swatch.classList.add('hasPreview');
+  }catch(error){}
+}
+function applyLookPreviewToDom(name,url){
+  const nodes=document.querySelectorAll('#presetChips .chip[data-preset-name], #savedPresetChips .chip[data-preset-name]');
+  for(const node of nodes){
+    if(node.dataset?.presetName!==name) continue;
+    setLookPreviewSwatch(node.querySelector?.('.presetColorSwatch'),url);
+  }
+}
+function refreshLookPreviews(){
+  if(!availablePresets) return;
+  const nodes=document.querySelectorAll('#presetChips .chip[data-preset-name], #savedPresetChips .chip[data-preset-name]');
+  for(const node of nodes){
+    const url=cachedLookPreview(availablePresets.get(node.dataset?.presetName));
+    if(url) setLookPreviewSwatch(node.querySelector?.('.presetColorSwatch'),url);
+  }
+  scheduleLookPreviews();
 }
 function syncPresetHoverOptions(){
   const menu=$('presetHoverMenu'), select=$('presetSelect');
@@ -6376,6 +6646,7 @@ function renderChips(){
     const isCustom=customPresets.some(p=>p.name===name);
     if(isCustom && savedCards){
       const card=document.createElement('button'); card.type='button'; card.className='chip custom'; card.textContent=name;
+      if(card.dataset)card.dataset.presetName=name;
       const curve=document.createElement('span'); curve.className='presetColorSwatch'; curve.setAttribute('aria-hidden','true'); if(curve.style) curve.style.background=presetSwatchGradient(values); card.appendChild(curve);
       card.setAttribute('aria-pressed','false'); card.title='Right-click to delete';
       card.addEventListener('pointerenter',()=>previewPresetHoverOption(name));
@@ -6388,6 +6659,7 @@ function renderChips(){
     }
     if(featuredPresetNames.includes(name)){
       const chip=document.createElement('button'); chip.type='button';
+      if(chip.dataset)chip.dataset.presetName=name;
       chip.className='chip'+(isCustom?' custom':'');
       chip.textContent=name;
       const swatch=document.createElement('span'); swatch.className='presetColorSwatch'; swatch.setAttribute('aria-hidden','true'); if(swatch.style) swatch.style.background=presetSwatchGradient(values); chip.appendChild(swatch);
@@ -6420,6 +6692,7 @@ function renderChips(){
   if(activePresetName && !availablePresets.has(activePresetName)) activePresetName=null;
   if(typeof selectedPresetName!=='undefined' && selectedPresetName && !availablePresets.has(selectedPresetName)) selectedPresetName=activePresetName;
   syncPresetSelection();
+  if(typeof refreshLookPreviews==='function') refreshLookPreviews();
 }
 function cancelPresetHoverPreview(){
   if(presetHoverPreviewTimer!==null){clearTimeout(presetHoverPreviewTimer);presetHoverPreviewTimer=null;}
@@ -6750,6 +7023,7 @@ function renderPhotoStrip(){
     const number=document.createElement('span'); number.textContent=String(index+1).padStart(2,'0');
     btn.append(image,number); btn.addEventListener('click',()=>activatePhoto(index)); list.appendChild(btn);
   });
+  schedulePreviewFit();
 }
 $('cropPanelToggle').addEventListener('click',()=>setCropPanelOpen($('cropPanelBody').hidden));
 $('settingsToolsToggle').addEventListener('click',()=>{
@@ -6887,15 +7161,18 @@ const closeOpenTips=except=>document.querySelectorAll('.infoTip[aria-expanded="t
 document.querySelectorAll('.infoTip').forEach(tip=>tip.addEventListener('click',e=>{e.stopPropagation();const open=tip.getAttribute('aria-expanded')!=='true';closeOpenTips(tip);tip.setAttribute('aria-expanded',String(open));}));
 document.addEventListener('click',e=>{if(!e.target.closest('.infoTip'))closeOpenTips(null);});
 const mobileSidebar=$('sidebar'), sheetHandle=$('sidebarSheetHandle');
+if(document.body)document.body.dataset.sheet=mobileSidebar.classList.contains('mobileSheetOpen')?'open':'peek';
 function refreshCanvasAfterSheetLayout(){
   requestAnimationFrame(()=>{
     updatePreviewZoom();
     refreshPreviewResolution();
+    schedulePreviewFit();
     if(hasContent)render(performance.now());
   });
 }
 function setMobileSheet(open){
   mobileSidebar.classList.toggle('mobileSheetOpen',open);
+  if(document.body)document.body.dataset.sheet=open?'open':'peek'; // sheet-aware stage sizing
   sheetHandle.setAttribute('aria-expanded',String(open));
   sheetHandle.setAttribute('aria-label',open?'Close editing controls':'Open editing controls');
   refreshCanvasAfterSheetLayout();
@@ -7630,6 +7907,12 @@ function selectSidebarTab(name){
   if(name==='grade'){drawGradeCurve();scheduleGradeHistogram();}
 }
 document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{userSelectedSidebarTab=true;selectSidebarTab(button.dataset.tab);}));
+// The peek bar is tappable: choosing a tab on a collapsed sheet opens it on that tab.
+document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{
+  const sheet=$('sidebar');
+  if(typeof setMobileSheet!=='function'||!sheet)return;
+  if(!sheet.classList.contains('mobileSheetOpen'))setMobileSheet(true);
+}));
 function updateClusterSummaries(){
   const groups={
     basic:appState.mode==='video'?[['Exposure','Exposure'],['Contrast','Contrast'],['Saturation','Saturation'],['Temperature','Temperature'],['Vibrance','Vibrance'],['Fade','Fade'],['ShadowTone','Shadow'],['HighlightTone','Highlights'],['HighlightTint','Tint'],['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']]:[['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']],
@@ -7730,6 +8013,7 @@ window.filmLabTimelineBridge={
 window.addEventListener('film-lab-toast',event=>{ if(event.detail) showToast(String(event.detail),5000); });
 // init
 initializeColorGrading(); setupSliderNumberEditing(); updateFromSliders(); updateSliderUI(); updateSocialUI(); restoreSharedLook(); render(performance.now()); initializeWorkspaceModes();
+syncHeaderHeight(); installPreviewFitObserver(); schedulePreviewFit();
 window.addEventListener('dragover',e=> e.preventDefault());
 window.addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ e.preventDefault(); handleFiles(e.dataTransfer.files); } });
 // FFmpeg is initialized only after a video upload succeeds; exports await the shared loader promise.

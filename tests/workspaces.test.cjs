@@ -125,8 +125,9 @@ test('photo and video panels switch with appState.mode while the existing DOM st
 
 test('empty and photo workspaces hide irrelevant video chrome and guard header export actions', () => {
   assert.match(styles, /body\[data-mode="empty"\] #app #content #timeline-module,[\s\S]*?body\[data-mode="photo"\] #app #shortcuts-bar \{ display: none !important; \}/);
-  assert.match(styles, /body\[data-mode="empty"\] #app #headerActions #hdrBeforeBtn/);
-  assert.match(styles, /body\[data-mode="empty"\] #app #headerActions #hdrDownloadBtn/);
+  // Before / Export stay mounted on the landing screen and read as disabled until media loads.
+  assert.doesNotMatch(styles, /body\[data-mode="empty"\] #app #headerActions #hdrBeforeBtn/);
+  assert.match(styles, /#hdrBeforeBtn:disabled,#hdrDownloadBtn:disabled \{ opacity: \.38; cursor: not-allowed;/);
   const update = script.match(/function updateSocialUI\(\)\{[\s\S]*?\n\}/)[0];
   assert.match(update, /\$\('hdrBeforeBtn'\)\.disabled=!hasContent\|\|locked/);
   assert.match(update, /\$\('hdrDownloadBtn'\)\.disabled=!hasContent\|\|locked/);
