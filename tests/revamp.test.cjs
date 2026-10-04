@@ -178,6 +178,21 @@ test('Adjust keeps Bloom and Hallation in Basic and folds Technical controls int
   assert.match(summaryGroups, /creative:[\s\S]*?\['Dither','Dither'\][\s\S]*?\['Sharp','Sharpening'\]/);
 });
 
+test('photo Grade owns color and light controls while video Adjust Basic retains them', () => {
+  const adjust = html.match(/<section class="sidebarPanel" id="adjustPanel"[\s\S]*?<\/section>\s*<section class="sidebarPanel exportTabPanel"/)?.[0] || '';
+  const basicStart = adjust.indexOf('<details class="adjustCluster" data-cluster="basic"');
+  const creativeStart = adjust.indexOf('<details class="adjustCluster" data-cluster="creative"');
+  const basic = adjust.slice(basicStart, creativeStart);
+  assert.ok(basic.includes('data-group="bloom"') && basic.includes('data-group="hallation"'));
+  assert.ok(basic.includes('id="sliderExposure"') && basic.includes('id="sliderContrast"')); // retained for preset compatibility
+  assert.ok(styles.includes('body[data-mode="photo"] #adjustPanel .adjustCluster[data-cluster="basic"] > .clusterContents > .adjustSectionHeading:first-child,'));
+  assert.ok(styles.includes('body[data-mode="photo"] #adjustPanel .adjustCluster[data-cluster="basic"] > .clusterContents > .effectGroup[data-group="color"] { display: none !important; }'));
+  assert.ok(html.includes('data-summary="basic">Bloom · Hallation'));
+  assert.ok(script.includes("basic:appState.mode==='video'?"));
+  assert.ok(script.includes(":[['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']]"));
+  assert.match(html, /id="gradeBasicSection"[\s\S]*?White balance[\s\S]*?Light[\s\S]*?Color/);
+});
+
 test('FFmpeg preload status is separate from the export-only progress dialog', () => {
   const initialize = script.match(/async function initializeFFmpeg\(\)\{[\s\S]*?\n\}/)[0];
   assert.match(html, /id="videoEngineStatus"[^>]*role="status" aria-live="polite"/);

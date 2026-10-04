@@ -805,6 +805,8 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 .adjustCluster[open] > summary::after { transform: translateY(2px) rotate(225deg); }
 .clusterSummary { min-width: 0; overflow: hidden; color: var(--text-dim2); font: 400 9px/1.4 Inter,system-ui,sans-serif; letter-spacing: .01em; text-transform: none; text-overflow: ellipsis; white-space: nowrap; }
 .clusterContents { display: flex; flex-direction: column; gap: 10px; padding: 8px; border: 1px solid var(--panel-border); }
+body[data-mode="photo"] #adjustPanel .adjustCluster[data-cluster="basic"] > .clusterContents > .adjustSectionHeading:first-child,
+body[data-mode="photo"] #adjustPanel .adjustCluster[data-cluster="basic"] > .clusterContents > .effectGroup[data-group="color"] { display: none !important; }
 .adjustSectionHeading { color: var(--text-dim); font: 600 14px Inter,system-ui,sans-serif; letter-spacing: .16em; text-transform: uppercase; }
 .clusterContents .effectGroup { padding: 10px 0 8px; }
 .clusterContents .subControls { gap: 12px; }
@@ -1511,7 +1513,7 @@ body[data-mode="photo"] #app #shortcuts-bar { display: none !important; }
               <div class="sectionLabel adjustTitle">Adjust</div>
               <p class="sectionHint">0 is neutral · <span class="darkHint">white subtracts · red adds</span><span class="lightHint">black subtracts · red adds</span>. Open an effect for finer controls.</p>
               <details class="adjustCluster" data-cluster="basic" open>
-                <summary><span>Basic</span><span class="clusterSummary" data-summary="basic">Exposure · Contrast · Saturation · Temperature · Bloom · Hallation</span></summary>
+                <summary><span>Basic</span><span class="clusterSummary" data-summary="basic">Bloom · Hallation</span></summary>
                 <div class="clusterContents"><div class="adjustSectionHeading">Color &amp; Light</div><div class="effectGroup open" data-group="color">
           <div class="effectHeader">
             <button type="button" class="effectTitle" aria-expanded="true" aria-controls="colorControls"><i style="background:var(--text)"></i> Color & Light <span class="expand" aria-hidden="true"></span></button>
@@ -7630,7 +7632,7 @@ function selectSidebarTab(name){
 document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{userSelectedSidebarTab=true;selectSidebarTab(button.dataset.tab);}));
 function updateClusterSummaries(){
   const groups={
-    basic:[['Exposure','Exposure'],['Contrast','Contrast'],['Saturation','Saturation'],['Temperature','Temperature'],['Vibrance','Vibrance'],['Fade','Fade'],['ShadowTone','Shadow'],['HighlightTone','Highlights'],['HighlightTint','Tint'],['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']],
+    basic:appState.mode==='video'?[['Exposure','Exposure'],['Contrast','Contrast'],['Saturation','Saturation'],['Temperature','Temperature'],['Vibrance','Vibrance'],['Fade','Fade'],['ShadowTone','Shadow'],['HighlightTone','Highlights'],['HighlightTint','Tint'],['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']]:[['Bloom','Bloom'],['Hall','Hallation'],['BloomAnam','Anamorphic']],
     creative:[['Grain','Grain'],['VignStrength','Vignette'],['VignSize','Vignette size'],['Dither','Dither'],['Sharp','Sharpening']]
   };
   for(const [name,items] of Object.entries(groups)){
