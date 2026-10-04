@@ -1,25 +1,95 @@
 /* Photo-only selfie segmentation worker. Inference stays in-browser; image bytes are never uploaded. */
-const TASKS_VISION_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm/';
-const SELFIE_MULTICLASS_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
-const TASKS_VISION_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js';
+const BASE = new URL('vendor/mediapipe-tasks/', self.location.href).href;
+const TASKS_VISION_CDN_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/';
+const TASKS_VISION_CDN_BUNDLE_URL = TASKS_VISION_CDN_BASE + 'vision_bundle.js';
+const TASKS_VISION_CDN_WASM_URL = TASKS_VISION_CDN_BASE + 'wasm';
+const LOCAL_SELFIE_MULTICLASS_MODEL_URL = BASE + 'selfie_multiclass_256x256.tflite';
+const REMOTE_SELFIE_MULTICLASS_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
 let segmenterPromise = null;
+
+function importVisionBundle() {
+  try {
+    importScripts(BASE + 'vision_bundle.js');
+  } catch (localError) {
+    try {
+      importScripts(TASKS_VISION_CDN_BUNDLE_URL);
+    } catch (cdnError) {
+      throw new Error(`Could not load MediaPipe Vision bundle locally or from the pinned jsDelivr CDN. Local: ${localError?.message || localError}; CDN: ${cdnError?.message || cdnError}`);
+    }
+  }
+}
+
+function resolveVisionApi() {
+  const api = self.Vision || self.vision || self;
+  const candidates = [api, self.Vision, self.vision, self].filter(Boolean);
+  const FilesetResolver = candidates.map(candidate => candidate.FilesetResolver)
+    .find(value => typeof value?.forVisionTasks === 'function');
+  const ImageSegmenter = candidates.map(candidate => candidate.ImageSegmenter)
+    .find(value => typeof value?.createFromOptions === 'function');
+  const missing = [];
+  if (!FilesetResolver) missing.push('FilesetResolver.forVisionTasks');
+  if (!ImageSegmenter) missing.push('ImageSegmenter.createFromOptions');
+  if (missing.length) throw new Error(`MediaPipe Vision API is missing ${missing.join(' and ')}`);
+  return {FilesetResolver, ImageSegmenter};
+}
+
+async function hasLocalModelAsset() {
+  try {
+    const response = await fetch(LOCAL_SELFIE_MULTICLASS_MODEL_URL, {method: 'HEAD', cache: 'no-store'});
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
 
 async function getImageSegmenter() {
   if (!segmenterPromise) {
     segmenterPromise = (async () => {
-      if (!self.vision) importScripts(TASKS_VISION_BUNDLE_URL);
-      const api = self.vision || self;
-      const {FilesetResolver, ImageSegmenter} = api;
-      if (typeof FilesetResolver?.forVisionTasks !== 'function' || typeof ImageSegmenter?.createFromOptions !== 'function') {
-        throw new Error('MediaPipe ImageSegmenter is unavailable');
+      importVisionBundle();
+      const {FilesetResolver, ImageSegmenter} = resolveVisionApi();
+      const filesets = [], failures = [];
+      try {
+        filesets.push({url: BASE + 'wasm', label: 'local', fileset: await FilesetResolver.forVisionTasks(BASE + 'wasm')});
+      } catch (error) {
+        failures.push(`local WASM fileset: ${error?.message || error}`);
       }
-      const fileset = await FilesetResolver.forVisionTasks(TASKS_VISION_WASM_URL);
-      return ImageSegmenter.createFromOptions(fileset, {
-        baseOptions: {modelAssetPath: SELFIE_MULTICLASS_MODEL_URL},
-        runningMode: 'IMAGE',
-        outputCategoryMask: true,
-        outputConfidenceMasks: true
-      });
+
+      const localModelAvailable = await hasLocalModelAsset();
+      const modelPaths = localModelAvailable
+        ? [LOCAL_SELFIE_MULTICLASS_MODEL_URL, REMOTE_SELFIE_MULTICLASS_MODEL_URL]
+        : [REMOTE_SELFIE_MULTICLASS_MODEL_URL, LOCAL_SELFIE_MULTICLASS_MODEL_URL];
+      const createWithFileset = async entry => {
+        for (const modelAssetPath of modelPaths) {
+          try {
+            return await ImageSegmenter.createFromOptions(entry.fileset, {
+              baseOptions: {modelAssetPath},
+              runningMode: 'IMAGE',
+              outputCategoryMask: true,
+              outputConfidenceMasks: true
+            });
+          } catch (error) {
+            failures.push(`${entry.label} WASM with ${modelAssetPath}: ${error?.message || error}`);
+          }
+        }
+        return null;
+      };
+
+      for (const entry of filesets) {
+        const segmenter = await createWithFileset(entry);
+        if (segmenter) return segmenter;
+      }
+      if (!filesets.some(entry => entry.url === TASKS_VISION_CDN_WASM_URL)) {
+        try {
+          filesets.push({url: TASKS_VISION_CDN_WASM_URL, label: 'pinned jsDelivr', fileset: await FilesetResolver.forVisionTasks(TASKS_VISION_CDN_WASM_URL)});
+        } catch (error) {
+          failures.push(`pinned jsDelivr WASM fileset: ${error?.message || error}`);
+        }
+        for (const entry of filesets.filter(entry => entry.url === TASKS_VISION_CDN_WASM_URL)) {
+          const segmenter = await createWithFileset(entry);
+          if (segmenter) return segmenter;
+        }
+      }
+      throw new Error(`MediaPipe ImageSegmenter could not be initialized. ${failures.join('; ') || 'No WASM fileset was available.'}`);
     })().catch(error => {
       segmenterPromise = null;
       throw error;

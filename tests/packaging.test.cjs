@@ -11,6 +11,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const pkg = JSON.parse(read('package.json'));
+const packageLock = JSON.parse(read('package-lock.json'));
 const capacitorConfig = JSON.parse(read('capacitor.config.json'));
 const electronMain = read('electron', 'main.js');
 const workflow = read('.github', 'workflows', 'build.yml');
@@ -24,7 +25,9 @@ function tempDir(name) {
 
 test('package.json drives Electron and electron-builder for Windows, macOS and Linux', () => {
   assert.equal(pkg.name, 'film-lab');
-  assert.equal(pkg.version, '1.0.0');
+  assert.equal(pkg.version, '1.0.5');
+  assert.equal(packageLock.version, pkg.version);
+  assert.equal(packageLock.packages[''].version, pkg.version);
   assert.equal(pkg.description, 'Cinematic photo and video editor');
   assert.equal(pkg.main, 'electron/main.js');
   assert.ok(fs.existsSync(path.join(root, pkg.main)), 'the Electron entry point must exist');
@@ -324,6 +327,7 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
     'manifest.json',
     'sw.js',
     'social-tools.js',
+    'color-grading.js',
     'timeline-module.js',
     'multi-timeline.js',
     'background-blur-worker.js',
@@ -332,6 +336,8 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
     'icons/icon-512.png',
     'vendor/heic2any.min.js',
     'vendor/mediapipe-selfie/selfie_segmentation.js',
+    'vendor/mediapipe-tasks/vision_bundle.js',
+    'vendor/mediapipe-tasks/wasm/vision_wasm_internal.wasm',
     'vendor/ffmpeg/ffmpeg.js'
   ]) {
     assert.ok(fs.existsSync(path.join(target, file)), `staged bundle is missing ${file}`);

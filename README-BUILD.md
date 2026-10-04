@@ -51,15 +51,15 @@ tag-driven workflow below to get all three at once.
 `.github/workflows/build.yml` runs on every push to `main` and when you push a version tag:
 
 ```sh
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.5
+git push origin v1.0.5
 ```
 
 The workflow runs `windows-latest`, `macos-latest` and `ubuntu-latest` desktop builds in
 parallel alongside an `android` job that stages the web app, syncs Capacitor and runs
 `./android/gradlew assembleDebug -p android` to produce `film-lab-android` (`app-debug.apk`).
 Once all four builds finish, a final `release` job publishes a GitHub Release named
-`Film Lab <tag>` (for example `Film Lab v1.0.0`) on tag pushes — or creates/updates a
+`Film Lab <tag>` (for example `Film Lab v1.0.5`) on tag pushes — or creates/updates a
 rolling `latest-build` release on pushes to `main` — with the Windows `.exe`, macOS `.dmg`,
 Linux `.AppImage` and Android `.apk` attached as downloadable assets, so
 [the latest release](https://github.com/juwainhq/film-lab/releases/latest) always has the

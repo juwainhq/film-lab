@@ -40,6 +40,8 @@ test('the PWA manifest and generated icons use the Film Lab identity and GitHub 
 test('the service worker precaches only the app shell and leaves model and encoding assets uncached', () => {
   assert.match(serviceWorker, /const PRECACHE = \[/);
   assert.match(serviceWorker, /social-tools\.js/);
+  assert.match(serviceWorker, /color-grading\.js/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v4'/);
   assert.match(serviceWorker, /timeline-module\.js/);
   assert.match(serviceWorker, /multi-timeline\.js/);
   assert.match(serviceWorker, /background-blur-worker\.js/);

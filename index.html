@@ -636,6 +636,98 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 .sidebarTab.active { background: var(--text); color: var(--inverse); }
 .sidebarTab:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
+/* Lightroom-style color grading lives in its own photo-only sidebar tab. */
+#colorGradePanel { gap: 13px; }
+.gradeDashboard { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gradePanelHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.gradePanelEyebrow { color: var(--text); font: 600 12px Inter,system-ui,sans-serif; letter-spacing: .18em; text-transform: uppercase; }
+.gradePanelVersion { color: var(--text-dim2); font: 8px 'JetBrains Mono',monospace; letter-spacing: .12em; }
+.gradeHistogramFrame { position: relative; overflow: hidden; border: 1px solid var(--panel-border); background: var(--bg); }
+#gradeHistogram { display: block; width: 100%; height: 82px; }
+.gradeHistogramLabel { position: absolute; left: 8px; top: 6px; color: var(--text-dim2); font: 7px 'JetBrains Mono',monospace; letter-spacing: .12em; pointer-events: none; }
+.gradeHistogramLegend { display: flex; justify-content: flex-end; gap: 9px; margin: 0; color: var(--text-dim2); font: 7px 'JetBrains Mono',monospace; letter-spacing: .04em; }
+.gradeHistogramLegend span::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 4px 0 0; background: currentColor; vertical-align: 1px; }
+.gradeHistogramLegend .histR { color: #e45f5f; }.gradeHistogramLegend .histG { color: #64b878; }.gradeHistogramLegend .histB { color: #6798ef; }.gradeHistogramLegend .histL { color: var(--text); }
+.gradePanelToolbar { display: flex; align-items: center; gap: 6px; }
+.gradePanelToolbar .toolBtn { flex: 1 1 0; min-width: 0; min-height: 36px; margin: 0; padding: 6px 5px; font-size: 8px; letter-spacing: .06em; }
+.gradePanelToolbar .gradeResetAll { flex: 1.2 1 0; border-color: var(--border-strong); color: var(--text); }
+.gradeMobileBefore { display: none !important; }
+.gradeSection { min-width: 0; border-top: 1px solid var(--panel-border); }
+.gradeSection:last-child { border-bottom: 1px solid var(--panel-border); }
+.gradeSection > summary { position: relative; display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 3px 1px; list-style: none; color: var(--text); font: 600 12px Inter,system-ui,sans-serif; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.gradeSection > summary::-webkit-details-marker { display: none; }
+.gradeSection > summary::after { content: '＋'; margin-left: auto; color: var(--text-dim2); font: 12px 'JetBrains Mono',monospace; }
+.gradeSection[open] > summary::after { content: '−'; }
+.gradeSection > summary:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.gradeDirtyDot { width: 5px; height: 5px; flex: none; border-radius: 50%; background: var(--accent); opacity: 0; transform: scale(.7); transition: opacity .18s,transform .18s; }
+.gradeSection.is-dirty > summary .gradeDirtyDot { opacity: 1; transform: scale(1); }
+.gradeSectionContent { display: flex; flex-direction: column; gap: 14px; padding: 2px 1px 15px; }
+.gradeGroupHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; color: var(--text-dim2); font: 600 8px 'JetBrains Mono',monospace; letter-spacing: .16em; text-transform: uppercase; }
+.gradeGroupHeading .toolBtn { min-height: 29px; margin: 0; padding: 5px 9px; font-size: 8px; }
+.gradeControlRow { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gradeControlRow .subHead { min-height: 19px; }
+.gradeControlRow .subLabel { font-size: 9px; letter-spacing: .1em; }
+.gradeControlRow .subLabel span { font-size: 8px; }
+.gradeControlRow .subVal { min-width: 44px; }
+.gradeSlider { height: 34px !important; background: linear-gradient(var(--panel-border),var(--panel-border)) center / 100% 2px no-repeat !important; }
+.gradeSlider:focus-visible { outline-offset: 2px !important; }
+.gradeExposureSlider { --slider-thumb: var(--slider-neutral); }
+.gradeCurveChannelTabs,.gradeHslTabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--panel-border); background: var(--bg); }
+.gradeCurveChannelTabs button,.gradeHslTabs button { flex: 1; min-width: 0; min-height: 34px; padding: 6px 4px; border: 0; background: transparent; color: var(--text-dim); font: 600 9px Inter,system-ui,sans-serif; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.gradeCurveChannelTabs button[aria-pressed="true"],.gradeHslTabs button[aria-pressed="true"] { background: var(--text); color: var(--inverse); }
+.gradeCurveChannelTabs button:focus-visible,.gradeHslTabs button:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.gradeCurveCanvasWrap { width: min(100%,256px); aspect-ratio: 1; margin: 0 auto; border: 1px solid var(--panel-border); background: var(--bg); touch-action: none; }
+#gradeCurveCanvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.gradeCurveHint { margin: -3px 0 0; color: var(--text-dim2); font-size: 8px; line-height: 1.5; }
+.gradeCurveReset { align-self: flex-end; min-height: 34px; margin: 0; padding: 6px 10px; font-size: 8px; }
+.gradeHslRows { display: flex; flex-direction: column; gap: 8px; }
+.gradeHslRow { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.gradeHslRow[hidden] { display: none !important; }
+.gradeHslRow .subHead { min-height: 18px; }
+.gradeHslRow .subLabel { gap: 7px; font-size: 8px; letter-spacing: .09em; }
+.gradeBandSwatch { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--band-color); }
+.gradeHslRow .subVal { min-width: 35px; }
+.gradeHslSlider { height: 31px !important; background: linear-gradient(var(--band-color),var(--band-color)) center / 100% 2px no-repeat !important; }
+.gradeHslSlider::-webkit-slider-thumb { background: var(--band-color) !important; }
+.gradeHslSlider::-moz-range-thumb { background: var(--band-color) !important; }
+.gradeHslReset { min-height: 32px; margin: 0; padding: 6px 10px; font-size: 8px; }
+.gradeQuickToolbar { display: flex; flex-wrap: wrap; gap: 6px; }
+.gradeQuickToolbar .toolBtn { flex: 1 1 82px; min-width: 0; min-height: 36px; margin: 0; padding: 6px 7px; font-size: 8px; }
+.gradeQuickToolbar .toolBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.gradeWheelGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.gradeWheelCard { min-width: 0; padding: 8px 5px 9px; border: 1px solid var(--panel-border); background: var(--bg); }
+.gradeWheelTitle { display: block; margin-bottom: 7px; color: var(--text-dim); text-align: center; font: 600 8px Inter,system-ui,sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.gradeWheelPicker { position: relative; width: min(100%,94px); aspect-ratio: 1; margin: 0 auto 7px; border: 1px solid var(--panel-border); border-radius: 50%; background: radial-gradient(circle at center,#fff 0%,rgba(255,255,255,0) 73%),conic-gradient(from -90deg,#ff0000 0%,#ffff00 16.667%,#00ff00 33.333%,#00ffff 50%,#0000ff 66.667%,#ff00ff 83.333%,#ff0000 100%); cursor: crosshair; touch-action: none; }
+.gradeWheelPicker:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gradeWheelHandle { position: absolute; left: 50%; top: 50%; width: 11px; height: 11px; border: 2px solid #fff; border-radius: 50%; background: #151515; box-shadow: 0 0 0 1px rgba(0,0,0,.8); transform: translate(-50%,-50%); pointer-events: none; }
+.gradeWheelCard .gradeControlRow { margin-top: 3px; }
+.gradeWheelCard .subLabel { font-size: 7px; }
+.gradeWheelCard .subVal { min-width: 29px; font-size: 8px; }
+.gradeWheelCard .gradeSlider { height: 29px !important; }
+.gradeBwMix { display: flex; flex-direction: column; gap: 8px; }
+.gradeBwMix[hidden] { display: none !important; }
+.gradePresetAmountRow { margin-bottom: 3px; }
+.gradePresetFilters { display: flex; flex-wrap: wrap; gap: 5px; }
+.gradePresetFilters button { min-height: 30px; padding: 5px 8px; border: 1px solid var(--panel-border); background: transparent; color: var(--text-dim); font: 600 8px Inter,system-ui,sans-serif; cursor: pointer; }
+.gradePresetFilters button[aria-pressed="true"] { border-color: var(--text); color: var(--text); background: var(--soft-bg); }
+.gradePresetGrid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.gradePresetCard { position: relative; min-width: 0; border: 1px solid var(--panel-border); background: var(--bg); }
+.gradePresetCard.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.gradePresetSelect { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.gradePresetSelect img { display: block; width: 100%; aspect-ratio: 1.55; object-fit: cover; background: var(--soft-bg); }
+.gradePresetTitle { display: block; overflow: hidden; padding: 6px 7px 1px; font: 600 9px Inter,system-ui,sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.gradePresetCategory { display: block; padding: 0 7px 7px; color: var(--text-dim2); font: 7px 'JetBrains Mono',monospace; letter-spacing: .08em; text-transform: uppercase; }
+.gradePresetDelete { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid rgba(255,255,255,.35); border-radius: 50%; background: rgba(0,0,0,.68); color: #fff; font-size: 13px; cursor: pointer; }
+.gradePresetSaveRow { display: flex; gap: 6px; }
+.gradePresetSaveRow input { flex: 1; min-width: 0; min-height: 36px; padding: 7px 9px; border: 1px solid var(--panel-border); border-radius: 0; background: var(--bg); color: var(--text); font-size: 10px; }
+.gradePresetSaveRow button,.gradePresetFileActions button,.gradeLutActions button { min-height: 36px; margin: 0; padding: 6px 9px; font-size: 8px; }
+.gradePresetFileActions,.gradeLutActions { display: flex; flex-wrap: wrap; gap: 6px; }
+.gradePresetStatus,.gradeLutStatus { min-height: 1.4em; margin: 0; color: var(--text-dim2); font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; }
+.gradeLutStatus.is-error { color: #f07979; }
+.gradeLutStatus.is-ready { color: #79bd88; }
+.gradeSectionContent .gradeFileInput { display: none; }
+.gradeRangeUnit { color: var(--text-dim2); font-size: 7px; }
+
 #maskPanel { gap: 0; }
 .maskBackgroundDetails { border-top: 1px solid var(--panel-border); border-bottom: 1px solid var(--panel-border); }
 .maskBackgroundDetails > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; list-style: none; color: var(--text); font: 600 11px Inter,system-ui,sans-serif; letter-spacing: .16em; text-transform: uppercase; cursor: pointer; }
@@ -780,6 +872,11 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
   #app[data-workspace="video"] #editorTimeline { bottom: 52px; }
   #app[data-workspace="video"] #videoPlaybackControls { bottom: 142px; }
   #app[data-workspace="video"] #holdCompareBtn { bottom: 204px; }
+  .gradeMobileBefore { display: inline-flex !important; align-items: center; justify-content: center; }
+  .gradeSection > summary { min-height: 48px; }
+  .gradeSlider { height: 44px !important; }
+  .gradePanelToolbar .toolBtn,.gradeCurveChannelTabs button,.gradeHslTabs button,.gradeCurveReset,.gradeHslReset { min-height: 44px; }
+  .gradeControlRow .subHead { min-height: 28px; }
   #app[data-workspace="photo"] #carouselStrip { bottom: 64px; }
   #app[data-workspace="photo"] #mainArea.hasPhotos #holdCompareBtn { bottom: 164px; }
   #app[data-workspace="video"] #sidebarViews > .sidebarPanel:not(.active) { display: none !important; }
@@ -1377,6 +1474,7 @@ body[data-mode="empty"] #previewControls { display: none !important; }
         <div class="sidebarTabs" id="sidebarTabs" role="tablist" aria-label="Editor sections">
           <button type="button" class="sidebarTab active" id="looksTab" role="tab" aria-selected="true" aria-controls="looksPanel" data-tab="looks">Looks</button>
           <button type="button" class="sidebarTab" id="adjustTab" role="tab" aria-selected="false" aria-controls="adjustPanel" data-tab="adjust">Adjust</button>
+          <button type="button" class="sidebarTab photo-only" id="gradeTab" role="tab" aria-selected="false" aria-controls="colorGradePanel" data-tab="grade">Grade</button>
           <button type="button" class="sidebarTab photo-only" id="maskTab" role="tab" aria-selected="false" aria-controls="maskPanel" data-tab="mask">Mask</button>
           <button type="button" class="sidebarTab" id="exportTab" role="tab" aria-selected="false" aria-controls="exportTabPanel" data-tab="export">Export</button>
         </div>
@@ -1600,6 +1698,179 @@ body[data-mode="empty"] #previewControls { display: none !important; }
         <p class="socialHint">Drag the caption on the preview to position it. One caption layer for this clip.</p>
       </section>
           </section>
+          <section class="sidebarPanel photo-only gradeDashboard" id="colorGradePanel" data-panel="grade" role="tabpanel" aria-labelledby="gradeTab" hidden>
+            <div class="gradePanelHeading"><span class="gradePanelEyebrow">Color Grade</span><span class="gradePanelVersion">PHOTO · 01</span></div>
+            <div class="gradeHistogramFrame"><span class="gradeHistogramLabel">LIVE RGB / LUMA</span><canvas id="gradeHistogram" width="256" height="82" aria-label="Live RGB and luminance histogram"></canvas></div>
+            <div class="gradeHistogramLegend" aria-hidden="true"><span class="histR">R</span><span class="histG">G</span><span class="histB">B</span><span class="histL">LUMA</span></div>
+            <div class="gradePanelToolbar" role="group" aria-label="Color grading history and comparison">
+              <button type="button" class="toolBtn" id="gradeUndoBtn" title="Undo color grading (Ctrl+Z)" aria-label="Undo grading" disabled>↶ Undo</button>
+              <button type="button" class="toolBtn" id="gradeRedoBtn" title="Redo color grading (Ctrl+Shift+Z)" aria-label="Redo grading" disabled>↷ Redo</button>
+              <button type="button" class="toolBtn gradeMobileBefore" id="gradeBeforeBtn" aria-pressed="false" title="Hold to compare before and after">Before</button>
+              <button type="button" class="toolBtn gradeResetAll" id="gradeResetAllBtn">Reset all</button>
+            </div>
+            <details class="gradeSection" id="gradeBasicSection" data-grade-section="basic" open>
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Basic</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeGroupHeading">White balance</div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Temperature <span>cool → warm</span></div><div class="subVal" id="valGradeTemperature">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeTemperature" min="-100" max="100" value="0" data-grade-default="0" aria-label="Temperature"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Tint <span>green → magenta</span></div><div class="subVal" id="valGradeTint">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeTint" min="-100" max="100" value="0" data-grade-default="0" aria-label="Tint"></div>
+                <div class="gradeGroupHeading">Light</div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Exposure <span>stops</span></div><div class="subVal" id="valGradeExposure">0</div></div><input class="subSlider gradeSlider gradeExposureSlider" type="range" id="sliderGradeExposure" min="-5" max="5" step="0.05" value="0" data-grade-default="0" aria-label="Exposure in stops"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Contrast</div><div class="subVal" id="valGradeContrast">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeContrast" min="-100" max="100" value="0" data-grade-default="0" aria-label="Contrast"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Highlights</div><div class="subVal" id="valGradeHighlights">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeHighlights" min="-100" max="100" value="0" data-grade-default="0" aria-label="Highlights"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Shadows</div><div class="subVal" id="valGradeShadows">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeShadows" min="-100" max="100" value="0" data-grade-default="0" aria-label="Shadows"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Whites</div><div class="subVal" id="valGradeWhites">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeWhites" min="-100" max="100" value="0" data-grade-default="0" aria-label="Whites"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Blacks</div><div class="subVal" id="valGradeBlacks">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeBlacks" min="-100" max="100" value="0" data-grade-default="0" aria-label="Blacks"></div>
+                <div class="gradeGroupHeading">Presence <span>local detail controls</span></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Texture</div><div class="subVal" id="valGradeTexture">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeTexture" min="-100" max="100" value="0" data-grade-default="0" aria-label="Texture"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Clarity</div><div class="subVal" id="valGradeClarity">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeClarity" min="-100" max="100" value="0" data-grade-default="0" aria-label="Clarity"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Dehaze</div><div class="subVal" id="valGradeDehaze">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeDehaze" min="-100" max="100" value="0" data-grade-default="0" aria-label="Dehaze"></div>
+                <div class="gradeGroupHeading">Color</div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Vibrance</div><div class="subVal" id="valGradeVibrance">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVibrance" min="-100" max="100" value="0" data-grade-default="0" aria-label="Vibrance"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Saturation</div><div class="subVal" id="valGradeSaturation">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeSaturation" min="-100" max="100" value="0" data-grade-default="0" aria-label="Saturation"></div>
+                <div class="gradeGroupHeading">Auto tone <button type="button" class="toolBtn" id="gradeAutoBtn" title="Estimate exposure, contrast, whites and blacks from the current image">Auto</button></div>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeToneCurveSection" data-grade-section="curve">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Tone Curve</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeCurveChannelTabs" role="tablist" aria-label="Tone curve channel">
+                  <button type="button" data-curve-channel="master" role="tab" aria-selected="true" aria-pressed="true">RGB</button>
+                  <button type="button" data-curve-channel="red" role="tab" aria-selected="false" aria-pressed="false">R</button>
+                  <button type="button" data-curve-channel="green" role="tab" aria-selected="false" aria-pressed="false">G</button>
+                  <button type="button" data-curve-channel="blue" role="tab" aria-selected="false" aria-pressed="false">B</button>
+                </div>
+                <div class="gradeCurveCanvasWrap"><canvas id="gradeCurveCanvas" width="256" height="256" aria-label="Tone curve. Add a point by clicking, drag to adjust, and double-click a point to remove it."></canvas></div>
+                <p class="gradeCurveHint">Tap to add · drag to shape · double-tap a point to remove. Endpoints stay fixed.</p>
+                <button type="button" class="toolBtn gradeCurveReset" id="gradeCurveResetBtn">Reset curve</button>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeHslSection" data-grade-section="hsl">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Color Mixer · HSL</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeHslTabs" role="tablist" aria-label="HSL adjustment type">
+                  <button type="button" data-hsl-tab="hue" role="tab" aria-selected="true" aria-pressed="true">Hue</button>
+                  <button type="button" data-hsl-tab="saturation" role="tab" aria-selected="false" aria-pressed="false">Saturation</button>
+                  <button type="button" data-hsl-tab="luminance" role="tab" aria-selected="false" aria-pressed="false">Luminance</button>
+                </div>
+                <div class="gradeHslRows" id="gradeHslRows" data-active-tab="hue">
+                  <div class="gradeHslRow" data-hsl-color="red" style="--band-color:#ee5b58"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Red</div><div class="subVal" id="valHslHueRed">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueRed" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="red" aria-label="Red hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="orange" style="--band-color:#f09345"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Orange</div><div class="subVal" id="valHslHueOrange">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueOrange" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="orange" aria-label="Orange hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="yellow" style="--band-color:#e3c542"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Yellow</div><div class="subVal" id="valHslHueYellow">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueYellow" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="yellow" aria-label="Yellow hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="green" style="--band-color:#5ab875"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Green</div><div class="subVal" id="valHslHueGreen">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueGreen" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="green" aria-label="Green hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="aqua" style="--band-color:#42c5c0"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Aqua</div><div class="subVal" id="valHslHueAqua">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueAqua" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="aqua" aria-label="Aqua hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="blue" style="--band-color:#5c8ce9"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Blue</div><div class="subVal" id="valHslHueBlue">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueBlue" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="blue" aria-label="Blue hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="purple" style="--band-color:#986de2"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Purple</div><div class="subVal" id="valHslHuePurple">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHuePurple" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="purple" aria-label="Purple hue"></div>
+                  <div class="gradeHslRow" data-hsl-color="magenta" style="--band-color:#d75db5"><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Magenta</div><div class="subVal" id="valHslHueMagenta">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslHueMagenta" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="hue" data-hsl-band="magenta" aria-label="Magenta hue"></div>
+
+                  <div class="gradeHslRow" data-hsl-color="red" style="--band-color:#ee5b58" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Red</div><div class="subVal" id="valHslSaturationRed">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationRed" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="red" aria-label="Red saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="orange" style="--band-color:#f09345" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Orange</div><div class="subVal" id="valHslSaturationOrange">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationOrange" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="orange" aria-label="Orange saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="yellow" style="--band-color:#e3c542" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Yellow</div><div class="subVal" id="valHslSaturationYellow">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationYellow" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="yellow" aria-label="Yellow saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="green" style="--band-color:#5ab875" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Green</div><div class="subVal" id="valHslSaturationGreen">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationGreen" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="green" aria-label="Green saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="aqua" style="--band-color:#42c5c0" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Aqua</div><div class="subVal" id="valHslSaturationAqua">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationAqua" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="aqua" aria-label="Aqua saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="blue" style="--band-color:#5c8ce9" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Blue</div><div class="subVal" id="valHslSaturationBlue">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationBlue" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="blue" aria-label="Blue saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="purple" style="--band-color:#986de2" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Purple</div><div class="subVal" id="valHslSaturationPurple">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationPurple" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="purple" aria-label="Purple saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="magenta" style="--band-color:#d75db5" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Magenta</div><div class="subVal" id="valHslSaturationMagenta">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslSaturationMagenta" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="saturation" data-hsl-band="magenta" aria-label="Magenta saturation"></div>
+                  <div class="gradeHslRow" data-hsl-color="red" style="--band-color:#ee5b58" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Red</div><div class="subVal" id="valHslLuminanceRed">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceRed" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="red" aria-label="Red luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="orange" style="--band-color:#f09345" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Orange</div><div class="subVal" id="valHslLuminanceOrange">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceOrange" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="orange" aria-label="Orange luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="yellow" style="--band-color:#e3c542" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Yellow</div><div class="subVal" id="valHslLuminanceYellow">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceYellow" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="yellow" aria-label="Yellow luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="green" style="--band-color:#5ab875" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Green</div><div class="subVal" id="valHslLuminanceGreen">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceGreen" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="green" aria-label="Green luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="aqua" style="--band-color:#42c5c0" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Aqua</div><div class="subVal" id="valHslLuminanceAqua">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceAqua" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="aqua" aria-label="Aqua luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="blue" style="--band-color:#5c8ce9" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Blue</div><div class="subVal" id="valHslLuminanceBlue">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceBlue" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="blue" aria-label="Blue luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="purple" style="--band-color:#986de2" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Purple</div><div class="subVal" id="valHslLuminancePurple">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminancePurple" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="purple" aria-label="Purple luminance"></div>
+                  <div class="gradeHslRow" data-hsl-color="magenta" style="--band-color:#d75db5" hidden><div class="subHead"><div class="subLabel"><i class="gradeBandSwatch"></i>Magenta</div><div class="subVal" id="valHslLuminanceMagenta">0</div></div><input class="subSlider gradeSlider gradeHslSlider" type="range" id="sliderHslLuminanceMagenta" min="-100" max="100" value="0" data-grade-default="0" data-hsl-control="luminance" data-hsl-band="magenta" aria-label="Magenta luminance"></div>
+                </div>
+                <button type="button" class="toolBtn gradeHslReset" id="gradeHslResetBtn">Reset hue</button>
+              </div>
+            </details>
+            <div class="gradeQuickToolbar" role="group" aria-label="Quick grading actions">
+              <button type="button" class="toolBtn" id="gradeBlackWhiteBtn" aria-pressed="false" title="Toggle black and white channel mix">Black &amp; white</button>
+              <button type="button" class="toolBtn" id="gradeCopyBtn" title="Copy grading settings (Ctrl+Shift+C)">Copy settings</button>
+              <button type="button" class="toolBtn" id="gradePasteBtn" title="Paste grading settings (Ctrl+Shift+V)">Paste settings</button>
+            </div>
+            <details class="gradeSection" id="gradeColorWheelsSection" data-grade-section="wheels">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Color Wheels</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeWheelGrid">
+                  <div class="gradeWheelCard">
+                    <span class="gradeWheelTitle">Shadows</span>
+                    <div class="gradeWheelPicker" data-grade-wheel="shadows" role="slider" tabindex="0" aria-label="Shadows color wheel. Drag to tint; double-click to reset." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="gradeWheelHandle" aria-hidden="true"></span></div>
+                    <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Amount</div><div class="subVal" id="valGradeWheelShadowsIntensity">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeWheelShadowsIntensity" min="0" max="100" value="100" data-grade-default="100" aria-label="Shadows wheel amount"></div>
+                  </div>
+                  <div class="gradeWheelCard">
+                    <span class="gradeWheelTitle">Midtones</span>
+                    <div class="gradeWheelPicker" data-grade-wheel="midtones" role="slider" tabindex="0" aria-label="Midtones color wheel. Drag to tint; double-click to reset." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="gradeWheelHandle" aria-hidden="true"></span></div>
+                    <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Amount</div><div class="subVal" id="valGradeWheelMidtonesIntensity">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeWheelMidtonesIntensity" min="0" max="100" value="100" data-grade-default="100" aria-label="Midtones wheel amount"></div>
+                  </div>
+                  <div class="gradeWheelCard">
+                    <span class="gradeWheelTitle">Highlights</span>
+                    <div class="gradeWheelPicker" data-grade-wheel="highlights" role="slider" tabindex="0" aria-label="Highlights color wheel. Drag to tint; double-click to reset." aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="gradeWheelHandle" aria-hidden="true"></span></div>
+                    <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Amount</div><div class="subVal" id="valGradeWheelHighlightsIntensity">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeWheelHighlightsIntensity" min="0" max="100" value="100" data-grade-default="100" aria-label="Highlights wheel amount"></div>
+                  </div>
+                </div>
+                <p class="gradeCurveHint">Drag toward a hue to tint that tonal range. Double-click or double-tap a wheel to clear its color.</p>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeDetailSection" data-grade-section="detail">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Sharpening &amp; Noise Reduction</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeGroupHeading">Sharpening</div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Amount</div><div class="subVal" id="valGradeSharpness">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeSharpness" min="0" max="100" value="0" data-grade-default="0" aria-label="Fine sharpening amount"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Radius <span>edge scale</span></div><div class="subVal" id="valGradeSharpRadius">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeSharpRadius" min="0" max="100" value="0" data-grade-default="0" aria-label="Fine sharpening radius"></div>
+                <div class="gradeGroupHeading">Noise reduction</div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Luminance</div><div class="subVal" id="valGradeNoiseReduction">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeNoiseReduction" min="0" max="100" value="0" data-grade-default="0" aria-label="Luminance noise reduction"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Detail protection <span>preserve edges</span></div><div class="subVal" id="valGradeNoiseDetail">50</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeNoiseDetail" min="0" max="100" value="50" data-grade-default="50" aria-label="Noise reduction detail protection"></div>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeVignetteSection" data-grade-section="vignette">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Vignette</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Amount <span>darken ↔ lighten</span></div><div class="subVal" id="valGradeVignette">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVignette" min="-100" max="100" value="0" data-grade-default="0" aria-label="Vignette amount"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Midpoint</div><div class="subVal" id="valGradeVignetteMidpoint">50</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVignetteMidpoint" min="0" max="100" value="50" data-grade-default="50" aria-label="Vignette midpoint"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Roundness</div><div class="subVal" id="valGradeVignetteRoundness">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVignetteRoundness" min="-100" max="100" value="0" data-grade-default="0" aria-label="Vignette roundness"></div>
+                <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Feather</div><div class="subVal" id="valGradeVignetteFeather">50</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVignetteFeather" min="0" max="100" value="50" data-grade-default="50" aria-label="Vignette feather"></div>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeBlackWhiteSection" data-grade-section="blackWhite">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Black &amp; White Mix</span></summary>
+              <div class="gradeSectionContent">
+                <p class="gradeCurveHint">Enable with the Black &amp; white button above, then shape the tonal response of each channel.</p>
+                <div class="gradeBwMix" id="gradeBwMix" hidden>
+                  <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Red</div><div class="subVal" id="valGradeBwRed">21</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeBwRed" min="0" max="100" value="21" data-grade-default="21" aria-label="Black and white red channel mix"></div>
+                  <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Green</div><div class="subVal" id="valGradeBwGreen">72</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeBwGreen" min="0" max="100" value="72" data-grade-default="72" aria-label="Black and white green channel mix"></div>
+                  <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Blue</div><div class="subVal" id="valGradeBwBlue">7</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeBwBlue" min="0" max="100" value="7" data-grade-default="7" aria-label="Black and white blue channel mix"></div>
+                </div>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradeLutSection" data-grade-section="lut">
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>3D LUT</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradeLutActions"><button type="button" class="toolBtn" id="gradeLutImportBtn">Import .cube</button><button type="button" class="toolBtn" id="gradeLutClearBtn" disabled>Remove LUT</button></div>
+                <input class="gradeFileInput" type="file" id="gradeLutInput" accept=".cube,text/plain" aria-label="Import 3D .cube LUT">
+                <p class="gradeLutStatus" id="gradeLutStatus" role="status" aria-live="polite">Supports 17³, 33³, and 64³ 3D LUTs.</p>
+              </div>
+            </details>
+            <details class="gradeSection" id="gradePresetsSection" data-grade-section="presets" open>
+              <summary><span class="gradeDirtyDot" aria-hidden="true"></span><span>Presets</span></summary>
+              <div class="gradeSectionContent">
+                <div class="gradePresetFilters" id="gradePresetFilters" role="group" aria-label="Filter grading presets">
+                  <button type="button" data-preset-filter="all" aria-pressed="true">All</button>
+                  <button type="button" data-preset-filter="Cinematic" aria-pressed="false">Cinematic</button>
+                  <button type="button" data-preset-filter="Portrait" aria-pressed="false">Portrait</button>
+                  <button type="button" data-preset-filter="Black &amp; White" aria-pressed="false">B&amp;W</button>
+                  <button type="button" data-preset-filter="Film" aria-pressed="false">Film</button>
+                  <button type="button" data-preset-filter="Moody" aria-pressed="false">Moody</button>
+                  <button type="button" data-preset-filter="Bright &amp; Airy" aria-pressed="false">Bright &amp; Airy</button>
+                  <button type="button" data-preset-filter="My Looks" aria-pressed="false">My Looks</button>
+                </div>
+                <div class="gradePresetGrid" id="gradePresetGrid" aria-live="polite"></div>
+                <div class="gradePresetSaveRow"><input type="text" id="gradePresetName" maxlength="40" placeholder="Name this look" aria-label="New grading preset name"><button type="button" class="toolBtn" id="gradePresetSaveBtn">Save look</button></div>
+                <div class="gradePresetFileActions"><button type="button" class="toolBtn" id="gradePresetExportBtn">Export presets JSON</button><button type="button" class="toolBtn" id="gradePresetImportBtn">Import presets JSON</button></div>
+                <input class="gradeFileInput" type="file" id="gradePresetImportInput" accept="application/json,.json" aria-label="Import grading presets JSON">
+                <p class="gradePresetStatus" id="gradePresetStatus" role="status" aria-live="polite">24 studio presets · your looks stay on this device.</p>
+              </div>
+            </details>
+          </section>
           <section class="sidebarPanel photo-only" id="maskPanel" data-panel="mask" role="tabpanel" aria-labelledby="maskTab" hidden>
             <details class="maskBackgroundDetails" id="maskBackgroundDetails" open>
               <summary><span>Mask &amp; Background</span><span class="maskBgSummaryHint">PHOTO ONLY</span></summary>
@@ -1810,14 +2081,15 @@ body[data-mode="empty"] #previewControls { display: none !important; }
     <div class="sectionLabel" id="shortcutsTitle">Keyboard shortcuts</div>
     <div class="shortcutList">
       <div><kbd>Space</kbd><span>Video: play / pause · Photo: compare before / after</span></div>
+      <div><kbd>\</kbd><span>Hold to compare before / after in photo mode</span></div>
       <div><kbd>← / →</kbd><span>Video: one frame · focused playhead: 0.1s · focused trim handle: 1/120 of clip duration</span></div>
       <div><kbd>Shift + ← / →</kbd><span>Video: five seconds · focused playhead: one second · crop moves 5× · trim handle: 1/30 of clip duration</span></div>
       <div><kbd>↑ / ↓</kbd><span>Move the focused crop frame up or down</span></div>
       <div><kbd>Home / End</kbd><span>Move a focused timeline playhead or trim handle to its start / end</span></div>
       <div><kbd>Delete / Backspace</kbd><span>Delete the selected video clip</span></div>
-      <div><kbd>Ctrl / ⌘ + Z</kbd><span>Undo the last video timeline edit</span></div>
+      <div><kbd>Ctrl / ⌘ + Z</kbd><span>Undo color grading in photo mode · undo the last video timeline edit</span></div>
       <div><kbd>Ctrl / ⌘ + Y</kbd><span>Redo the last video timeline edit</span></div>
-      <div><kbd>Ctrl / ⌘ + Shift + Z</kbd><span>Redo the last video timeline edit</span></div>
+      <div><kbd>Ctrl / ⌘ + Shift + Z</kbd><span>Redo color grading in photo mode · redo the last video timeline edit</span></div>
       <div><kbd>S</kbd><span>Split the selected video clip at the playhead</span></div>
       <div><kbd>R</kbd><span>Reset adjustments</span></div>
       <div><kbd>D</kbd><span>Export: video reel or photo PNG</span></div>
@@ -1896,6 +2168,7 @@ body[data-mode="empty"] #previewControls { display: none !important; }
 })();
 </script>
 <script src="./social-tools.js"></script>
+<script src="./color-grading.js"></script>
 <script>
 const startFilmLab=()=>{
 (() => {
@@ -1922,6 +2195,25 @@ const gl = canvas.getContext('webgl2', {preserveDrawingBuffer:true, antialias:fa
 if(!gl){ alert('WebGL 2 not supported'); return; }
 const $ = id => document.getElementById(id);
 const social = window.FilmSocial;
+const colorGrading=window.FilmLabColorGrading;
+const gradeCurveChannels=['master','red','green','blue'];
+const gradeHslBands=['red','orange','yellow','green','aqua','blue','purple','magenta'];
+const gradeHslTabs=['hue','saturation','luminance'];
+const gradeCurvePoints=Object.fromEntries(gradeCurveChannels.map(channel=>[channel,[{x:0,y:0},{x:1,y:1}]]));
+const gradeCurveSamples=Object.fromEntries(gradeCurveChannels.map(channel=>[channel,new Uint8Array(256)]));
+const gradeCurveTextures=Object.create(null);
+let gradeCurveChannel='master', gradeHslTab='hue', gradeCurveCanvasContext=null;
+let gradeRenderFrame=null, gradeHistogramTimer=null, gradeHistogramLastAt=0, gradeBeforeActive=false;
+let gradeReadbackCanvas=null, gradeReadbackContext=null, gradeHistogramContext=null;
+let gradeHistory=[], gradeHistoryIndex=-1, gradeApplyingSnapshot=false, gradePassWarningShown=false;
+let gradeCurveDrag=null, gradeCurveTap=null, gradeCurveInteractionChanged=false;
+const gradeWheelNames=['shadows','midtones','highlights'];
+const gradeWheelState=Object.fromEntries(gradeWheelNames.map(name=>[name,{x:0,y:0}]));
+const gradeLutRegistry=new Map(), gradePresetThumbnailCache=new Map();
+let activeGradeLutId=null, nextGradeLutId=1, gradeWheelDrag=null, gradeWheelTap=null, gradeBlackWhiteEnabled=false;
+let gradePresetFilter='all', activeGradePresetId=null, gradeUserPresets=[];
+const GRADE_PRESET_STORAGE_KEY='film_lab_user_grade_presets_v1';
+const GRADE_COPY_STORAGE_KEY='film_lab_grade_copy_v1';
 const dropZone=$('dropZone'), canvasWrap=$('canvasWrap'), fileInput=$('fileInput'), beforeLabel=$('beforeLabel'), toastEl=$('toast');
 let videoEl=$('videoEl');
 const zoomControls=$('zoomControls'), zoomOutBtn=$('zoomOutBtn'), zoomResetBtn=$('zoomResetBtn'), zoomInBtn=$('zoomInBtn');
@@ -1942,7 +2234,7 @@ const ditherAlgorithmSelect=$('ditherAlgorithm'), ditherDownscaleSelect=$('dithe
 const ditherColorModeSelect=$('ditherColorMode'), ditherPaletteSizeSelect=$('ditherPaletteSize');
 const ditherPaletteShadow=$('ditherPaletteShadow'), ditherPaletteHighlight=$('ditherPaletteHighlight');
 
-let sourceTexture=null, fboComposite=null, fboSharpened=null, fboDithered=null, fboBloomExtract=null, fboBloomBlurH=null, fboBloomBlurV=null, fboBloomBlurH2=null, fboBloomBlurV2=null, fboHallExtract=null, fboHallBlurH=null, fboHallBlurV=null;
+let sourceTexture=null, fboComposite=null, fboSharpened=null, fboGraded=null, fboDithered=null, fboBloomExtract=null, fboBloomBlurH=null, fboBloomBlurV=null, fboBloomBlurH2=null, fboBloomBlurV2=null, fboHallExtract=null, fboHallBlurH=null, fboHallBlurV=null;
 let maskBgTexture=null, maskBgBackgroundTexture=null;
 let floydTexture=null, floydLastKey=null, subjectMaskRevision=0;
 const appState={mode:'empty'};
@@ -2148,6 +2440,864 @@ function setupSliderNumberEditing(){
     readout.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!readout.querySelector('input')){e.preventDefault();readout.dispatchEvent(new MouseEvent('dblclick',{bubbles:true}));}});
   }
 }
+function gradeSliderList(){ return [...document.querySelectorAll('#colorGradePanel input.gradeSlider')]; }
+function gradeStateKey(){
+  const values=gradeSliderList().map(slider=>[slider.id,Number(slider.value)]);
+  const curves=gradeCurveChannels.map(channel=>[channel,gradeCurvePoints[channel].map(point=>[Number(point.x.toFixed(5)),Number(point.y.toFixed(5))])]);
+  const wheels=gradeWheelNames.map(name=>[name,Number(gradeWheelState[name].x.toFixed(4)),Number(gradeWheelState[name].y.toFixed(4))]);
+  return JSON.stringify([values,curves,wheels,gradeBlackWhiteEnabled,activeGradeLutId]);
+}
+function gradeLegacyProcessingIsActive(){
+  const activeIds=['sliderGradeTemperature','sliderGradeTint','sliderGradeExposure','sliderGradeContrast','sliderGradeHighlights','sliderGradeShadows','sliderGradeWhites','sliderGradeBlacks','sliderGradeVibrance','sliderGradeSaturation'];
+  if(activeIds.some(id=>Number($(id)?.value||0)!==0)) return true;
+  if(gradeSliderList().some(slider=>slider.dataset.hslControl&&Number(slider.value)!==0)) return true;
+  return gradeCurveChannels.some(channel=>!isGradeCurveIdentity(channel));
+}
+function gradePostProcessingIsActive(){
+  if(gradeBlackWhiteEnabled||activeGradeLutId&&gradeLutRegistry.has(activeGradeLutId))return true;
+  const amountIds=['sliderGradeTexture','sliderGradeClarity','sliderGradeDehaze','sliderGradeSharpness','sliderGradeNoiseReduction','sliderGradeVignette'];
+  if(amountIds.some(id=>Number($(id)?.value||0)!==0))return true;
+  return gradeWheelNames.some(name=>{
+    const amount=Number($(`sliderGradeWheel${name[0].toUpperCase()+name.slice(1)}Intensity`)?.value||0);
+    return amount>0.001&&Math.hypot(gradeWheelState[name].x,gradeWheelState[name].y)>0.0001;
+  });
+}
+function gradeProcessingIsActive(){return gradeLegacyProcessingIsActive()||gradePostProcessingIsActive();}
+function gradeUniformSettings(){
+  const number=id=>Number($(id)?.value||0);
+  const channelValues=(control,scale)=>new Float32Array(gradeHslBands.map(band=>number(`sliderHsl${control[0].toUpperCase()+control.slice(1)}${band[0].toUpperCase()+band.slice(1)}`)/100*scale));
+  return {
+    temperature:number('sliderGradeTemperature'),tint:number('sliderGradeTint'),exposure:number('sliderGradeExposure'),contrast:number('sliderGradeContrast'),
+    highlights:number('sliderGradeHighlights'),shadows:number('sliderGradeShadows'),whites:number('sliderGradeWhites'),blacks:number('sliderGradeBlacks'),
+    vibrance:number('sliderGradeVibrance'),saturation:number('sliderGradeSaturation'),
+    hslHue:channelValues('hue',0.15),hslSaturation:channelValues('saturation',0.55),hslLuminance:channelValues('luminance',0.25)
+  };
+}
+function gradePostUniformSettings(){
+  const number=id=>Number($(id)?.value||0);
+  const wheel=(name)=>{
+    const intensity=number(`sliderGradeWheel${name[0].toUpperCase()+name.slice(1)}Intensity`)/100;
+    return new Float32Array([gradeWheelState[name].x,gradeWheelState[name].y,intensity]);
+  };
+  return {
+    texture:number('sliderGradeTexture')/100,clarity:number('sliderGradeClarity')/100,dehaze:number('sliderGradeDehaze')/100,
+    sharpness:number('sliderGradeSharpness')/100,sharpRadius:number('sliderGradeSharpRadius')/100,
+    noiseReduction:number('sliderGradeNoiseReduction')/100,noiseDetail:number('sliderGradeNoiseDetail')/100,
+    vignette:number('sliderGradeVignette')/100,vignetteMidpoint:number('sliderGradeVignetteMidpoint')/100,
+    vignetteRoundness:number('sliderGradeVignetteRoundness')/100,vignetteFeather:0.015+number('sliderGradeVignetteFeather')/100*0.60,
+    bwMix:new Float32Array(['Red','Green','Blue'].map(channel=>number(`sliderGradeBw${channel}`)/100)),
+    wheelShadows:wheel('shadows'),wheelMidtones:wheel('midtones'),wheelHighlights:wheel('highlights')
+  };
+}
+function updateGradeHistoryButtons(){
+  const undo=$('gradeUndoBtn'), redo=$('gradeRedoBtn');
+  if(undo) undo.disabled=gradeHistoryIndex<=0;
+  if(redo) redo.disabled=gradeHistoryIndex<0||gradeHistoryIndex>=gradeHistory.length-1;
+}
+function makeGradeSnapshot(){
+  return {
+    values:Object.fromEntries(gradeSliderList().map(slider=>[slider.id,String(slider.value)])),
+    curves:Object.fromEntries(gradeCurveChannels.map(channel=>[channel,gradeCurvePoints[channel].map(point=>({x:point.x,y:point.y}))])),
+    wheels:Object.fromEntries(gradeWheelNames.map(name=>[name,{x:gradeWheelState[name].x,y:gradeWheelState[name].y}])),
+    bwEnabled:gradeBlackWhiteEnabled,lutId:activeGradeLutId
+  };
+}
+function commitGradeSnapshot(){
+  if(gradeApplyingSnapshot) return false;
+  const snapshot=makeGradeSnapshot(), serialized=JSON.stringify(snapshot);
+  if(gradeHistoryIndex>=0&&JSON.stringify(gradeHistory[gradeHistoryIndex])===serialized){updateGradeHistoryButtons();return false;}
+  gradeHistory=gradeHistory.slice(0,gradeHistoryIndex+1); gradeHistory.push(snapshot);
+  if(gradeHistory.length>51) gradeHistory.splice(0,gradeHistory.length-51);
+  gradeHistoryIndex=gradeHistory.length-1; updateGradeHistoryButtons(); return true;
+}
+function applyGradeSnapshot(snapshot){
+  if(!snapshot)return;
+  gradeApplyingSnapshot=true;
+  try{
+    for(const slider of gradeSliderList()){
+      slider.value=snapshot.values?.[slider.id]??slider.dataset.gradeDefault??'0';
+      slider.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+    for(const channel of gradeCurveChannels){
+      const points=snapshot.curves?.[channel];
+      gradeCurvePoints[channel]=Array.isArray(points)&&points.length>=2?points.map(point=>({x:Number(point.x),y:Number(point.y)})):[{x:0,y:0},{x:1,y:1}];
+      updateGradeCurveTexture(channel);
+    }
+    for(const name of gradeWheelNames){
+      const point=snapshot.wheels?.[name]||{x:0,y:0};
+      gradeWheelState[name].x=Number.isFinite(Number(point.x))?Math.max(-1,Math.min(1,Number(point.x))):0;
+      gradeWheelState[name].y=Number.isFinite(Number(point.y))?Math.max(-1,Math.min(1,Number(point.y))):0;
+    }
+    gradeBlackWhiteEnabled=!!snapshot.bwEnabled;
+    setActiveGradeLut(snapshot.lutId||null,{warnOnMissing:!!snapshot.lutId});
+  }finally{ gradeApplyingSnapshot=false; }
+  syncGradeWheelControls();syncGradeBlackWhiteControl();syncGradeLutControls();
+  drawGradeCurve(); updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender();
+}
+function stepGradeHistory(direction){
+  const next=gradeHistoryIndex+direction;
+  if(next<0||next>=gradeHistory.length)return;
+  gradeHistoryIndex=next; applyGradeSnapshot(gradeHistory[next]); updateGradeHistoryButtons();
+}
+function gradeSectionHasChanged(sectionId){
+  const section=$(sectionId); if(!section)return false;
+  return [...section.querySelectorAll('input.gradeSlider')].some(slider=>Number(slider.value)!==Number(slider.dataset.gradeDefault||0));
+}
+function updateGradeIndicators(){
+  const basic=$('gradeBasicSection'), curve=$('gradeToneCurveSection'), hsl=$('gradeHslSection');
+  if(basic)basic.classList.toggle('is-dirty',gradeSectionHasChanged('gradeBasicSection'));
+  if(curve)curve.classList.toggle('is-dirty',gradeCurveChannels.some(channel=>!isGradeCurveIdentity(channel)));
+  if(hsl)hsl.classList.toggle('is-dirty',gradeSectionHasChanged('gradeHslSection'));
+  const wheelDirty=gradeSectionHasChanged('gradeColorWheelsSection')||gradeWheelNames.some(name=>Math.abs(gradeWheelState[name].x)>0.0001||Math.abs(gradeWheelState[name].y)>0.0001);
+  $('gradeColorWheelsSection')?.classList.toggle('is-dirty',wheelDirty);
+  $('gradeDetailSection')?.classList.toggle('is-dirty',gradeSectionHasChanged('gradeDetailSection'));
+  $('gradeVignetteSection')?.classList.toggle('is-dirty',gradeSectionHasChanged('gradeVignetteSection'));
+  $('gradeBlackWhiteSection')?.classList.toggle('is-dirty',gradeBlackWhiteEnabled||gradeSectionHasChanged('gradeBlackWhiteSection'));
+  $('gradeLutSection')?.classList.toggle('is-dirty',!!activeGradeLutId);
+}
+function invalidateGradePreview(){
+  lastPreviewRenderKey=null; floydLastKey=null;
+}
+function cancelGradeRender(){
+  if(gradeRenderFrame!==null){cancelAnimationFrame(gradeRenderFrame);gradeRenderFrame=null;}
+}
+function drawGradeFallback(error){
+  if(!gradePassWarningShown){console.warn('Color grading render failed; showing the unedited image instead.',error);gradePassWarningShown=true;}
+  try{
+    gl.bindFramebuffer(gl.FRAMEBUFFER,null); gl.viewport(0,0,canvas.width,canvas.height);
+    gl.useProgram(progPassthrough); bindQuad(progPassthrough);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sourceTexture);
+    gl.uniform1i(gl.getUniformLocation(progPassthrough,'u_image'),0); gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  }catch(fallbackError){console.warn('Unable to display the color grading fallback image.',fallbackError);}
+  lastPreviewRenderKey=null;
+}
+function scheduleGradeRender(){
+  invalidateGradePreview();
+  if(!hasContent||exportBusy||gradeRenderFrame!==null)return;
+  gradeRenderFrame=requestAnimationFrame(()=>{
+    gradeRenderFrame=null;
+    if(!hasContent||exportBusy)return;
+    try{render(isVideo&&videoEl?videoEl.currentTime*1000:performance.now());}
+    catch(error){drawGradeFallback(error);}
+  });
+}
+function onGradeSliderInput(){
+  if(gradeApplyingSnapshot)return;
+  activeGradePresetId=null;syncGradePresetSelection();
+  updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender();
+}
+function onGradeSliderCommit(){
+  if(gradeApplyingSnapshot)return;
+  commitGradeSnapshot(); updateGradeIndicators(); scheduleGradeRender();
+}
+function gradeCanCaptureKeyboard(event){
+  const target=event.target;
+  return !target?.closest?.('input,textarea,select,[contenteditable="true"],.numericEditor,[role="textbox"]');
+}
+function isGradeCompareKey(event){ return event.code==='Backslash'||event.key?.charCodeAt(0)===92; }
+function gradeBeforeCompare(active){
+  gradeBeforeActive=!!active;
+  showOriginal=gradeBeforeActive;
+  beforeLabel.textContent=showOriginal?'BEFORE — original':'AFTER'; beforeLabel.classList.toggle('show',showOriginal);syncGradeCompareControls();
+  $('gradeBeforeBtn')?.setAttribute('aria-pressed',String(showOriginal));
+  $('gradeBeforeBtn')?.classList.toggle('active',showOriginal);
+  $('holdCompareBtn')?.setAttribute('aria-pressed',String(showOriginal));
+  updateSplitDivider(); if(hasContent)render(performance.now());
+}
+function syncGradeCompareControls(){
+  gradeBeforeActive=!!showOriginal;
+  const gradeButton=$('gradeBeforeBtn');
+  if(gradeButton){gradeButton.setAttribute('aria-pressed',String(showOriginal));gradeButton.classList.toggle('active',!!showOriginal);gradeButton.textContent=showOriginal?'After':'Before';}
+}
+function selectGradeHslTab(tab){
+  if(!gradeHslTabs.includes(tab))return;
+  gradeHslTab=tab;
+  const rows=$('gradeHslRows'); if(rows) rows.dataset.activeTab=tab;
+  document.querySelectorAll('#colorGradePanel [data-hsl-tab]').forEach(button=>{
+    const active=button.dataset.hslTab===tab; button.setAttribute('aria-selected',String(active)); button.setAttribute('aria-pressed',String(active));
+  });
+  document.querySelectorAll('#gradeHslRows .gradeHslRow').forEach(row=>{
+    const slider=row.querySelector('input[data-hsl-control]'); row.hidden=slider?.dataset.hslControl!==tab;
+  });
+  const reset=$('gradeHslResetBtn'); if(reset) reset.textContent=`Reset ${tab}`;
+}
+function resetGradeHslTab(){
+  gradeApplyingSnapshot=true;
+  try{
+    document.querySelectorAll(`#gradeHslRows input[data-hsl-control="${gradeHslTab}"]`).forEach(slider=>{
+      slider.value=slider.dataset.gradeDefault||'0'; slider.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+  }finally{gradeApplyingSnapshot=false;}
+  updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); commitGradeSnapshot();
+}
+function resetAllColorGrade(skipConfirmation=false){
+  if(!skipConfirmation&&!window.confirm('Reset all color grading controls, tone curves, LUT, and HSL mixer settings?'))return;
+  gradeApplyingSnapshot=true;
+  try{
+    gradeSliderList().forEach(slider=>{slider.value=slider.dataset.gradeDefault||'0';slider.dispatchEvent(new Event('input',{bubbles:true}));});
+    gradeCurveChannels.forEach(channel=>{gradeCurvePoints[channel]=[{x:0,y:0},{x:1,y:1}];updateGradeCurveTexture(channel);});
+    gradeWheelNames.forEach(name=>{gradeWheelState[name].x=0;gradeWheelState[name].y=0;});
+    gradeBlackWhiteEnabled=false;setActiveGradeLut(null);
+  }finally{gradeApplyingSnapshot=false;}
+  syncGradeWheelControls();syncGradeBlackWhiteControl();syncGradeLutControls();activeGradePresetId=null;syncGradePresetSelection();
+  drawGradeCurve(); updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); commitGradeSnapshot(); showToast('Color grading reset');
+}
+function syncGradeWheelControls(){
+  document.querySelectorAll('#colorGradePanel [data-grade-wheel]').forEach(wheel=>{
+    const state=gradeWheelState[wheel.dataset.gradeWheel]; if(!state)return;
+    const handle=wheel.querySelector('.gradeWheelHandle');
+    if(handle){handle.style.left=`${50+state.x*44}%`;handle.style.top=`${50-state.y*44}%`;}
+    const radius=Math.min(100,Math.round(Math.hypot(state.x,state.y)*100));
+    wheel.setAttribute('aria-valuenow',String(radius));
+    wheel.setAttribute('aria-valuetext',radius?`${radius}% color strength`:'Neutral');
+  });
+}
+function gradeWheelPositionFromEvent(event,wheel){
+  const rect=wheel.getBoundingClientRect(),radius=Math.max(1,Math.min(rect.width,rect.height)*0.44);
+  let x=(event.clientX-(rect.left+rect.width/2))/radius;
+  let y=-(event.clientY-(rect.top+rect.height/2))/radius;
+  const distance=Math.hypot(x,y);
+  if(distance>0.96){x*=0.96/distance;y*=0.96/distance;}
+  return {x,y};
+}
+function setGradeWheelPoint(name,x,y){
+  if(exportBusy||mediaBusy||!gradeWheelState[name])return;
+  const distance=Math.hypot(x,y),limit=0.96;
+  if(distance>limit){x*=limit/distance;y*=limit/distance;}
+  const nextX=Math.max(-1,Math.min(1,x)),nextY=Math.max(-1,Math.min(1,y));
+  const changed=Math.hypot(gradeWheelState[name].x-nextX,gradeWheelState[name].y-nextY)>0.0001;
+  gradeWheelState[name].x=nextX;gradeWheelState[name].y=nextY;
+  if(changed){activeGradePresetId=null;syncGradePresetSelection();}
+  syncGradeWheelControls();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();
+}
+function finishGradeWheelInteraction(commit=true){
+  if(!gradeWheelDrag)return;
+  const wheel=gradeWheelDrag.wheel,changed=gradeWheelDrag.changed;
+  try{if(wheel.hasPointerCapture(gradeWheelDrag.pointerId))wheel.releasePointerCapture(gradeWheelDrag.pointerId);}catch(_){}
+  gradeWheelDrag=null;
+  if(commit&&changed)commitGradeSnapshot();
+}
+function resetGradeWheel(name){
+  if(exportBusy||mediaBusy||!gradeWheelState[name])return;
+  const intensity=$(`sliderGradeWheel${name[0].toUpperCase()+name.slice(1)}Intensity`);
+  const intensityDefault=Number(intensity?.dataset.gradeDefault||100);
+  const changed=Math.abs(gradeWheelState[name].x)>0.0001||Math.abs(gradeWheelState[name].y)>0.0001||Number(intensity?.value||intensityDefault)!==intensityDefault;
+  gradeWheelState[name].x=0;gradeWheelState[name].y=0;
+  if(intensity){intensity.value=String(intensityDefault);intensity.dispatchEvent(new Event('input',{bubbles:true}));}
+  if(changed){activeGradePresetId=null;syncGradePresetSelection();}
+  syncGradeWheelControls();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();
+  if(changed)commitGradeSnapshot();
+}
+function syncGradeBlackWhiteControl(){
+  const button=$('gradeBlackWhiteBtn'),mix=$('gradeBwMix');
+  if(button){button.setAttribute('aria-pressed',String(gradeBlackWhiteEnabled));button.classList.toggle('active',gradeBlackWhiteEnabled);}
+  if(mix)mix.hidden=!gradeBlackWhiteEnabled;
+}
+function toggleGradeBlackWhite(){
+  gradeBlackWhiteEnabled=!gradeBlackWhiteEnabled;
+  syncGradeBlackWhiteControl();if(gradeBlackWhiteEnabled)$('gradeBlackWhiteSection').open=true;
+  activeGradePresetId=null;syncGradePresetSelection();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();commitGradeSnapshot();
+}
+function setGradeLutStatus(message,state=''){
+  const status=$('gradeLutStatus');if(!status)return;
+  status.textContent=message;status.classList.toggle('is-error',state==='error');status.classList.toggle('is-ready',state==='ready');
+}
+function syncGradeLutControls(){
+  const record=activeGradeLutId?gradeLutRegistry.get(activeGradeLutId):null;
+  const clear=$('gradeLutClearBtn');if(clear)clear.disabled=!record;
+  if(record)setGradeLutStatus(`${record.name} · ${record.size}³ LUT active.`,'ready');
+  else setGradeLutStatus('Supports 17³, 33³, and 64³ 3D LUTs.');
+}
+function setActiveGradeLut(id,{warnOnMissing=false}={}){
+  if(id&&!gradeLutRegistry.has(id)){
+    activeGradeLutId=null;
+    if(warnOnMissing)console.warn(`Grading LUT ${id} is not available in this session.`);
+  }else activeGradeLutId=id||null;
+  syncGradeLutControls();updateGradeIndicators();invalidateGradePreview();
+}
+function createGradeLutTexture(record){
+  const texture=gl.createTexture();if(!texture)throw new Error('WebGL could not allocate a 3D LUT texture.');
+  for(let drain=0;drain<16;drain++){if(gl.getError()===gl.NO_ERROR)break;}
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,texture);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+  gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,record.size,record.size,record.size,0,gl.RGBA,gl.UNSIGNED_BYTE,record.data);
+  const error=gl.getError();gl.activeTexture(gl.TEXTURE0);
+  if(error!==gl.NO_ERROR){gl.deleteTexture(texture);throw new Error(`WebGL could not upload this ${record.size}³ LUT (error ${error}).`);}
+  return texture;
+}
+function gradeLutFingerprint(record){
+  let hash=2166136261;
+  const bytes=record.data;
+  for(let index=0;index<bytes.length;index+=Math.max(1,Math.floor(bytes.length/8192))){hash^=bytes[index];hash=Math.imul(hash,16777619);}
+  return `${record.size}:${hash>>>0}:${record.domainMin.join(',')}:${record.domainMax.join(',')}`;
+}
+function registerGradeLut(name,parsed){
+  const maximum=gl.getParameter(gl.MAX_3D_TEXTURE_SIZE);
+  if(parsed.size>maximum)throw new Error(`This device supports LUTs up to ${maximum}³; this file is ${parsed.size}³.`);
+  const record={name:String(name||'Imported LUT').slice(0,120),size:parsed.size,data:new Uint8Array(parsed.data),domainMin:Array.from(parsed.domainMin),domainMax:Array.from(parsed.domainMax),texture:null};
+  const fingerprint=gradeLutFingerprint(record);
+  for(const [id,existing] of gradeLutRegistry){if(existing.fingerprint===fingerprint){activeGradeLutId=id;return id;}}
+  record.fingerprint=fingerprint;record.texture=createGradeLutTexture(record);
+  const id=`grade-lut-${nextGradeLutId++}`;gradeLutRegistry.set(id,record);activeGradeLutId=id;return id;
+}
+function clearGradeLut(){
+  if(!activeGradeLutId)return;
+  activeGradeLutId=null;activeGradePresetId=null;syncGradePresetSelection();syncGradeLutControls();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();commitGradeSnapshot();
+  setGradeLutStatus('3D LUT removed.');
+}
+function bytesToBase64(bytes){
+  let binary='';const chunk=0x8000;
+  for(let offset=0;offset<bytes.length;offset+=chunk){binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(bytes.length,offset+chunk)));}
+  return btoa(binary);
+}
+function base64ToBytes(encoded,expectedLength){
+  if(typeof encoded!=='string'||encoded.length>2*1024*1024||!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded))throw new Error('Preset LUT data is not valid base64 or is too large.');
+  const binary=atob(encoded);if(binary.length!==expectedLength)throw new Error(`Preset LUT data length is invalid; expected ${expectedLength} bytes.`);
+  const bytes=new Uint8Array(binary.length);for(let index=0;index<binary.length;index++)bytes[index]=binary.charCodeAt(index);return bytes;
+}
+function serializeGradeSnapshot(snapshot){
+  const copy=JSON.parse(JSON.stringify(snapshot));
+  const record=copy.lutId?gradeLutRegistry.get(copy.lutId):null;
+  copy.lut=record?{name:record.name,size:record.size,domainMin:record.domainMin,domainMax:record.domainMax,data:bytesToBase64(record.data)}:null;
+  delete copy.lutId;return copy;
+}
+function normalizeGradeSnapshot(input,{portable=true}={}){
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('A grading preset must include a settings object.');
+  const values={};
+  for(const slider of gradeSliderList()){
+    const raw=input.values?.[slider.id];const value=raw===undefined?Number(slider.dataset.gradeDefault||0):Number(raw);
+    if(!Number.isFinite(value))throw new Error(`Preset value for ${slider.id} is not a finite number.`);
+    values[slider.id]=String(Math.max(Number(slider.min),Math.min(Number(slider.max),value)));
+  }
+  const curves={};
+  for(const channel of gradeCurveChannels){
+    const source=input.curves?.[channel];
+    if(!Array.isArray(source)||source.length<2){curves[channel]=[{x:0,y:0},{x:1,y:1}];continue;}
+    if(source.length>34)throw new Error(`Preset ${channel} curve contains too many points.`);
+    const points=source.map(point=>({x:Number(point?.x),y:Number(point?.y)}));
+    if(points.some(point=>!Number.isFinite(point.x)||!Number.isFinite(point.y)))throw new Error(`Preset ${channel} curve contains an invalid point.`);
+    points.sort((a,b)=>a.x-b.x);
+    const interior=points.filter(point=>point.x>0.0001&&point.x<0.9999).map(point=>({x:Math.max(0,Math.min(1,point.x)),y:Math.max(0,Math.min(1,point.y))}));
+    curves[channel]=[{x:0,y:Math.max(0,Math.min(1,points[0].y))},...interior,{x:1,y:Math.max(0,Math.min(1,points[points.length-1].y))}];
+  }
+  const wheels={};
+  for(const name of gradeWheelNames){const point=input.wheels?.[name]||{x:0,y:0};const x=Number(point.x),y=Number(point.y);if(!Number.isFinite(x)||!Number.isFinite(y))throw new Error(`Preset ${name} wheel position is invalid.`);wheels[name]={x:Math.max(-1,Math.min(1,x)),y:Math.max(-1,Math.min(1,y))};}
+  let lutId=typeof input.lutId==='string'&&gradeLutRegistry.has(input.lutId)?input.lutId:null;
+  if(input.lut&&typeof input.lut==='object'){
+    const size=Number(input.lut.size),expected=size*size*size*4;
+    if(![17,33,64].includes(size))throw new Error('Preset includes an unsupported LUT size.');
+    const data=base64ToBytes(input.lut.data,expected);
+    const domainMin=Array.from(input.lut.domainMin||[0,0,0],Number),domainMax=Array.from(input.lut.domainMax||[1,1,1],Number);
+    if(domainMin.length!==3||domainMax.length!==3||domainMin.some((v,i)=>!Number.isFinite(v)||!Number.isFinite(Math.fround(v))||!Number.isFinite(domainMax[i])||!Number.isFinite(Math.fround(domainMax[i]))||domainMax[i]<=v||!Number.isFinite(Math.fround(domainMax[i]-v))))throw new Error('Preset LUT domain is invalid.');
+    lutId=registerGradeLut(input.lut.name||'Preset LUT',{size,data,domainMin:new Float32Array(domainMin),domainMax:new Float32Array(domainMax)});
+  }else if(!portable&&input.lutId&&gradeLutRegistry.has(input.lutId))lutId=input.lutId;
+  return {values,curves,wheels,bwEnabled:!!input.bwEnabled,lutId};
+}
+function readGradeLutFile(file){
+  if(!file)return;
+  if(file.size>8*1024*1024){setGradeLutStatus('LUT file is too large (maximum 8 MB).','error');return;}
+  const reader=new FileReader();
+  reader.onerror=()=>setGradeLutStatus('Could not read this LUT file.','error');
+  reader.onload=()=>{
+    try{
+      if(!colorGrading?.parseCubeLut)throw new Error('The .cube LUT parser is unavailable.');
+      const parsed=colorGrading.parseCubeLut(String(reader.result||''));registerGradeLut(file.name,parsed);
+      syncGradeLutControls();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();commitGradeSnapshot();
+      activeGradePresetId=null;syncGradePresetSelection();setGradeLutStatus(`${file.name} · ${parsed.size}³ LUT active.`,'ready');
+    }catch(error){console.warn('3D LUT import failed; the current grade was kept.',error);setGradeLutStatus(`Invalid LUT: ${error.message} Current settings were kept.`,'error');}
+  };
+  reader.readAsText(file);
+}
+function makeBuiltinGradePreset(id,name,category,values={},wheels={},bwEnabled=false){
+  const positions={};
+  for(const channel of gradeWheelNames){
+    const point=wheels[channel]||{x:0,y:0,amount:0};
+    positions[channel]={x:Number(point.x)||0,y:Number(point.y)||0};
+    if(Number(point.amount))values[`sliderGradeWheel${channel[0].toUpperCase()+channel.slice(1)}Intensity`]=Number(point.amount);
+  }
+  return {id,name,category,snapshot:{values:{...values},wheels:positions,bwEnabled:!!bwEnabled,lutId:null}};
+}
+const BUILTIN_GRADE_PRESETS=[
+  makeBuiltinGradePreset('cine-teal-ember','Teal & Ember','Cinematic',{
+    sliderGradeExposure:0.05,sliderGradeContrast:17,sliderGradeHighlights:-20,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeSaturation:-5,sliderGradeVibrance:9,sliderGradeVignette:13
+  },{shadows:{x:-0.52,y:0.40,amount:18},highlights:{x:0.72,y:0.42,amount:11}}),
+  makeBuiltinGradePreset('cine-night-signal','Night Signal','Cinematic',{
+    sliderGradeExposure:-0.28,sliderGradeContrast:19,sliderGradeHighlights:-18,sliderGradeShadows:-4,sliderGradeTemperature:-12,sliderGradeSaturation:-9,sliderGradeDehaze:8,sliderGradeVignette:18
+  },{shadows:{x:-0.48,y:-0.68,amount:13},midtones:{x:-0.18,y:-0.54,amount:7}}),
+  makeBuiltinGradePreset('cine-dust-west','Dusty Western','Cinematic',{
+    sliderGradeExposure:0.08,sliderGradeContrast:11,sliderGradeHighlights:-13,sliderGradeShadows:16,sliderGradeTemperature:17,sliderGradeSaturation:-15,sliderGradeTexture:8,sliderGradeVignette:17
+  },{shadows:{x:0.18,y:0.22,amount:8},highlights:{x:0.82,y:0.38,amount:16}}),
+  makeBuiltinGradePreset('cine-neon-fade','Neon Fade','Cinematic',{
+    sliderGradeExposure:-0.06,sliderGradeContrast:8,sliderGradeHighlights:-25,sliderGradeShadows:21,sliderGradeSaturation:8,sliderGradeVibrance:13,sliderGradeClarity:8,sliderGradeVignette:9
+  },{shadows:{x:-0.32,y:-0.62,amount:14},highlights:{x:0.66,y:-0.35,amount:9}}),
+  makeBuiltinGradePreset('portrait-soft-linen','Soft Linen','Portrait',{
+    sliderGradeExposure:0.18,sliderGradeContrast:-8,sliderGradeHighlights:-16,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeTexture:-22,sliderGradeClarity:-9,sliderGradeSaturation:-4,sliderGradeVignette:4
+  },{highlights:{x:0.82,y:0.28,amount:8}}),
+  makeBuiltinGradePreset('portrait-golden-hour','Golden Hour','Portrait',{
+    sliderGradeExposure:0.14,sliderGradeContrast:4,sliderGradeHighlights:-14,sliderGradeShadows:9,sliderGradeTemperature:13,sliderGradeTint:3,sliderGradeVibrance:10,sliderGradeTexture:-12,sliderGradeVignette:7
+  },{midtones:{x:0.86,y:0.32,amount:9},highlights:{x:0.90,y:0.38,amount:9}}),
+  makeBuiltinGradePreset('portrait-clean-studio','Clean Studio','Portrait',{
+    sliderGradeExposure:0.12,sliderGradeContrast:3,sliderGradeHighlights:-8,sliderGradeWhites:6,sliderGradeTexture:-10,sliderGradeClarity:-4,sliderGradeVibrance:5,sliderGradeVignette:-3
+  }),
+  makeBuiltinGradePreset('portrait-editorial-warm','Editorial Warm','Portrait',{
+    sliderGradeExposure:0.03,sliderGradeContrast:12,sliderGradeHighlights:-20,sliderGradeShadows:7,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeTexture:-8,sliderGradeVignette:11
+  },{shadows:{x:0.25,y:0.14,amount:5},highlights:{x:0.72,y:0.32,amount:7}}),
+  makeBuiltinGradePreset('bw-classic-mono','Classic Mono','Black & White',{
+    sliderGradeContrast:12,sliderGradeHighlights:-10,sliderGradeShadows:4,sliderGradeBwRed:24,sliderGradeBwGreen:69,sliderGradeBwBlue:7,sliderGradeVignette:8
+  },{},true),
+  makeBuiltinGradePreset('bw-silver-gelatin','Silver Gelatin','Black & White',{
+    sliderGradeExposure:-0.05,sliderGradeContrast:21,sliderGradeHighlights:-18,sliderGradeBlacks:-8,sliderGradeBwRed:30,sliderGradeBwGreen:62,sliderGradeBwBlue:8,sliderGradeTexture:5,sliderGradeVignette:14
+  },{},true),
+  makeBuiltinGradePreset('bw-warm-matte','Warm Matte Mono','Black & White',{
+    sliderGradeContrast:-7,sliderGradeHighlights:-12,sliderGradeShadows:13,sliderGradeBlacks:12,sliderGradeBwRed:34,sliderGradeBwGreen:61,sliderGradeBwBlue:5,sliderGradeVignette:5
+  },{highlights:{x:0.85,y:0.36,amount:5}},true),
+  makeBuiltinGradePreset('bw-cool-platinum','Cool Platinum','Black & White',{
+    sliderGradeExposure:0.08,sliderGradeContrast:9,sliderGradeHighlights:-17,sliderGradeShadows:8,sliderGradeBwRed:18,sliderGradeBwGreen:67,sliderGradeBwBlue:15,sliderGradeVignette:6
+  },{shadows:{x:-0.46,y:-0.56,amount:4}},true),
+  makeBuiltinGradePreset('film-portra-400','Portra 400','Film',{
+    sliderGradeExposure:0.12,sliderGradeContrast:-5,sliderGradeHighlights:-18,sliderGradeShadows:10,sliderGradeTemperature:6,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeVibrance:6,sliderGradeTexture:3,sliderGradeVignette:4
+  },{highlights:{x:0.8,y:0.32,amount:5}}),
+  makeBuiltinGradePreset('film-gold-200','Gold 200','Film',{
+    sliderGradeExposure:0.1,sliderGradeContrast:6,sliderGradeHighlights:-10,sliderGradeShadows:6,sliderGradeTemperature:12,sliderGradeSaturation:6,sliderGradeVibrance:7,sliderGradeTexture:5,sliderGradeVignette:6
+  },{midtones:{x:0.88,y:0.28,amount:7}}),
+  makeBuiltinGradePreset('film-ektar-pop','Ektar Pop','Film',{
+    sliderGradeExposure:0.02,sliderGradeContrast:17,sliderGradeHighlights:-12,sliderGradeShadows:5,sliderGradeSaturation:12,sliderGradeVibrance:17,sliderGradeClarity:7,sliderGradeTexture:5,sliderGradeVignette:5
+  },{shadows:{x:-0.38,y:0.52,amount:5}}),
+  makeBuiltinGradePreset('film-soft-chrome','Soft Chrome','Film',{
+    sliderGradeExposure:0.06,sliderGradeContrast:-3,sliderGradeHighlights:-19,sliderGradeShadows:11,sliderGradeTemperature:-3,sliderGradeSaturation:-12,sliderGradeVibrance:-3,sliderGradeTexture:4,sliderGradeVignette:3
+  },{shadows:{x:-0.25,y:0.36,amount:4}}),
+  makeBuiltinGradePreset('moody-forest-night','Forest Night','Moody',{
+    sliderGradeExposure:-0.25,sliderGradeContrast:16,sliderGradeHighlights:-19,sliderGradeShadows:-8,sliderGradeTemperature:-6,sliderGradeSaturation:-12,sliderGradeDehaze:12,sliderGradeVignette:19
+  },{shadows:{x:-0.48,y:0.48,amount:12},midtones:{x:-0.34,y:0.19,amount:7}}),
+  makeBuiltinGradePreset('moody-slate-rain','Slate Rain','Moody',{
+    sliderGradeExposure:-0.15,sliderGradeContrast:14,sliderGradeHighlights:-22,sliderGradeShadows:4,sliderGradeTemperature:-13,sliderGradeSaturation:-17,sliderGradeClarity:7,sliderGradeVignette:15
+  },{shadows:{x:-0.55,y:-0.47,amount:12},highlights:{x:-0.25,y:-0.44,amount:5}}),
+  makeBuiltinGradePreset('moody-desert-dusk','Desert Dusk','Moody',{
+    sliderGradeExposure:-0.1,sliderGradeContrast:11,sliderGradeHighlights:-15,sliderGradeShadows:8,sliderGradeTemperature:14,sliderGradeTint:4,sliderGradeSaturation:-11,sliderGradeVignette:17
+  },{shadows:{x:0.14,y:0.28,amount:8},highlights:{x:0.84,y:0.25,amount:12}}),
+  makeBuiltinGradePreset('moody-deep-olive','Deep Olive','Moody',{
+    sliderGradeExposure:-0.22,sliderGradeContrast:20,sliderGradeHighlights:-16,sliderGradeShadows:-2,sliderGradeTemperature:3,sliderGradeTint:-5,sliderGradeSaturation:-15,sliderGradeDehaze:9,sliderGradeVignette:18
+  },{shadows:{x:0.18,y:0.35,amount:13},midtones:{x:0.29,y:0.22,amount:8}}),
+  makeBuiltinGradePreset('airy-cloudlight','Cloudlight','Bright & Airy',{
+    sliderGradeExposure:0.38,sliderGradeContrast:-11,sliderGradeHighlights:-22,sliderGradeShadows:17,sliderGradeWhites:8,sliderGradeBlacks:8,sliderGradeTemperature:3,sliderGradeSaturation:-8,sliderGradeVignette:-5
+  }),
+  makeBuiltinGradePreset('airy-creamy-daylight','Creamy Daylight','Bright & Airy',{
+    sliderGradeExposure:0.27,sliderGradeContrast:-6,sliderGradeHighlights:-18,sliderGradeShadows:14,sliderGradeTemperature:7,sliderGradeTexture:-10,sliderGradeClarity:-5,sliderGradeVibrance:7,sliderGradeVignette:-3
+  },{highlights:{x:0.87,y:0.29,amount:5}}),
+  makeBuiltinGradePreset('airy-fresh-pastel','Fresh Pastel','Bright & Airy',{
+    sliderGradeExposure:0.31,sliderGradeContrast:-13,sliderGradeHighlights:-23,sliderGradeShadows:19,sliderGradeSaturation:-13,sliderGradeVibrance:8,sliderGradeTexture:-8,sliderGradeVignette:-4
+  },{midtones:{x:-0.14,y:0.26,amount:4}}),
+  makeBuiltinGradePreset('airy-sunlit-room','Sunlit Room','Bright & Airy',{
+    sliderGradeExposure:0.24,sliderGradeContrast:-4,sliderGradeHighlights:-15,sliderGradeShadows:10,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-3,sliderGradeTexture:-5,sliderGradeVignette:-2
+  },{highlights:{x:0.82,y:0.34,amount:7}})
+];
+function getAllGradePresets(){return [...BUILTIN_GRADE_PRESETS,...gradeUserPresets];}
+function gradePresetCssFilter(preset){
+  const values=preset.snapshot?.values||{},number=id=>Number(values[id]||0);
+  const brightness=Math.max(0.65,Math.min(1.5,Math.pow(2,number('sliderGradeExposure')/5)));
+  const contrast=Math.max(0.68,Math.min(1.45,1+number('sliderGradeContrast')*0.003));
+  const saturation=Math.max(0,Math.min(2,1+(number('sliderGradeSaturation')+number('sliderGradeVibrance')*0.45)*0.005));
+  const temperature=number('sliderGradeTemperature');
+  return `${preset.snapshot?.bwEnabled?'grayscale(1) ':''}brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) ${Math.abs(temperature)>10?`sepia(${Math.abs(temperature)/400}) hue-rotate(${temperature<0?210:345}deg)`:''}`;
+}
+function createGradePresetThumbnail(preset){
+  const sourceKey=`${currentPhoto?.id||'empty'}:${photoTextureRevision}:${hasContent?'photo':'placeholder'}`;
+  const key=`${preset.id}|${sourceKey}`;
+  if(gradePresetThumbnailCache.has(key))return gradePresetThumbnailCache.get(key);
+  const thumb=document.createElement('canvas');thumb.width=192;thumb.height=124;
+  const context=thumb.getContext('2d');context.save();context.filter=gradePresetCssFilter(preset);
+  if(hasContent&&canvas.width&&canvas.height){context.drawImage(canvas,0,0,thumb.width,thumb.height);}
+  else{
+    const gradient=context.createLinearGradient(0,0,thumb.width,thumb.height);gradient.addColorStop(0,'#dfc9a7');gradient.addColorStop(.48,'#526b78');gradient.addColorStop(1,'#21252c');
+    context.fillStyle=gradient;context.fillRect(0,0,thumb.width,thumb.height);
+    context.fillStyle='rgba(245,216,165,.85)';context.beginPath();context.arc(143,35,19,0,Math.PI*2);context.fill();
+    context.fillStyle='rgba(25,38,43,.58)';context.beginPath();context.moveTo(0,88);context.lineTo(48,53);context.lineTo(88,86);context.lineTo(132,47);context.lineTo(192,94);context.lineTo(192,124);context.lineTo(0,124);context.closePath();context.fill();
+    context.fillStyle='rgba(16,25,31,.55)';context.fillRect(0,99,192,25);
+  }
+  context.restore();
+  const url=thumb.toDataURL('image/jpeg',0.76);gradePresetThumbnailCache.set(key,url);
+  while(gradePresetThumbnailCache.size>144)gradePresetThumbnailCache.delete(gradePresetThumbnailCache.keys().next().value);
+  return url;
+}
+function syncGradePresetSelection(){
+  document.querySelectorAll('#gradePresetGrid .gradePresetCard').forEach(card=>card.classList.toggle('is-selected',card.dataset.presetId===activeGradePresetId));
+}
+function setGradePresetFilter(filter){
+  gradePresetFilter=filter;
+  document.querySelectorAll('#gradePresetFilters [data-preset-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.presetFilter===filter)));
+  renderGradePresetCards();
+}
+function renderGradePresetCards(){
+  const grid=$('gradePresetGrid');if(!grid)return;
+  const presets=getAllGradePresets().filter(preset=>gradePresetFilter==='all'||preset.category===gradePresetFilter);
+  grid.replaceChildren();
+  if(!presets.length){const empty=document.createElement('p');empty.className='gradePresetStatus';empty.textContent='No saved looks here yet.';grid.append(empty);return;}
+  for(const preset of presets){
+    const card=document.createElement('article');card.className='gradePresetCard';card.dataset.presetId=preset.id;
+    const select=document.createElement('button');select.type='button';select.className='gradePresetSelect';select.title=`Apply ${preset.name}`;select.setAttribute('aria-label',`Apply preset ${preset.name}, ${preset.category}`);
+    const image=document.createElement('img');image.src=createGradePresetThumbnail(preset);image.alt='';image.width=192;image.height=124;image.loading='lazy';
+    const title=document.createElement('span');title.className='gradePresetTitle';title.textContent=preset.name;
+    const category=document.createElement('span');category.className='gradePresetCategory';category.textContent=preset.category;
+    select.append(image,title,category);select.addEventListener('click',()=>applyGradePreset(preset));card.append(select);
+    if(preset.category==='My Looks'){
+      const remove=document.createElement('button');remove.type='button';remove.className='gradePresetDelete';remove.textContent='×';remove.title=`Delete ${preset.name}`;remove.setAttribute('aria-label',`Delete preset ${preset.name}`);
+      remove.addEventListener('click',event=>{event.stopPropagation();deleteGradeUserPreset(preset.id);});card.append(remove);
+    }
+    if(preset.id===activeGradePresetId)card.classList.add('is-selected');grid.append(card);
+  }
+}
+function setGradePresetStatus(message,error=false){
+  const status=$('gradePresetStatus');if(status){status.textContent=message;status.classList.toggle('is-error',error);}
+}
+function persistGradeUserPresets(){
+  try{
+    const payload={format:'film-lab-color-presets',version:1,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
+    localStorage.setItem(GRADE_PRESET_STORAGE_KEY,JSON.stringify(payload));return true;
+  }catch(error){console.warn('Could not save grading presets to local storage.',error);setGradePresetStatus('Could not save: browser storage is full or unavailable.',true);return false;}
+}
+function hydrateGradeUserPresets(payload){
+  const list=Array.isArray(payload)?payload:payload?.presets;
+  if(!Array.isArray(list))throw new Error('JSON must contain a presets array.');
+  if(list.length>100)throw new Error('A maximum of 100 presets can be imported at once.');
+  const previousLut=activeGradeLutId, imported=[];
+  try{
+    for(const entry of list){
+      const name=String(entry?.name||'').trim().slice(0,40);if(!name)throw new Error('Every preset needs a name.');
+      const snapshot=normalizeGradeSnapshot(entry.snapshot||entry.settings,{portable:true});
+      imported.push({id:`user-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,name,category:'My Looks',snapshot});
+    }
+  }finally{setActiveGradeLut(previousLut);}
+  return imported;
+}
+function loadGradeUserPresets(){
+  try{
+    const raw=localStorage.getItem(GRADE_PRESET_STORAGE_KEY);if(!raw)return;
+    if(raw.length>12*1024*1024)throw new Error('Saved preset data is larger than 12 MB.');
+    gradeUserPresets=hydrateGradeUserPresets(JSON.parse(raw));
+    setGradePresetStatus(`${BUILTIN_GRADE_PRESETS.length} studio presets · ${gradeUserPresets.length} saved on this device.`);
+  }catch(error){console.warn('Saved grading presets could not be loaded.',error);gradeUserPresets=[];setGradePresetStatus(`Saved presets could not be loaded: ${error.message}`,true);}
+}
+function applyGradePreset(preset){
+  try{
+    const snapshot=normalizeGradeSnapshot(preset.snapshot,{portable:false});
+    applyGradeSnapshot(snapshot);activeGradePresetId=preset.id;syncGradePresetSelection();commitGradeSnapshot();
+    if(snapshot.bwEnabled)$('gradeBlackWhiteSection').open=true;
+    showToast(`${preset.name} applied`);
+  }catch(error){console.warn('Could not apply grading preset.',error);showToast(`Preset could not be applied: ${error.message}`,4500);}
+}
+function saveGradeUserPreset(){
+  const input=$('gradePresetName'),name=String(input.value||'').trim();
+  if(!name){input.focus();setGradePresetStatus('Enter a name for this look.',true);return;}
+  if(gradeUserPresets.length>=100){setGradePresetStatus('You have reached the 100 saved-look limit.',true);return;}
+  const preset={id:`user-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,name:name.slice(0,40),category:'My Looks',snapshot:makeGradeSnapshot()};
+  gradeUserPresets=[...gradeUserPresets,preset];
+  if(!persistGradeUserPresets()){gradeUserPresets.pop();return;}
+  input.value='';activeGradePresetId=preset.id;gradePresetFilter='My Looks';
+  document.querySelectorAll('#gradePresetFilters [data-preset-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.presetFilter===gradePresetFilter)));
+  renderGradePresetCards();setGradePresetStatus(`${gradeUserPresets.length} saved look${gradeUserPresets.length===1?'':'s'} stored on this device.`);showToast(`Saved “${preset.name}”`);
+}
+function deleteGradeUserPreset(id){
+  const preset=gradeUserPresets.find(item=>item.id===id);if(!preset)return;
+  if(!window.confirm(`Delete the saved look “${preset.name}”?`))return;
+  const previous=gradeUserPresets;gradeUserPresets=gradeUserPresets.filter(item=>item.id!==id);
+  if(!persistGradeUserPresets()){gradeUserPresets=previous;return;}
+  if(activeGradePresetId===id)activeGradePresetId=null;
+  renderGradePresetCards();setGradePresetStatus(`${gradeUserPresets.length} saved look${gradeUserPresets.length===1?'':'s'} stored on this device.`);
+}
+function exportGradeUserPresets(){
+  try{
+    const payload={format:'film-lab-color-presets',version:1,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='film-lab-presets.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    setGradePresetStatus(`Exported ${gradeUserPresets.length} user preset${gradeUserPresets.length===1?'':'s'} as JSON.`);
+  }catch(error){console.warn('Could not export grading presets.',error);setGradePresetStatus(`Export failed: ${error.message}`,true);}
+}
+function importGradePresetFile(file){
+  if(!file)return;
+  if(file.size>10*1024*1024){setGradePresetStatus('Preset JSON is too large (maximum 10 MB).',true);return;}
+  const reader=new FileReader();reader.onerror=()=>setGradePresetStatus('Could not read that JSON file.',true);
+  reader.onload=()=>{
+    try{
+      const imported=hydrateGradeUserPresets(JSON.parse(String(reader.result||'')));
+      if(gradeUserPresets.length+imported.length>100)throw new Error('Import would exceed the 100 saved-look limit.');
+      const previous=gradeUserPresets;gradeUserPresets=[...gradeUserPresets,...imported];
+      if(!persistGradeUserPresets()){gradeUserPresets=previous;return;}
+      gradePresetFilter='My Looks';document.querySelectorAll('#gradePresetFilters [data-preset-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.presetFilter===gradePresetFilter)));
+      renderGradePresetCards();setGradePresetStatus(`Imported ${imported.length} preset${imported.length===1?'':'s'} from JSON.`);
+    }catch(error){console.warn('Grading preset JSON import failed.',error);setGradePresetStatus(`Invalid preset JSON: ${error.message}`,true);}
+  };
+  reader.readAsText(file);
+}
+async function copyGradeSettings(){
+  try{
+    const text=JSON.stringify({format:'film-lab-grade-settings',version:1,snapshot:serializeGradeSnapshot(makeGradeSnapshot())});
+    let copied=false;
+    try{localStorage.setItem(GRADE_COPY_STORAGE_KEY,text);copied=true;}catch(error){console.warn('Could not keep a local copy of grading settings.',error);}
+    if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);copied=true;}
+    if(!copied)throw new Error('Neither clipboard nor local storage is available.');
+    showToast('Grading settings copied');
+  }catch(error){console.warn('Could not copy grading settings.',error);showToast('Clipboard access was unavailable; settings are still available in this tab when storage permits.');}
+}
+async function pasteGradeSettings(){
+  if(exportBusy||mediaBusy){showToast('Wait for the current operation to finish');return;}
+  let text='';
+  try{if(navigator.clipboard?.readText)text=await navigator.clipboard.readText();}catch(error){console.warn('Clipboard read was blocked; using the saved grading copy.',error);}
+  if(exportBusy||mediaBusy){showToast('Wait for the current operation to finish');return;}
+  if(!text){try{text=localStorage.getItem(GRADE_COPY_STORAGE_KEY)||'';}catch(_){}}
+  if(!text){showToast('No copied grading settings found');return;}
+  try{
+    const parsed=JSON.parse(text);if(parsed?.format!=='film-lab-grade-settings'||parsed.version!==1)throw new Error('Clipboard data is not a Film Lab grading copy.');
+    const snapshot=normalizeGradeSnapshot(parsed.snapshot,{portable:true});applyGradeSnapshot(snapshot);activeGradePresetId=null;syncGradePresetSelection();commitGradeSnapshot();
+    if(snapshot.bwEnabled)$('gradeBlackWhiteSection').open=true;
+    showToast('Grading settings pasted');
+  }catch(error){console.warn('Could not paste grading settings.',error);showToast(`Could not paste settings: ${error.message}`,4500);}
+}
+function readGradePreviewPixels(){
+  if(!hasContent||!canvas.width||!canvas.height)return null;
+  render(isVideo&&videoEl?videoEl.currentTime*1000:performance.now());
+  const scale=Math.min(1,256/canvas.width,256/canvas.height);
+  const width=Math.max(1,Math.round(canvas.width*scale)),height=Math.max(1,Math.round(canvas.height*scale));
+  if(!gradeReadbackCanvas){gradeReadbackCanvas=document.createElement('canvas');gradeReadbackContext=gradeReadbackCanvas.getContext('2d',{willReadFrequently:true});}
+  if(gradeReadbackCanvas.width!==width||gradeReadbackCanvas.height!==height){gradeReadbackCanvas.width=width;gradeReadbackCanvas.height=height;}
+  gradeReadbackContext.clearRect(0,0,width,height); gradeReadbackContext.drawImage(canvas,0,0,width,height);
+  return gradeReadbackContext.getImageData(0,0,width,height);
+}
+function drawGradeHistogram(pixels){
+  const histogramCanvas=$('gradeHistogram'); if(!histogramCanvas)return;
+  const context=gradeHistogramContext|| (gradeHistogramContext=histogramCanvas.getContext('2d'));
+  const width=histogramCanvas.width,height=histogramCanvas.height,top=13,bottom=height-5,plotHeight=bottom-top;
+  context.clearRect(0,0,width,height); context.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#111'; context.fillRect(0,0,width,height);
+  context.strokeStyle='rgba(150,150,150,.15)';context.lineWidth=1;
+  for(let division=1;division<4;division++){const x=Math.round(width*division/4)+.5;context.beginPath();context.moveTo(x,top);context.lineTo(x,bottom);context.stroke();}
+  context.beginPath();context.moveTo(0,bottom+.5);context.lineTo(width,bottom+.5);context.stroke();
+  if(!pixels?.length)return;
+  const channels=[new Uint32Array(256),new Uint32Array(256),new Uint32Array(256),new Uint32Array(256)];
+  let maximum=0;
+  for(let offset=0;offset+3<pixels.length;offset+=4){
+    if(pixels[offset+3]===0)continue;
+    const red=pixels[offset],green=pixels[offset+1],blue=pixels[offset+2];
+    channels[0][red]++;channels[1][green]++;channels[2][blue]++;
+    channels[3][Math.round(.2126*red+.7152*green+.0722*blue)]++;
+  }
+  channels.forEach(channel=>channel.forEach(value=>{if(value>maximum)maximum=value;}));
+  if(!maximum)return;
+  const palette=[['rgba(228,95,95,.25)','#e45f5f'],['rgba(100,184,120,.24)','#64b878'],['rgba(103,152,239,.25)','#6798ef'],['rgba(245,245,245,.12)',getComputedStyle(document.documentElement).getPropertyValue('--text').trim()||'#eeeeee']];
+  const scaleCount=value=>Math.log1p(value)/Math.log1p(maximum);
+  channels.forEach((channel,index)=>{
+    const [fill,stroke]=palette[index]; context.beginPath();context.moveTo(0,bottom);
+    for(let x=0;x<256;x++){const y=bottom-scaleCount(channel[x])*plotHeight;context.lineTo(x,y);}
+    context.lineTo(width-1,bottom);context.closePath();context.fillStyle=fill;context.fill();
+    context.beginPath();for(let x=0;x<256;x++){const y=bottom-scaleCount(channel[x])*plotHeight;if(x===0)context.moveTo(x,y);else context.lineTo(x,y);}
+    context.strokeStyle=stroke;context.lineWidth=index===3?1.2:.8;context.stroke();
+  });
+}
+function scheduleGradeHistogram(){
+  if(exportBusy||!$('colorGradePanel')?.classList.contains('active'))return;
+  if(gradeHistogramTimer!==null)return;
+  const wait=Math.max(0,100-(performance.now()-gradeHistogramLastAt));
+  gradeHistogramTimer=setTimeout(()=>{
+    gradeHistogramTimer=null;gradeHistogramLastAt=performance.now();
+    if(exportBusy||!$('colorGradePanel')?.classList.contains('active'))return;
+    try{drawGradeHistogram(readGradePreviewPixels()?.data||null);}
+    catch(error){console.warn('Live color grading histogram could not be updated.',error);drawGradeHistogram(null);}
+  },wait);
+}
+function runGradeAuto(){
+  if(!hasContent){showToast('Upload a photo to use Auto tone');return;}
+  if(!colorGrading?.autoAdjustFromPixels){console.warn('Histogram-based Auto tone is unavailable.');return;}
+  try{
+    const pixels=readGradePreviewPixels(); if(!pixels) return;
+    const adjustments=colorGrading.autoAdjustFromPixels(pixels);
+    gradeApplyingSnapshot=true;
+    try{
+      for(const [name,value] of Object.entries(adjustments)){
+        const slider=$(`sliderGrade${name}`); if(!slider)continue;
+        slider.value=String(value); slider.dispatchEvent(new Event('input',{bubbles:true}));
+      }
+    }finally{gradeApplyingSnapshot=false;}
+    updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); commitGradeSnapshot(); showToast('Auto tone applied');
+  }catch(error){console.warn('Color grading Auto tone failed; existing settings were kept.',error);showToast('Auto tone could not read this image');}
+}
+function drawGradeCurve(){
+  const curveCanvas=$('gradeCurveCanvas'); if(!curveCanvas)return;
+  const context=gradeCurveCanvasContext||(gradeCurveCanvasContext=curveCanvas.getContext('2d'));
+  const width=curveCanvas.width,height=curveCanvas.height;
+  context.clearRect(0,0,width,height);context.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#111';context.fillRect(0,0,width,height);
+  context.lineWidth=1;context.strokeStyle='rgba(150,150,150,.2)';
+  for(let step=1;step<4;step++){const x=Math.round(width*step/4)+.5,y=Math.round(height*step/4)+.5;context.beginPath();context.moveTo(x,0);context.lineTo(x,height);context.stroke();context.beginPath();context.moveTo(0,y);context.lineTo(width,y);context.stroke();}
+  context.strokeStyle='rgba(190,190,190,.42)';context.setLineDash([3,4]);context.beginPath();context.moveTo(0,height);context.lineTo(width,0);context.stroke();context.setLineDash([]);
+  const themeText=getComputedStyle(document.documentElement).getPropertyValue('--text').trim()||'#f0f0f0';
+  const themeBg=getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#111';
+  const samples=gradeCurveSamples[gradeCurveChannel]||new Uint8Array(256),colors={master:themeText,red:'#ef5a5a',green:'#62c579',blue:'#6b9df0'};
+  context.strokeStyle=colors[gradeCurveChannel]||themeText;context.lineWidth=2;context.beginPath();
+  for(let index=0;index<256;index++){const x=index,y=255-samples[index];if(index===0)context.moveTo(x,y);else context.lineTo(x,y);}context.stroke();
+  const points=gradeCurvePoints[gradeCurveChannel]||[];
+  points.forEach((point,index)=>{
+    const x=point.x*255,y=(1-point.y)*255;context.beginPath();context.arc(x,y,index===0||index===points.length-1?4:4.5,0,Math.PI*2);
+    context.fillStyle=colors[gradeCurveChannel]||themeText;context.fill();context.strokeStyle=themeBg;context.lineWidth=1.3;context.stroke();
+  });
+}
+function changeGradeCurveChannel(channel){
+  if(!gradeCurveChannels.includes(channel))return;
+  gradeCurveChannel=channel;
+  document.querySelectorAll('#colorGradePanel [data-curve-channel]').forEach(button=>{
+    const active=button.dataset.curveChannel===channel;button.setAttribute('aria-selected',String(active));button.setAttribute('aria-pressed',String(active));
+  });
+  drawGradeCurve();
+}
+function gradeCurvePosition(event){
+  const rect=$('gradeCurveCanvas').getBoundingClientRect();
+  return {x:Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width))),y:Math.max(0,Math.min(1,1-(event.clientY-rect.top)/Math.max(1,rect.height))),width:rect.width,height:rect.height};
+}
+function findGradeCurvePoint(position){
+  const points=gradeCurvePoints[gradeCurveChannel];let best=-1,bestDistance=12;
+  points.forEach((point,index)=>{const dx=(point.x-position.x)*position.width,dy=(point.y-position.y)*position.height,distance=Math.hypot(dx,dy);if(distance<bestDistance){best=index;bestDistance=distance;}});
+  return best;
+}
+function changedGradeCurve(){
+  updateGradeCurveTexture(gradeCurveChannel);drawGradeCurve();updateGradeIndicators();invalidateGradePreview();scheduleGradeRender();
+}
+function removeGradeCurvePoint(index){
+  const points=gradeCurvePoints[gradeCurveChannel];if(index<=0||index>=points.length-1)return false;
+  points.splice(index,1);changedGradeCurve();return true;
+}
+function resetGradeCurve(){
+  const current=gradeCurvePoints[gradeCurveChannel];
+  if(current.length===2&&Math.abs(current[0].x)<1e-6&&Math.abs(current[0].y)<1e-6&&Math.abs(current[1].x-1)<1e-6&&Math.abs(current[1].y-1)<1e-6)return;
+  gradeCurvePoints[gradeCurveChannel]=[{x:0,y:0},{x:1,y:1}];changedGradeCurve();commitGradeSnapshot();
+}
+function initializeGradeExtendedControls(){
+  loadGradeUserPresets();
+  syncGradeWheelControls();syncGradeBlackWhiteControl();syncGradeLutControls();
+  $('gradeBlackWhiteBtn').addEventListener('click',toggleGradeBlackWhite);
+  $('gradeCopyBtn').addEventListener('click',copyGradeSettings);$('gradePasteBtn').addEventListener('click',pasteGradeSettings);
+  $('gradeLutImportBtn').addEventListener('click',()=>$('gradeLutInput').click());
+  $('gradeLutInput').addEventListener('change',event=>{readGradeLutFile(event.target.files?.[0]);event.target.value='';});
+  $('gradeLutClearBtn').addEventListener('click',clearGradeLut);
+  document.querySelectorAll('#gradePresetFilters [data-preset-filter]').forEach(button=>button.addEventListener('click',()=>setGradePresetFilter(button.dataset.presetFilter)));
+  $('gradePresetSaveBtn').addEventListener('click',saveGradeUserPreset);
+  $('gradePresetName').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();saveGradeUserPreset();}});
+  $('gradePresetExportBtn').addEventListener('click',exportGradeUserPresets);
+  $('gradePresetImportBtn').addEventListener('click',()=>$('gradePresetImportInput').click());
+  $('gradePresetImportInput').addEventListener('change',event=>{importGradePresetFile(event.target.files?.[0]);event.target.value='';});
+  renderGradePresetCards();
+  document.querySelectorAll('#colorGradePanel [data-grade-wheel]').forEach(wheel=>{
+    wheel.addEventListener('pointerdown',event=>{
+      if(exportBusy||mediaBusy||(event.button!==undefined&&event.button!==0))return;
+      const name=wheel.dataset.gradeWheel,now=performance.now();
+      if(event.pointerType==='touch'&&gradeWheelTap&&gradeWheelTap.name===name&&now-gradeWheelTap.time<450&&Math.hypot(event.clientX-gradeWheelTap.x,event.clientY-gradeWheelTap.y)<20){
+        gradeWheelTap=null;resetGradeWheel(name);event.preventDefault();return;
+      }
+      if(event.pointerType==='touch')gradeWheelTap={name,time:now,x:event.clientX,y:event.clientY};
+      if(event.pointerType!=='touch'&&event.detail>1)return;
+      try{wheel.setPointerCapture(event.pointerId);}catch(_){}
+      gradeWheelDrag={wheel,pointerId:event.pointerId,name,changed:false};
+      const point=gradeWheelPositionFromEvent(event,wheel),old=gradeWheelState[name];
+      gradeWheelDrag.changed=Math.hypot(old.x-point.x,old.y-point.y)>0.001;
+      setGradeWheelPoint(name,point.x,point.y);event.preventDefault();
+    });
+    wheel.addEventListener('pointermove',event=>{
+      if(!gradeWheelDrag||gradeWheelDrag.wheel!==wheel||gradeWheelDrag.pointerId!==event.pointerId)return;
+      if(exportBusy||mediaBusy){finishGradeWheelInteraction(true);return;}
+      if(event.pointerType==='touch'&&gradeWheelTap&&Math.hypot(event.clientX-gradeWheelTap.x,event.clientY-gradeWheelTap.y)>20)gradeWheelTap=null;
+      const point=gradeWheelPositionFromEvent(event,wheel),old=gradeWheelState[gradeWheelDrag.name];
+      if(Math.hypot(old.x-point.x,old.y-point.y)>0.001)gradeWheelDrag.changed=true;
+      setGradeWheelPoint(gradeWheelDrag.name,point.x,point.y);event.preventDefault();
+    });
+    wheel.addEventListener('pointerup',()=>finishGradeWheelInteraction(true));
+    wheel.addEventListener('pointercancel',()=>finishGradeWheelInteraction(true));
+    wheel.addEventListener('lostpointercapture',()=>{if(gradeWheelDrag?.wheel===wheel)finishGradeWheelInteraction(true);});
+    wheel.addEventListener('dblclick',event=>{event.preventDefault();resetGradeWheel(wheel.dataset.gradeWheel);});
+    wheel.addEventListener('keydown',event=>{
+      if(exportBusy||mediaBusy)return;
+      const state=gradeWheelState[wheel.dataset.gradeWheel],step=event.shiftKey?0.12:0.04;let handled=true;
+      if(event.key==='Home'){resetGradeWheel(wheel.dataset.gradeWheel);}
+      else if(event.key==='ArrowLeft')setGradeWheelPoint(wheel.dataset.gradeWheel,state.x-step,state.y);
+      else if(event.key==='ArrowRight')setGradeWheelPoint(wheel.dataset.gradeWheel,state.x+step,state.y);
+      else if(event.key==='ArrowUp')setGradeWheelPoint(wheel.dataset.gradeWheel,state.x,state.y+step);
+      else if(event.key==='ArrowDown')setGradeWheelPoint(wheel.dataset.gradeWheel,state.x,state.y-step);
+      else handled=false;
+      if(handled){event.preventDefault();commitGradeSnapshot();}
+    });
+  });
+}
+function initializeColorGrading(){
+
+  gradeCurveChannels.forEach(channel=>{for(let index=0;index<256;index++)gradeCurveSamples[channel][index]=index;updateGradeCurveTexture(channel);});
+  gradeCurveCanvasContext=$('gradeCurveCanvas')?.getContext('2d')||null;
+  gradeHistogramContext=$('gradeHistogram')?.getContext('2d')||null;
+  gradeSliderList().forEach(slider=>{
+    slider.addEventListener('input',onGradeSliderInput);
+    slider.addEventListener('change',onGradeSliderCommit);
+    slider.addEventListener('pointerup',onGradeSliderCommit);
+    slider.addEventListener('keyup',onGradeSliderCommit);
+    slider.addEventListener('dblclick',event=>{
+      event.preventDefault();slider.value=slider.dataset.gradeDefault||'0';
+      slider.dispatchEvent(new Event('input',{bubbles:true}));slider.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  });
+  document.querySelectorAll('#colorGradePanel [data-curve-channel]').forEach(button=>button.addEventListener('click',()=>changeGradeCurveChannel(button.dataset.curveChannel)));
+  document.querySelectorAll('#colorGradePanel [data-hsl-tab]').forEach(button=>button.addEventListener('click',()=>selectGradeHslTab(button.dataset.hslTab)));
+  $('gradeHslResetBtn').addEventListener('click',resetGradeHslTab);
+  $('gradeCurveResetBtn').addEventListener('click',resetGradeCurve);
+  $('gradeAutoBtn').addEventListener('click',runGradeAuto);
+  $('gradeResetAllBtn').addEventListener('click',()=>resetAllColorGrade(false));
+  $('gradeUndoBtn').addEventListener('click',()=>stepGradeHistory(-1));
+  $('gradeRedoBtn').addEventListener('click',()=>stepGradeHistory(1));
+  $('gradeBeforeBtn').addEventListener('click',()=>gradeBeforeCompare(!showOriginal));
+  $('themeToggle').addEventListener('click',()=>{drawGradeCurve();scheduleGradeHistogram();});
+  initializeGradeExtendedControls();
+  selectGradeHslTab('hue');changeGradeCurveChannel('master');drawGradeCurve();drawGradeHistogram(null);
+  gradeHistory=[makeGradeSnapshot()];gradeHistoryIndex=0;updateGradeHistoryButtons();updateGradeIndicators();
+  document.addEventListener('keydown',event=>{
+    const key=event.key?.toLowerCase();
+    if(appState.mode==='photo'&&!exportBusy&&!mediaBusy&&(event.ctrlKey||event.metaKey)&&event.shiftKey&&!event.altKey&&gradeCanCaptureKeyboard(event)&&!event.repeat&&(key==='c'||key==='v')){
+      event.preventDefault();if(key==='c')void copyGradeSettings();else void pasteGradeSettings();return;
+    }
+    if(isGradeCompareKey(event)&&appState.mode==='photo'&&gradeCanCaptureKeyboard(event)&&hasContent&&!event.repeat){event.preventDefault();gradeBeforeCompare(true);return;}
+    if(appState.mode!=='photo'||!(event.ctrlKey||event.metaKey)||event.altKey||event.key.toLowerCase()!=='z'||!gradeCanCaptureKeyboard(event))return;
+    event.preventDefault();stepGradeHistory(event.shiftKey?1:-1);
+  });
+  document.addEventListener('keyup',event=>{if(isGradeCompareKey(event)&&gradeBeforeActive)gradeBeforeCompare(false);});
+  window.addEventListener('blur',()=>{if(gradeBeforeActive)gradeBeforeCompare(false);});
+  $('gradeCurveCanvas').addEventListener('pointerdown',event=>{
+    if(event.button!==undefined&&event.button!==0)return;
+    const position=gradeCurvePosition(event),points=gradeCurvePoints[gradeCurveChannel],hit=findGradeCurvePoint(position),now=performance.now();
+    if(event.pointerType==='touch'&&gradeCurveTap&&now-gradeCurveTap.time<450&&Math.hypot((position.x-gradeCurveTap.x)*position.width,(position.y-gradeCurveTap.y)*position.height)<18&&hit===gradeCurveTap.index){
+      if(removeGradeCurvePoint(hit)){gradeCurveTap=null;gradeCurveInteractionChanged=false;commitGradeSnapshot();event.preventDefault();return;}
+    }
+    if(event.pointerType==='touch')gradeCurveTap={time:now,x:position.x,y:position.y,index:hit};
+    if(event.pointerType!=='touch'&&event.detail>1)return;
+    let index=hit;
+    if(hit<0){
+      const addedPoint={x:Math.max(0.008,Math.min(0.992,position.x)),y:position.y};
+      points.push(addedPoint);points.sort((a,b)=>a.x-b.x);index=points.indexOf(addedPoint);
+      if(index<=0||index>=points.length-1){points.splice(index,1);index=-1;}else{gradeCurveInteractionChanged=true;changedGradeCurve();}
+      if(event.pointerType==='touch'&&index>=0)gradeCurveTap={time:now,x:addedPoint.x,y:position.y,index};
+    }
+    if(index>=0){gradeCurveDrag={pointerId:event.pointerId,index};try{event.currentTarget.setPointerCapture(event.pointerId);}catch(_){}}
+    event.preventDefault();
+  });
+  $('gradeCurveCanvas').addEventListener('pointermove',event=>{
+    if(!gradeCurveDrag||gradeCurveDrag.pointerId!==event.pointerId)return;
+    const points=gradeCurvePoints[gradeCurveChannel],index=gradeCurveDrag.index;
+    if(index<=0||index>=points.length-1)return;
+    const position=gradeCurvePosition(event),minimum=0.008;
+    points[index].x=Math.max(points[index-1].x+minimum,Math.min(points[index+1].x-minimum,position.x));
+    points[index].y=position.y;gradeCurveInteractionChanged=true;changedGradeCurve();event.preventDefault();
+  });
+  const endCurveInteraction=event=>{
+    if(!gradeCurveDrag||gradeCurveDrag.pointerId!==event.pointerId)return;
+    gradeCurveDrag=null;if(gradeCurveInteractionChanged){gradeCurveInteractionChanged=false;commitGradeSnapshot();}
+  };
+  $('gradeCurveCanvas').addEventListener('pointerup',endCurveInteraction);
+  $('gradeCurveCanvas').addEventListener('pointercancel',endCurveInteraction);
+  $('gradeCurveCanvas').addEventListener('lostpointercapture',endCurveInteraction);
+  $('gradeCurveCanvas').addEventListener('dblclick',event=>{
+    const index=findGradeCurvePoint(gradeCurvePosition(event));if(removeGradeCurvePoint(index))commitGradeSnapshot();event.preventDefault();
+  });
+}
 function updateSliderUI(){
   ids.forEach(n=>{
     const s=sliders[n], value=Number(s.value);
@@ -2211,6 +3361,250 @@ void main(){ gl_Position=vec4(a_position,0.,1.); v_texCoord=a_texCoord; }`;
 const fsPassthrough=`#version 300 es
 precision highp float; in vec2 v_texCoord; uniform sampler2D u_image; out vec4 outColor;
 void main(){ outColor=texture(u_image, v_texCoord); }`;
+const fsColorGrade=`#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_image;
+uniform sampler2D u_gradeCurveMaster;
+uniform sampler2D u_gradeCurveRed;
+uniform sampler2D u_gradeCurveGreen;
+uniform sampler2D u_gradeCurveBlue;
+uniform int u_gradeActive;
+uniform float u_gradeTemperature;
+uniform float u_gradeTint;
+uniform float u_gradeExposure;
+uniform float u_gradeContrast;
+uniform float u_gradeHighlights;
+uniform float u_gradeShadows;
+uniform float u_gradeWhites;
+uniform float u_gradeBlacks;
+uniform float u_gradeVibrance;
+uniform float u_gradeSaturation;
+uniform float u_gradeHslHue[8];
+uniform float u_gradeHslSaturation[8];
+uniform float u_gradeHslLuminance[8];
+out vec4 outColor;
+vec3 srgbToLinear(vec3 value){
+  vec3 low=value/12.92;
+  vec3 high=pow((value+0.055)/1.055,vec3(2.4));
+  return mix(low,high,step(vec3(0.04045),value));
+}
+vec3 linearToSrgb(vec3 value){
+  value=max(value,vec3(0.0));
+  vec3 low=value*12.92;
+  vec3 high=1.055*pow(value,vec3(1.0/2.4))-0.055;
+  return mix(low,high,step(vec3(0.0031308),value));
+}
+vec3 rgbToHsl(vec3 color){
+  float maxValue=max(color.r,max(color.g,color.b));
+  float minValue=min(color.r,min(color.g,color.b));
+  float delta=maxValue-minValue;
+  float lightness=(maxValue+minValue)*0.5;
+  float hue=0.0;
+  float saturation=0.0;
+  if(delta>0.00001){
+    saturation=delta/max(0.00001,1.0-abs(2.0*lightness-1.0));
+    if(maxValue==color.r) hue=mod((color.g-color.b)/delta,6.0)/6.0;
+    else if(maxValue==color.g) hue=((color.b-color.r)/delta+2.0)/6.0;
+    else hue=((color.r-color.g)/delta+4.0)/6.0;
+  }
+  return vec3(fract(hue+1.0),saturation,lightness);
+}
+vec3 hslToRgb(vec3 hsl){
+  float chroma=(1.0-abs(2.0*hsl.z-1.0))*hsl.y;
+  float section=hsl.x*6.0;
+  float secondary=chroma*(1.0-abs(mod(section,2.0)-1.0));
+  vec3 rgb;
+  if(section<1.0) rgb=vec3(chroma,secondary,0.0);
+  else if(section<2.0) rgb=vec3(secondary,chroma,0.0);
+  else if(section<3.0) rgb=vec3(0.0,chroma,secondary);
+  else if(section<4.0) rgb=vec3(0.0,secondary,chroma);
+  else if(section<5.0) rgb=vec3(secondary,0.0,chroma);
+  else rgb=vec3(chroma,0.0,secondary);
+  return rgb+vec3(hsl.z-chroma*0.5);
+}
+float hueDistance(float a,float b){
+  float distance=abs(a-b);
+  return min(distance,1.0-distance);
+}
+float hueBandWeight(float hue,float center){
+  float distance=hueDistance(fract(hue),center);
+  return 1.0-smoothstep(0.045,0.18,distance);
+}
+void main(){
+  vec4 base=texture(u_image,v_texCoord);
+  if(u_gradeActive==0){ outColor=base; return; }
+  vec3 linearColor=srgbToLinear(clamp(base.rgb,0.0,1.0));
+  float temperature=clamp(u_gradeTemperature,-100.0,100.0)/100.0;
+  float tint=clamp(u_gradeTint,-100.0,100.0)/100.0;
+  linearColor.r*=exp2(temperature*0.20+tint*0.045);
+  linearColor.g*=exp2(-tint*0.14);
+  linearColor.b*=exp2(-temperature*0.20+tint*0.045);
+  linearColor*=exp2(clamp(u_gradeExposure,-5.0,5.0));
+  float contrastFactor=exp2(clamp(u_gradeContrast,-100.0,100.0)/100.0*1.35);
+  linearColor=(linearColor-vec3(0.18))*contrastFactor+vec3(0.18);
+  float luminance=max(0.0,dot(linearColor,vec3(0.2126,0.7152,0.0722)));
+  float shadowWeight=1.0-smoothstep(0.015,0.62,luminance);
+  float highlightWeight=smoothstep(0.28,1.0,luminance);
+  float blackWeight=1.0-smoothstep(0.02,0.30,luminance);
+  float whiteWeight=smoothstep(0.62,1.05,luminance);
+  linearColor+=vec3(u_gradeHighlights/100.0*0.24*highlightWeight);
+  linearColor+=vec3(u_gradeShadows/100.0*0.22*shadowWeight);
+  linearColor+=vec3(u_gradeWhites/100.0*0.13*whiteWeight);
+  linearColor+=vec3(u_gradeBlacks/100.0*0.11*blackWeight);
+  vec3 color=linearToSrgb(clamp(linearColor,0.0,1.0));
+  color=vec3(
+    texture(u_gradeCurveMaster,vec2(color.r,0.5)).r,
+    texture(u_gradeCurveMaster,vec2(color.g,0.5)).g,
+    texture(u_gradeCurveMaster,vec2(color.b,0.5)).b
+  );
+  color.r=texture(u_gradeCurveRed,vec2(color.r,0.5)).r;
+  color.g=texture(u_gradeCurveGreen,vec2(color.g,0.5)).g;
+  color.b=texture(u_gradeCurveBlue,vec2(color.b,0.5)).b;
+  vec3 hsl=rgbToHsl(clamp(color,0.0,1.0));
+  float hueCenters[8]=float[8](0.0,0.0833333,0.1666667,0.3333333,0.5,0.6666667,0.75,0.8333333);
+  float hueShift=0.0,saturationShift=0.0,luminanceShift=0.0;
+  for(int i=0;i<8;i++){
+    float weight=hueBandWeight(hsl.x,hueCenters[i]);
+    hueShift+=u_gradeHslHue[i]*weight;
+    saturationShift+=u_gradeHslSaturation[i]*weight;
+    luminanceShift+=u_gradeHslLuminance[i]*weight;
+  }
+  hsl.x=fract(hsl.x+hueShift+1.0);
+  hsl.y=clamp(hsl.y+saturationShift,0.0,1.0);
+  hsl.z=clamp(hsl.z+luminanceShift,0.0,1.0);
+  float vibrance=u_gradeVibrance/100.0;
+  float mutedBoost=vibrance>0.0?vibrance*(1.0-hsl.y)*0.62:vibrance*0.58;
+  hsl.y=clamp(hsl.y+mutedBoost,0.0,1.0);
+  hsl.y=clamp(hsl.y+u_gradeSaturation/100.0*0.62,0.0,1.0);
+  color=clamp(hslToRgb(hsl),0.0,1.0);
+  outColor=vec4(color,base.a);
+}`;
+const fsGradeFinish=`#version 300 es
+precision highp float;
+in vec2 v_texCoord;
+uniform sampler2D u_image;
+uniform sampler3D u_lut;
+uniform int u_lutEnabled;
+uniform int u_bwEnabled;
+uniform vec3 u_lutDomainMin;
+uniform vec3 u_lutDomainMax;
+uniform vec3 u_bwMix;
+uniform vec3 u_wheelShadows;
+uniform vec3 u_wheelMidtones;
+uniform vec3 u_wheelHighlights;
+uniform vec2 u_texelSize;
+uniform vec2 u_resolution;
+uniform float u_texture;
+uniform float u_clarity;
+uniform float u_dehaze;
+uniform float u_sharpness;
+uniform float u_sharpRadius;
+uniform float u_noiseReduction;
+uniform float u_noiseDetail;
+uniform float u_vignette;
+uniform float u_vignetteMidpoint;
+uniform float u_vignetteRoundness;
+uniform float u_vignetteFeather;
+out vec4 outColor;
+vec3 hueSpectrum(float hue){
+  return clamp(abs(mod(hue*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0,0.0,1.0);
+}
+vec3 gradedBase(vec2 uv){
+  vec3 color=texture(u_image,uv).rgb;
+  if(u_lutEnabled!=0){
+    vec3 domainSize=max(u_lutDomainMax-u_lutDomainMin,vec3(0.00001));
+    vec3 coordinate=clamp((color-u_lutDomainMin)/domainSize,0.0,1.0);
+    color=texture(u_lut,coordinate).rgb;
+  }
+  if(u_bwEnabled!=0){
+    vec3 mixWeights=max(u_bwMix,vec3(0.0));
+    float total=dot(mixWeights,vec3(1.0));
+    if(total<0.0001)mixWeights=vec3(0.2126,0.7152,0.0722);else mixWeights/=total;
+    color=vec3(dot(color,mixWeights));
+  }
+  return color;
+}
+vec3 wheelTint(vec2 position){
+  float radius=clamp(length(position),0.0,1.0);
+  if(radius<0.0001)return vec3(0.0);
+  float hue=fract(atan(position.y,position.x)/6.28318530718+1.0);
+  return (hueSpectrum(hue)-vec3(0.5))*radius;
+}
+void main(){
+  vec4 base=texture(u_image,v_texCoord);
+  vec3 color=gradedBase(v_texCoord);
+  float dehaze=clamp(u_dehaze,-1.0,1.0);
+  if(abs(dehaze)>0.0001){
+    if(dehaze>0.0){
+      float contrast=1.0+dehaze*0.78;
+      color=(color-vec3(0.5))*contrast+vec3(0.5);
+      float luma=dot(color,vec3(0.2126,0.7152,0.0722));
+      color=mix(vec3(luma),color,1.0+dehaze*0.12);
+    }else color=mix(color,vec3(0.5),-dehaze*0.28);
+  }
+  float textureAmount=clamp(u_texture,-1.0,1.0)*0.65;
+  float fineClarity=clamp(u_clarity,-1.0,1.0)*0.9;
+  float noiseReduction=clamp(u_noiseReduction,0.0,1.0);
+  float sharpen=clamp(u_sharpness,0.0,1.0);
+  vec3 fineBlur=color;
+  if(abs(textureAmount)>0.0001||noiseReduction>0.0001||sharpen>0.0001){
+    vec2 fineOffset=u_texelSize*(0.75+u_sharpRadius*1.75);
+    fineBlur=(
+      gradedBase(v_texCoord+vec2(-1.0,-1.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(0.0,-1.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(1.0,-1.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(-1.0,0.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(1.0,0.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(-1.0,1.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(0.0,1.0)*fineOffset)+
+      gradedBase(v_texCoord+vec2(1.0,1.0)*fineOffset)
+    )/8.0;
+  }
+  color+=(color-fineBlur)*textureAmount;
+  if(abs(fineClarity)>0.0001){
+    vec2 clarityOffset=u_texelSize*4.0;
+    vec3 broadBlur=(
+      gradedBase(v_texCoord+vec2(-1.0,-1.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(0.0,-1.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(1.0,-1.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(-1.0,0.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(1.0,0.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(-1.0,1.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(0.0,1.0)*clarityOffset)+
+      gradedBase(v_texCoord+vec2(1.0,1.0)*clarityOffset)
+    )/8.0;
+    color+=(color-broadBlur)*fineClarity;
+  }
+  if(noiseReduction>0.0001){
+    float edge=length(color-fineBlur);
+    float edgeProtection=smoothstep(0.025,0.19,edge)*clamp(u_noiseDetail,0.0,1.0)*0.82;
+    color=mix(color,fineBlur,noiseReduction*(1.0-edgeProtection));
+  }
+  if(sharpen>0.0001){
+    float edgeMask=smoothstep(0.008,0.12,length(color-fineBlur));
+    color+=(color-fineBlur)*sharpen*1.45*edgeMask;
+  }
+  float shadowLuma=dot(color,vec3(0.2126,0.7152,0.0722));
+  float shadowWeight=1.0-smoothstep(0.04,0.52,shadowLuma);
+  float midtoneWeight=exp(-pow((shadowLuma-0.5)*3.0,2.0));
+  float highlightWeight=smoothstep(0.38,0.96,shadowLuma);
+  color+=wheelTint(u_wheelShadows.xy)*u_wheelShadows.z*shadowWeight*0.38;
+  color+=wheelTint(u_wheelMidtones.xy)*u_wheelMidtones.z*midtoneWeight*0.32;
+  color+=wheelTint(u_wheelHighlights.xy)*u_wheelHighlights.z*highlightWeight*0.38;
+  float roundness=clamp(0.5+u_vignetteRoundness*0.5,0.0,1.0);
+  vec2 vignettePosition=(v_texCoord-vec2(0.5))*2.0;
+  float aspect=max(u_resolution.x/max(u_resolution.y,1.0),0.0001);
+  if(aspect>1.0)vignettePosition.y/=aspect;else vignettePosition.x*=aspect;
+  float circularDistance=length(vignettePosition)/length(vec2(1.0,min(aspect,1.0/aspect)));
+  float squareDistance=max(abs(vignettePosition.x),abs(vignettePosition.y));
+  float distanceFromCenter=mix(circularDistance,squareDistance,roundness);
+  float vignetteEdge=smoothstep(clamp(u_vignetteMidpoint,0.0,1.0),clamp(u_vignetteMidpoint+u_vignetteFeather,0.001,1.5),distanceFromCenter);
+  float vignette=clamp(u_vignette,-1.0,1.0);
+  if(vignette>0.0)color*=1.0-vignetteEdge*vignette*0.72;
+  else if(vignette<0.0)color=mix(color,vec3(1.0),vignetteEdge*(-vignette)*0.28);
+  outColor=vec4(clamp(color,0.0,1.0),base.a);
+}`;
 const fsSharpen=`#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -2553,6 +3947,12 @@ void main(){
 function compile(t,s){ const sh=gl.createShader(t); gl.shaderSource(sh,s); gl.compileShader(sh); if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(sh)); throw new Error('compile'); } return sh; }
 function createProgram(vs,fs){ const p=gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER,vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ console.error(gl.getProgramInfoLog(p)); throw new Error('link'); } return p; }
 const progPassthrough=createProgram(vsSrc, fsPassthrough);
+let progColorGrade=null;
+try{ progColorGrade=createProgram(vsSrc,fsColorGrade); }
+catch(error){ console.warn('Color grading shader unavailable; falling back to the ungraded image.',error); }
+let progGradeFinish=null;
+try{ progGradeFinish=createProgram(vsSrc,fsGradeFinish); }
+catch(error){ console.warn('Extended color grading shader unavailable; those settings will fall back to the ungraded image.',error); }
 const progSharpen=createProgram(vsSrc, fsSharpen);
 const progBright=createProgram(vsSrc, fsBright);
 const progHallExtract=createProgram(vsSrc, fsHallExtract);
@@ -2571,6 +3971,32 @@ function bindQuad(prog){
 function createTexture(w,h){ const t=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,t); gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); return t; }
 function createFBO(w,h){ const tex=createTexture(w,h); const fbo=gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER,fbo); gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,tex,0); gl.bindFramebuffer(gl.FRAMEBUFFER,null); return {fbo,tex,width:w,height:h}; }
 function deleteFBO(f){ if(!f) return; gl.deleteFramebuffer(f.fbo); gl.deleteTexture(f.tex); }
+function updateGradeCurveTexture(channel){
+  if(!colorGrading || !gradeCurvePoints[channel]) return;
+  try{
+    const samples=colorGrading.monotoneCurveSamples(gradeCurvePoints[channel],256);
+    const rgba=new Uint8Array(256*4);
+    for(let index=0;index<256;index++){
+      const value=samples[index]; rgba[index*4]=value; rgba[index*4+1]=value; rgba[index*4+2]=value; rgba[index*4+3]=255;
+    }
+    gradeCurveSamples[channel]=samples;
+    let texture=gradeCurveTextures[channel];
+    if(!texture) gradeCurveTextures[channel]=texture=createTexture(256,1);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,256,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);
+    gl.activeTexture(gl.TEXTURE0);
+  }catch(error){
+    const texture=gradeCurveTextures[channel];if(texture)try{gl.deleteTexture(texture);}catch(_){}
+    gradeCurveTextures[channel]=null;
+    console.warn('Color grading curve lookup update failed; the image will fall back without grading.',error);
+  }
+}
+function isGradeCurveIdentity(channel){
+  const samples=gradeCurveSamples[channel];
+  if(!samples || samples.length!==256) return true;
+  for(let index=0;index<256;index++) if(samples[index]!==index) return false;
+  return true;
+}
 const MOBILE_PREVIEW_MAX_EDGE=1280;
 function getRenderDimensions(w,h){
   const mobile=!!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
@@ -2579,8 +4005,8 @@ function getRenderDimensions(w,h){
 }
 function recreateFBOs(w,h){
   const renderSize=getRenderDimensions(w,h), renderWidth=renderSize.width, renderHeight=renderSize.height;
-  [fboComposite,fboSharpened,fboDithered,fboBloomExtract,fboBloomBlurH,fboBloomBlurV,fboBloomBlurH2,fboBloomBlurV2,fboHallExtract,fboHallBlurH,fboHallBlurV].forEach(deleteFBO);
-  fboComposite=createFBO(renderWidth,renderHeight); fboSharpened=createFBO(renderWidth,renderHeight);
+  [fboComposite,fboSharpened,fboGraded,fboDithered,fboBloomExtract,fboBloomBlurH,fboBloomBlurV,fboBloomBlurH2,fboBloomBlurV2,fboHallExtract,fboHallBlurH,fboHallBlurV].forEach(deleteFBO);
+  fboComposite=createFBO(renderWidth,renderHeight); fboSharpened=createFBO(renderWidth,renderHeight); fboGraded=createFBO(renderWidth,renderHeight);
   fboDithered=renderWidth!==w || renderHeight!==h ? createFBO(renderWidth,renderHeight) : null; floydLastKey=null;
   const hw=Math.max(1,Math.floor(renderWidth/2)), hh=Math.max(1,Math.floor(renderHeight/2));
   fboBloomExtract=createFBO(hw,hh); fboBloomBlurH=createFBO(hw,hh); fboBloomBlurV=createFBO(hw,hh); fboBloomBlurH2=createFBO(hw,hh); fboBloomBlurV2=createFBO(hw,hh);
@@ -2622,13 +4048,17 @@ floydTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE3); gl.bindTexture(g
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+const gradeNeutralLutTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,gradeNeutralLutTexture);
+gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,1,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
 gl.activeTexture(gl.TEXTURE0);
 
 function previewFrameKey(){
   const sourceFrame=isVideo
     ? `${videoEl?.currentSrc||videoEl?.src||'video'}:${Number(videoEl?.currentTime||0).toFixed(5)}:${videoRotation}`
     : `${currentPhoto?.id||'photo'}:${photoTextureRevision}`;
-  return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,sourceFrame,
+  return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,sourceFrame,gradeStateKey(),
     ids.map(id=>sliders[id]?.value??'').join(','),Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),
     ditherScope,JSON.stringify(getDitherSettings()),subjectMaskRevision,showOriginal,splitPreview,
     appState.mode==='photo'&&maskBgActive,maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
@@ -2645,6 +4075,7 @@ function render(timeMs){
     gl.uniform1i(gl.getUniformLocation(progPassthrough,'u_image'),0);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     if(cacheable) lastPreviewRenderKey=frameKey;
+    scheduleGradeHistogram();
     return;
   }
   // sharpen
@@ -2660,10 +4091,100 @@ function render(timeMs){
   gl.uniform1f(gl.getUniformLocation(progSharpen,'u_detail'),params.sharpenDetail);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 
+  // The grading passes run after sharpening and before the existing optical, grain and dither effects.
+  const gradeLegacyActive=gradeLegacyProcessingIsActive();
+  let gradeSourceTexture=fboSharpened.tex;
+  if(gradeLegacyActive){
+    if(progColorGrade&&colorGrading&&gradeCurveChannels.every(channel=>gradeCurveTextures[channel])&&fboGraded){
+      try{
+        const grade=gradeUniformSettings();
+        gl.bindFramebuffer(gl.FRAMEBUFFER,fboGraded.fbo);gl.viewport(0,0,fboGraded.width,fboGraded.height);
+        gl.useProgram(progColorGrade);bindQuad(progColorGrade);
+        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,fboSharpened.tex);
+        gl.uniform1i(gl.getUniformLocation(progColorGrade,'u_image'),0);
+        gl.uniform1i(gl.getUniformLocation(progColorGrade,'u_gradeActive'),1);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeTemperature'),grade.temperature);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeTint'),grade.tint);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeExposure'),grade.exposure);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeContrast'),grade.contrast);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeHighlights'),grade.highlights);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeShadows'),grade.shadows);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeWhites'),grade.whites);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeBlacks'),grade.blacks);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeVibrance'),grade.vibrance);
+        gl.uniform1f(gl.getUniformLocation(progColorGrade,'u_gradeSaturation'),grade.saturation);
+        gl.uniform1fv(gl.getUniformLocation(progColorGrade,'u_gradeHslHue[0]'),grade.hslHue);
+        gl.uniform1fv(gl.getUniformLocation(progColorGrade,'u_gradeHslSaturation[0]'),grade.hslSaturation);
+        gl.uniform1fv(gl.getUniformLocation(progColorGrade,'u_gradeHslLuminance[0]'),grade.hslLuminance);
+        [['master',5,'u_gradeCurveMaster'],['red',6,'u_gradeCurveRed'],['green',7,'u_gradeCurveGreen'],['blue',8,'u_gradeCurveBlue']].forEach(([channel,unit,name])=>{
+          gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,gradeCurveTextures[channel]);
+          gl.uniform1i(gl.getUniformLocation(progColorGrade,name),unit);
+        });
+        gl.drawArrays(gl.TRIANGLE_STRIP,0,4);gradeSourceTexture=fboGraded.tex;
+      }catch(error){
+        gl.activeTexture(gl.TEXTURE0);drawGradeFallback(error);
+        if(cacheable){lastPreviewRenderKey=frameKey;}
+        scheduleGradeHistogram();return;
+      }
+    }else{
+      gl.activeTexture(gl.TEXTURE0);drawGradeFallback(new Error('Color grading shader or framebuffer is unavailable.'));
+      if(cacheable){lastPreviewRenderKey=frameKey;}
+      scheduleGradeHistogram();return;
+    }
+  }
+  if(gradePostProcessingIsActive()){
+    const gradePostTarget=gradeLegacyActive?fboSharpened:fboGraded;
+    if(progGradeFinish&&gradePostTarget){
+      try{
+        const effects=gradePostUniformSettings(),lut=activeGradeLutId?gradeLutRegistry.get(activeGradeLutId):null;
+        for(let drain=0;drain<8;drain++){if(gl.getError()===gl.NO_ERROR)break;}
+        gl.bindFramebuffer(gl.FRAMEBUFFER,gradePostTarget.fbo);gl.viewport(0,0,gradePostTarget.width,gradePostTarget.height);
+        gl.useProgram(progGradeFinish);bindQuad(progGradeFinish);
+        gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gradeSourceTexture);
+        gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_image'),0);
+        gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,lut?.texture||gradeNeutralLutTexture);
+        gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_lut'),1);
+        gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_lutEnabled'),lut?1:0);
+        gl.uniform3f(gl.getUniformLocation(progGradeFinish,'u_lutDomainMin'),...(lut?.domainMin||[0,0,0]));
+        gl.uniform3f(gl.getUniformLocation(progGradeFinish,'u_lutDomainMax'),...(lut?.domainMax||[1,1,1]));
+        gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_bwEnabled'),gradeBlackWhiteEnabled?1:0);
+        gl.uniform3fv(gl.getUniformLocation(progGradeFinish,'u_bwMix'),effects.bwMix);
+        gl.uniform3fv(gl.getUniformLocation(progGradeFinish,'u_wheelShadows'),effects.wheelShadows);
+        gl.uniform3fv(gl.getUniformLocation(progGradeFinish,'u_wheelMidtones'),effects.wheelMidtones);
+        gl.uniform3fv(gl.getUniformLocation(progGradeFinish,'u_wheelHighlights'),effects.wheelHighlights);
+        gl.uniform2f(gl.getUniformLocation(progGradeFinish,'u_texelSize'),1/gradePostTarget.width,1/gradePostTarget.height);
+        gl.uniform2f(gl.getUniformLocation(progGradeFinish,'u_resolution'),gradePostTarget.width,gradePostTarget.height);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_texture'),effects.texture);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_clarity'),effects.clarity);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_dehaze'),effects.dehaze);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_sharpness'),effects.sharpness);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_sharpRadius'),effects.sharpRadius);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_noiseReduction'),effects.noiseReduction);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_noiseDetail'),effects.noiseDetail);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_vignette'),effects.vignette);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_vignetteMidpoint'),effects.vignetteMidpoint);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_vignetteRoundness'),effects.vignetteRoundness);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_vignetteFeather'),effects.vignetteFeather);
+        gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+        const gradeDrawError=gl.getError();if(gradeDrawError!==gl.NO_ERROR)throw new Error(`Extended color grade WebGL draw failed (error ${gradeDrawError}).`);
+        gradeSourceTexture=gradePostTarget.tex;
+      }catch(error){
+        gl.activeTexture(gl.TEXTURE0);drawGradeFallback(error);
+        if(cacheable)lastPreviewRenderKey=frameKey;
+        scheduleGradeHistogram();return;
+      }
+    }else{
+      gl.activeTexture(gl.TEXTURE0);drawGradeFallback(new Error('Extended color grading shader or framebuffer is unavailable.'));
+      if(cacheable)lastPreviewRenderKey=frameKey;
+      scheduleGradeHistogram();return;
+    }
+  }
+  gl.activeTexture(gl.TEXTURE0);
+
   // bloom extract
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboBloomExtract.fbo); gl.viewport(0,0,fboBloomExtract.width,fboBloomExtract.height);
   gl.useProgram(progBright); bindQuad(progBright);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,fboSharpened.tex);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,gradeSourceTexture);
   gl.uniform1i(gl.getUniformLocation(progBright,'u_image'),0);
   gl.uniform1f(gl.getUniformLocation(progBright,'u_threshold'),params.bloomThreshold);
   gl.uniform1f(gl.getUniformLocation(progBright,'u_softness'),params.bloomSoft);
@@ -2714,7 +4235,7 @@ function render(timeMs){
   // hallation extract
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboHallExtract.fbo); gl.viewport(0,0,fboHallExtract.width,fboHallExtract.height);
   gl.useProgram(progHallExtract); bindQuad(progHallExtract);
-  gl.bindTexture(gl.TEXTURE_2D,fboSharpened.tex);
+  gl.bindTexture(gl.TEXTURE_2D,gradeSourceTexture);
   gl.uniform1i(gl.getUniformLocation(progHallExtract,'u_image'),0);
   gl.uniform1f(gl.getUniformLocation(progHallExtract,'u_threshold'),params.hallThreshold);
   gl.uniform1f(gl.getUniformLocation(progHallExtract,'u_softness'),0.25);
@@ -2749,7 +4270,7 @@ function render(timeMs){
   // Color / light and optical effects compose into an offscreen texture; dithering follows in its own pass.
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboComposite.fbo); gl.viewport(0,0,fboComposite.width,fboComposite.height);
   gl.useProgram(progComposite); bindQuad(progComposite);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,fboSharpened.tex); gl.uniform1i(gl.getUniformLocation(progComposite,'u_base'),0);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,gradeSourceTexture); gl.uniform1i(gl.getUniformLocation(progComposite,'u_base'),0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,fboBloomBlurV2.tex); gl.uniform1i(gl.getUniformLocation(progComposite,'u_bloom'),1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D,fboHallBlurV.tex); gl.uniform1i(gl.getUniformLocation(progComposite,'u_hallation'),2);
   const maskBgEnabled=appState.mode==='photo' && !isVideo && !!maskBgActive && !!maskBgCanvas;
@@ -2801,6 +4322,7 @@ function render(timeMs){
   const ditherStrength=backgroundOnly && !subjectProtected?0:effectValue('dither',params.dither);
   renderDitherPass(timeMs,ditherStrength,backgroundOnly);
   if(cacheable) lastPreviewRenderKey=frameKey;
+  scheduleGradeHistogram();
 }
 function renderFrame(timeMs=performance.now()){ render(timeMs); }
 
@@ -2885,7 +4407,7 @@ function errorDiffusionPixels(source,width,height,options={}){
 }
 function floydStateKey(timeMs,dither,backgroundOnly,strength){
   const frame=isVideo?Math.floor(((timeMs??videoEl.currentTime*1000)*0.001)*240):0;
-  return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,isVideo?videoSourceFile?.name:'photo',currentPhoto?.id||'',frame,
+  return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,isVideo?videoSourceFile?.name:'photo',currentPhoto?.id||'',frame,gradeStateKey(),
     isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,ids.map(id=>sliders[id].value).join(','),
     Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),ditherScope,subjectMaskRevision,
     appState.mode==='photo'&&maskBgActive,maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
@@ -3530,27 +5052,30 @@ function buildMaskBgCanvasFromPixels(width,height,mask){
   }
   ctx.putImageData(image,0,0);return candidate;
 }
+function withTimeout(promise,ms,message){
+  let timeoutId=null;
+  const timeoutPromise=new Promise((_,reject)=>{
+    timeoutId=setTimeout(()=>{const error=new Error(message);error.name='TimeoutError';reject(error);},ms);
+    maskBgAutoTimeout=timeoutId;
+  });
+  return Promise.race([Promise.resolve(promise),timeoutPromise]).finally(()=>{
+    clearTimeout(timeoutId);
+    if(maskBgAutoTimeout===timeoutId)maskBgAutoTimeout=null;
+  });
+}
 async function autoRemoveMaskBackground(){
   if(!maskBgPhotoReady()||!photoForMask||!maskBgCanvas||maskBgProcessing)return;
   const token=++maskBgAutoRequestId,photo=photoForMask,width=maskBgCanvas.width,height=maskBgCanvas.height;
   maskBgProcessing=true;setMaskBgAiStatus('Loading AI model… this may take a moment.',true,true);
   setMaskBgStatus('Preparing automatic background removal on this device…');updateMaskBgControls();
-  maskBgAutoTimeout=setTimeout(()=>{
-    if(token!==maskBgAutoRequestId)return;
-    maskBgAutoRequestId++;maskBgProcessing=false;maskBgAutoTimeout=null;
-    terminateMaskBgWorker(new Error('Automatic removal timed out after 8 seconds'),'error');
-    setMaskBgAiStatus('Auto-remove failed — try painting the mask manually',true,false);
-    setMaskBgStatus('Auto-remove failed — try painting the mask manually');
-    updateMaskBgControls();
-  },8000);
   try{
-    await ensureMaskBgModel();
+    await withTimeout(ensureMaskBgModel(),90000,'AI model loading timed out after 90 seconds');
     if(token!==maskBgAutoRequestId||photo!==photoForMask)return;
     setMaskBgAiStatus('Analyzing image…',true,true);
     setMaskBgStatus('Analyzing image…');
     const image=await createImageBitmap(photo);
     if(token!==maskBgAutoRequestId){image.close?.();return;}
-    const result=await requestMaskBgWorker('segment',{image,width,height});
+    const result=await withTimeout(requestMaskBgWorker('segment',{image,width,height}),30000,'Image segmentation timed out after 30 seconds');
     if(token!==maskBgAutoRequestId||photo!==photoForMask)return;
     const candidate=buildMaskBgCanvasFromPixels(result.width,result.height,result.mask);
     const probe=document.createElement('canvas');probe.width=32;probe.height=32;
@@ -3565,8 +5090,11 @@ async function autoRemoveMaskBackground(){
   }catch(error){
     if(token===maskBgAutoRequestId){
       console.warn('Automatic background removal unavailable',error);
-      setMaskBgAiStatus('Auto-remove failed — try painting the mask manually',true,false);
-      setMaskBgStatus('Auto-remove failed — try painting the mask manually');
+      if(error?.name==='TimeoutError')terminateMaskBgWorker(error,'error');
+      const reason=error?.message||String(error||'Unknown error');
+      const failure=`Auto-remove failed: ${reason}. Try Magic select or Paint / keep.`;
+      setMaskBgAiStatus(failure,true,false);
+      setMaskBgStatus(failure);
     }
   }finally{
     if(token===maskBgAutoRequestId){clearTimeout(maskBgAutoTimeout);maskBgAutoTimeout=null;maskBgProcessing=false;updateMaskBgControls();}
@@ -3933,6 +5461,7 @@ function uploadPhoto(item,img,resetView=true){
   $('processVideoBtn').style.display='none';
   $('downloadBtn').innerHTML='⤓ Original-size PNG';
   updateSocialUI();
+  if(!exportBusy&&!mediaBusy){if(typeof render==='function')render(performance.now());if(typeof renderGradePresetCards==='function')renderGradePresetCards();}
 }
 async function createThumbnail(img,rotation=0){
   const thumb=document.createElement('canvas'), scale=Math.min(1,160/Math.max(img.naturalWidth,img.naturalHeight));
@@ -3963,7 +5492,7 @@ async function activatePhoto(index){
     saveActivePhotoMask(); activePhotoIndex=index; uploadPhoto(item,img); setMediaLoading(false); renderPhotoStrip();
     render(performance.now()); startLoop();
   }catch(error){ console.error(error); showToast(`Could not open ${item.file.name}`,5000); }
-  finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI(); } }
+  finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); } }
 }
 async function handleFiles(fileList,{append=false}={}){
   if(exportBusy){ showToast('Wait for the export to finish'); return; }
@@ -4010,7 +5539,7 @@ async function handleFiles(fileList,{append=false}={}){
       if(failed) notes.push(`${failed} could not be decoded`);
       showToast(notes.join(' · '),5000);
     }else showToast('Could not open these photos — your current media is unchanged',5000);
-  }finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI(); } }
+  }finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); } }
 }
 function handleFile(file){ if(file) return handleFiles([file]); }
 function waitForVideoData(element,url){
@@ -4399,7 +5928,7 @@ function toggleBeforeAfter(){
   showOriginal=!showOriginal;
   beforeLabel.textContent=showOriginal?'BEFORE — original':'AFTER';
   beforeLabel.classList.toggle('show',showOriginal);
-  updateSplitDivider(); render(performance.now());
+  if(typeof syncGradeCompareControls==='function')syncGradeCompareControls();updateSplitDivider(); render(performance.now());
 }
 $('beforeAfterBtn').addEventListener('click',toggleBeforeAfter);
 $('hdrBeforeBtn').addEventListener('click',toggleBeforeAfter);
@@ -5197,7 +6726,7 @@ async function rotateActiveMedia(){
     renderPhotoStrip(); updateSocialUI();
     showToast(`Photo rotated ${item.rotation}° clockwise`);
   }catch(error){ console.error(error); showToast(`Could not rotate this photo: ${error.message}`,5000); }
-  finally{ mediaBusy=false; updateSocialUI(); }
+  finally{ mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); }
 }
 function renderPhotoStrip(){
   const strip=$('carouselStrip'), list=$('photoThumbnails');
@@ -5458,10 +6987,10 @@ function checkExportCancelled(){ if(cancelRequested) throw new DOMException('Exp
 function beginExport(title){
   const view={original:showOriginal,split:splitPreview,playing:isVideo&&!videoEl.paused,time:videoEl.currentTime,
     zoom:previewZoom,panX:previewPanX,panY:previewPanY,fullResolution:renderAtFullResolution};
-  cancelRequested=false; cancelPresetAnimation(); cancelSliderRender(); if(maskUploadFrame) uploadSubjectMask();
+  cancelRequested=false; cancelPresetAnimation(); cancelSliderRender(); cancelGradeRender(); if(maskUploadFrame) uploadSubjectMask();
   if(animId!==null){ cancelAnimationFrame(animId); animId=null; }
   if(isVideo) videoEl.pause();
-  setEditorBusy(true); showOriginal=false; splitPreview=false; beforeLabel.classList.remove('show'); updateSplitDivider();
+  setEditorBusy(true); showOriginal=false; splitPreview=false; beforeLabel.classList.remove('show');if(typeof syncGradeCompareControls==='function')syncGradeCompareControls();updateSplitDivider();
   setFullResolutionRendering(true);
   $('progressTitle').textContent=title; progressWrap.classList.add('show'); progressFill.style.width='0%'; progressPct.textContent='0%';
   exportStartedAt=Date.now(); $('progressEta').textContent='Estimated time remaining: calculating…';
@@ -5471,9 +7000,9 @@ function beginExport(title){
 }
 function finishExport(view){
   if(exportEtaTimer){clearInterval(exportEtaTimer);exportEtaTimer=null;} exportStartedAt=0;
-  showOriginal=view.original; splitPreview=view.split; beforeLabel.classList.toggle('show',showOriginal);
+  showOriginal=view.original; splitPreview=view.split; beforeLabel.classList.toggle('show',showOriginal);if(typeof syncGradeCompareControls==='function')syncGradeCompareControls();
   previewZoom=view.zoom; previewPanX=view.panX; previewPanY=view.panY;
-  setEditorBusy(false); setFullResolutionRendering(view.fullResolution); updatePreviewZoom(); render(performance.now());
+  setEditorBusy(false); setFullResolutionRendering(view.fullResolution); updatePreviewZoom(); render(performance.now());if(typeof renderGradePresetCards==='function')renderGradePresetCards();
   if(view.playing) videoEl.play().catch(()=>{});
   startLoop(); progressWrap.classList.remove('show','loading','ready');
 }
@@ -6076,8 +7605,9 @@ $('processVideoBtn').addEventListener('click',processVideo);
 // Looks / Adjust / Export are views over the same existing editor controls.
 let activeSidebarTab='looks', userSelectedSidebarTab=false;
 function selectSidebarTab(name){
-  if(!['looks','adjust','mask','export'].includes(name))return;
+  if(!['looks','adjust','grade','mask','export'].includes(name))return;
   if(name==='mask'&&appState.mode!=='photo')return;
+  if(name==='grade'&&appState.mode!=='photo')return;
   activeSidebarTab=name;
   document.querySelectorAll('.sidebarTab').forEach(button=>{
     const active=button.dataset.tab===name;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));
@@ -6087,6 +7617,7 @@ function selectSidebarTab(name){
   });
   $('sidebarSheetHandle').querySelector('.sheetHandleText').textContent=name==='mask'?'MASK & BG':name.toUpperCase();
   if(name==='mask')loadMaskBgModelOnOpen();
+  if(name==='grade'){drawGradeCurve();scheduleGradeHistogram();}
 }
 document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{userSelectedSidebarTab=true;selectSidebarTab(button.dataset.tab);}));
 function updateClusterSummaries(){
@@ -6106,6 +7637,7 @@ $('resetOriginalBtn').addEventListener('click',()=>{
   ids.forEach(id=>sliders[id].value=0);setDitherScope('full');setDitherSettings(social.DEFAULT_DITHER);
   for(const [name,on] of Object.entries(effectEnabled))if(!on){effectEnabled[name]=true;const toggle=document.querySelector(`[data-toggle="${name}"]`);if(toggle){toggle.setAttribute('aria-checked','true');toggle.querySelector('.toggleText').textContent='ON';toggle.closest('.effectGroup').classList.remove('effectOff');}}
   presetIntensityInput.value='100';updatePresetIntensityReadout();
+  resetAllColorGrade(true);
   activePresetName=null;selectedPresetName=null;syncPresetSelection();userChangedSliders();updateSectionIndicators();updateClusterSummaries();updateSocialUI();showToast('Reset to original');
 });
 
@@ -6124,7 +7656,7 @@ const holdCompareButton=$('holdCompareBtn');
 function setHoldCompare(held){
   if(!hasContent)return;
   showOriginal=held;beforeLabel.textContent=held?'BEFORE — original':'AFTER';beforeLabel.classList.toggle('show',held);
-  holdCompareButton.setAttribute('aria-pressed',String(held));updateSplitDivider();render(performance.now());
+  holdCompareButton.setAttribute('aria-pressed',String(held));if(typeof syncGradeCompareControls==='function')syncGradeCompareControls();updateSplitDivider();render(performance.now());
 }
 holdCompareButton.addEventListener('pointerdown',event=>{if(event.button!==undefined&&event.button!==0)return;event.preventDefault();holdCompareButton.setPointerCapture(event.pointerId);setHoldCompare(true);});
 ['pointerup','pointercancel','lostpointercapture'].forEach(type=>holdCompareButton.addEventListener(type,()=>setHoldCompare(false)));
@@ -6135,8 +7667,9 @@ holdCompareButton.addEventListener('keyup',event=>{if(event.key===' '||event.key
 function setWorkspaceMode(mode){
   if(!['empty','photo','video'].includes(mode))return;
   appState.mode=mode;
+  if(mode!=='photo'&&gradeBeforeActive)gradeBeforeCompare(false);
   if(mode!=='photo'&&maskBgPaintMode){maskBgPaintMode=null;maskBgStroke=null;updateMaskBgControls();}
-  if(mode==='video'&&activeSidebarTab==='mask'){userSelectedSidebarTab=false;selectSidebarTab('looks');}
+  if(mode==='video'&&['mask','grade'].includes(activeSidebarTab)){userSelectedSidebarTab=false;selectSidebarTab('looks');}
 
   if(mode!=='empty' && hasContent && typeof setMediaLoading==='function') setMediaLoading(false);
   document.body.dataset.mode=mode;
@@ -6186,7 +7719,7 @@ window.filmLabTimelineBridge={
 };
 window.addEventListener('film-lab-toast',event=>{ if(event.detail) showToast(String(event.detail),5000); });
 // init
-setupSliderNumberEditing(); updateFromSliders(); updateSliderUI(); updateSocialUI(); restoreSharedLook(); render(performance.now()); initializeWorkspaceModes();
+initializeColorGrading(); setupSliderNumberEditing(); updateFromSliders(); updateSliderUI(); updateSocialUI(); restoreSharedLook(); render(performance.now()); initializeWorkspaceModes();
 window.addEventListener('dragover',e=> e.preventDefault());
 window.addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ e.preventDefault(); handleFiles(e.dataTransfer.files); } });
 // FFmpeg is initialized only after a video upload succeeds; exports await the shared loader promise.
