@@ -12,7 +12,7 @@ const multiTimeline = readFileSync(resolve(__dirname, '../multi-timeline.js'), '
 
 test('the existing upload landing routes image and video files without a reload', () => {
   assert.match(html, /id="dropZone"/);
-  assert.match(html, /READY FOR AN IMAGE/);
+  assert.match(html, /READY FOR MEDIA/);
   assert.match(html, /id="fileInput" accept="image\/\*[^\"]*video\/\*" multiple hidden/);
   assert.match(script, /function handleFiles\(fileList/);
   assert.match(script, /if\(document\.readyState==='loading'\)document\.addEventListener\('DOMContentLoaded',startFilmLab,\{once:true\}\)/);
@@ -123,6 +123,19 @@ test('photo and video panels switch with appState.mode while the existing DOM st
   assert.match(html, /Show on this clip/);
 });
 
+test('empty and photo workspaces hide irrelevant video chrome and guard header export actions', () => {
+  assert.match(styles, /body\[data-mode="empty"\] #app #content #timeline-module,[\s\S]*?body\[data-mode="photo"\] #app #shortcuts-bar \{ display: none !important; \}/);
+  assert.match(styles, /body\[data-mode="empty"\] #app #headerActions #hdrBeforeBtn/);
+  assert.match(styles, /body\[data-mode="empty"\] #app #headerActions #hdrDownloadBtn/);
+  const update = script.match(/function updateSocialUI\(\)\{[\s\S]*?\n\}/)[0];
+  assert.match(update, /\$\('hdrBeforeBtn'\)\.disabled=!hasContent\|\|locked/);
+  assert.match(update, /\$\('hdrDownloadBtn'\)\.disabled=!hasContent\|\|locked/);
+  const exportHandler = script.match(/function handleHeaderExport\(\)\{[\s\S]*?\n\}/)[0];
+  assert.match(exportHandler, /if\(!hasContent\|\|exportBusy\|\|mediaBusy\) return/);
+  assert.match(script, /hdrDownloadBtn'\)\.addEventListener\('click',\(\)=>\{if\(hasContent&&!isVideo\)/);
+  assert.match(styles, /body\[data-mode="video"\] #app #timeline-module:not\(\[hidden\]\) \{ display: flex; \}/);
+});
+
 test('video timeline is an additive module with trim, cut, history, zoom, waveform and transition controls', () => {
   assert.match(html, /<section id="timeline-module" class="video-only"/);
   for(const id of ['timeline-skip-start','timeline-play','timeline-skip-end','timeline-timecode','timeline-cut','timeline-delete','timeline-undo','timeline-redo','timeline-zoom-minus','timeline-zoom-plus','timeline-ruler','timeline-clips','timeline-audio','timeline-playhead']) assert.match(html,new RegExp(`id="${id}"`));
@@ -130,7 +143,8 @@ test('video timeline is an additive module with trim, cut, history, zoom, wavefo
   assert.match(html, /src="\.\/timeline-module\.js"/);
   assert.match(timeline, /function splitAt\(time\)/);
   assert.match(timeline, /No clip loaded/);
-  assert.match(styles, /body\[data-mode="empty"\] #app #content #timeline-module:not\(\[hidden\]\)/);
+  assert.match(styles, /body\[data-mode="video"\] #app #timeline-module:not\(\[hidden\]\) \{ display: flex; \}/);
+  assert.doesNotMatch(styles, /body\[data-mode="empty"\] #app #content #timeline-module:not\(\[hidden\]\)/);
   assert.match(timeline, /function getExportPlan\(\)/);
   assert.match(timeline, /function mapOutputTime\(time, plan = getExportPlan\(\)\)/);
   assert.match(timeline, /addEventListener\('timeupdate', onPlaybackTime\)/);

@@ -396,7 +396,7 @@ test('the top Export button runs Reel export for video and opens image options f
   assert.match(script, /function handleHeaderExport\(\)\{[\s\S]*?if\(isVideo\)\{ processVideo\(\); return; \}[\s\S]*?setCropPanelOpen\(true,true\)/);
   assert.match(script, /\$\('hdrDownloadBtn'\)\.addEventListener\('click',handleHeaderExport\)/);
   assert.match(script, /\$\('hdrDownloadBtn'\)\.textContent=isVideo\?'⤓ Export Reel':'⤓ Export'/);
-  assert.match(script, /\$\('hdrDownloadBtn'\)\.disabled=locked/);
+  assert.match(script, /\$\('hdrDownloadBtn'\)\.disabled=!hasContent\|\|locked/);
   assert.equal((html.match(/id="processVideoBtn"/g)||[]).length,1);
   assert.match(html, /id="videoTrimPanel"[\s\S]*?id="processVideoBtn"/);
 });
@@ -417,13 +417,14 @@ test('the calmer controls keep the original slider look with larger hit areas an
   assert.match(script, /settingsToolsToggle'[\s\S]*?body\.hidden=!open/);
 });
 
-test('header Export invokes the active video workflow but never exports a photo accidentally', () => {
+test('header Export runs only when media is loaded and routes to the active workspace', () => {
   const handler=script.match(/function handleHeaderExport\(\)\{[\s\S]*?\n\}/)[0];
   const calls={video:0,photo:0};
-  const state=vm.createContext({exportBusy:false,mediaBusy:false,isVideo:true,calls,
+  const state=vm.createContext({exportBusy:false,mediaBusy:false,hasContent:true,isVideo:true,calls,
     processVideo(){calls.video++;},setCropPanelOpen(open,scroll){if(open&&scroll)calls.photo++;}});
   vm.runInContext(`${handler}\nthis.run=handleHeaderExport;`,state);
   state.run(); assert.equal(calls.video,1); assert.equal(calls.photo,0);
   state.isVideo=false; state.run(); assert.equal(calls.video,1); assert.equal(calls.photo,1);
-  state.exportBusy=true; state.run(); assert.equal(calls.photo,1);
+  state.hasContent=false; state.run(); assert.equal(calls.photo,1);
+  state.hasContent=true; state.exportBusy=true; state.run(); assert.equal(calls.photo,1);
 });
