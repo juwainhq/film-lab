@@ -237,7 +237,10 @@ test('grading history is capped at 51 snapshots, captures slider release and cur
   assert.match(appScript, /slider\.addEventListener\('pointerup',onGradeSliderCommit\)/);
   assert.match(appScript, /slider\.addEventListener\('keyup',onGradeSliderCommit\)/);
   assert.match(appScript, /event\.key\.toLowerCase\(\)!=='z'/);
-  assert.match(appScript, /stepGradeHistory\(event\.shiftKey\?1:-1\)/);
+  assert.match(appScript, /const historyStep=event\.shiftKey\?1:-1;/);
+  assert.match(appScript, /stepGradeHistory\(historyStep\)/);
+  // Local mask changes step their own history first; the grade history still handles the rest.
+  assert.match(appScript, /localMaskCanCaptureKeyboard\(\)&&localMaskStepHistory\(historyStep\)/);
   assert.match(appScript, /gradeHistoryIndex=gradeHistory\.length-1/);
   assert.match(appScript, /gradeCurveInteractionChanged=false;commitGradeSnapshot\(\)/);
   assert.match(appScript, /gradeCurveRenderFrame|scheduleGradeRender/);
@@ -256,6 +259,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v7'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v8'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

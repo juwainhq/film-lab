@@ -770,6 +770,16 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 .maskLayerActions button[aria-pressed="true"] { border-color: var(--text); color: var(--text); }
 .maskLayerSettings { margin: 4px 0 8px; padding: 8px 9px; border: 1px solid var(--panel-border); }
 .maskLayerSettings .maskBgRangeRow:first-child { margin-top: 0; }
+.localMaskHeading { margin: 0 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted, #9a9a9a); }
+.localMaskRow .maskLayerName { flex: 1; text-align: left; }
+.localMaskRow .maskLayerName small { display: block; font-size: 10px; color: var(--muted, #9a9a9a); letter-spacing: .04em; }
+.localMaskNameInput { flex: 1; min-width: 0; background: var(--field, #17171a); color: var(--text, #f2f2f2); border: 1px solid var(--accent, #e8e8e8); border-radius: 8px; padding: 6px 8px; font: inherit; }
+.localMaskSlider input[type="range"] { background: linear-gradient(var(--panel-border),var(--panel-border)) center / 100% 2px no-repeat; }
+.localMaskProgress { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.localMaskProgressBar { position: relative; height: 6px; border-radius: 999px; background: rgba(255,255,255,.14); overflow: hidden; }
+.localMaskProgressBar span { display: block; height: 100%; width: 0%; background: var(--accent, #e8e8e8); transition: width .25s ease; }
+#localMaskProgressText { margin: 0; font-size: 11px; color: var(--muted, #9a9a9a); }
+
 .maskLayerOps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin: 7px 0 2px; }
 .maskLayerOps button { min-height: 34px; padding: 4px; border: 1px solid var(--panel-border); background: transparent; color: var(--text-dim); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .maskLayerOps button[aria-pressed="true"] { border-color: var(--text); color: var(--text); background: var(--soft-bg); }
@@ -2183,6 +2193,45 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
               <button type="button" class="actionBtn" id="downloadMaskBtn"><span>⤓ Download mask (PNG)</span><span aria-hidden="true">↗</span></button>
               <p class="maskBgHint" id="maskRefineStatus" role="status" aria-live="polite">Edge refine is debounced and runs at up to 2048 px on the long edge.</p>
             </details>
+            <details class="maskBackgroundDetails" id="localMasksDetails" open>
+              <summary><span>Local masks</span><span class="maskBgSummaryHint" id="localMaskCount">0 / 8</span></summary>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskAddSubjectBtn">＋ Subject</button>
+                <button type="button" class="toolBtn" id="localMaskAddBackgroundBtn">＋ Background</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskAddLinearBtn">＋ Linear</button>
+                <button type="button" class="toolBtn" id="localMaskAddRadialBtn">＋ Radial</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskAddColorBtn">＋ Color range</button>
+                <button type="button" class="toolBtn" id="localMaskAddLuminanceBtn">＋ Luminance</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskAddBrushBtn">＋ Brush</button>
+                <button type="button" class="toolBtn" id="localMaskDuplicateBtn">⧉ Duplicate</button>
+              </div>
+              <div class="maskLayerList" id="localMaskList" role="list" aria-label="Local masks"></div>
+              <p class="maskBgHint" id="localMaskEmpty">No local masks yet. Each mask keeps its own layers and its own adjustments.</p>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskRenameBtn">✎ Rename</button>
+                <button type="button" class="toolBtn" id="localMaskApplyAllBtn">⇉ Apply to all photos</button>
+              </div>
+              <div id="localMaskAdjust" hidden>
+                <p class="localMaskHeading" id="localMaskAdjustName">Mask 1</p>
+                <div id="localMaskSliders"></div>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="localMaskUndoBtn" disabled>↶ Mask undo</button>
+                <button type="button" class="toolBtn" id="localMaskRedoBtn" disabled>↷ Mask redo</button>
+              </div>
+              <div id="localMaskProgress" class="localMaskProgress" hidden>
+                <div class="localMaskProgressBar" id="localMaskProgressBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="localMaskProgressFill"></span></div>
+                <p id="localMaskProgressText" role="status" aria-live="polite"></p>
+              </div>
+              <p class="maskBgHint" id="localMaskStatus" role="status" aria-live="polite">Double-click a slider to reset it to neutral. Brush and Pick object masks stay specific to each photo.</p>
+              <p class="maskBgHint">Local masks apply after the global grade, so unedited sliders leave the photo untouched.</p>
+            </details>
           </section>
           <section class="sidebarPanel exportTabPanel" id="exportTabPanel" data-panel="export" role="tabpanel" aria-labelledby="exportTab" hidden>
 <section id="exportPanel" class="socialPanel photo-only" aria-label="Instagram export">
@@ -2480,7 +2529,7 @@ const ditherColorModeSelect=$('ditherColorMode'), ditherPaletteSizeSelect=$('dit
 const ditherPaletteShadow=$('ditherPaletteShadow'), ditherPaletteHighlight=$('ditherPaletteHighlight');
 
 let sourceTexture=null, fboComposite=null, fboSharpened=null, fboGraded=null, fboDithered=null, fboBloomExtract=null, fboBloomBlurH=null, fboBloomBlurV=null, fboBloomBlurH2=null, fboBloomBlurV2=null, fboHallExtract=null, fboHallBlurH=null, fboHallBlurV=null;
-let maskBgTexture=null, maskBgBackgroundTexture=null;
+let maskBgTexture=null, maskBgBackgroundTexture=null, localMaskTextureA=null, localMaskTextureB=null;
 let floydTexture=null, floydLastKey=null, subjectMaskRevision=0;
 const appState={mode:'empty'};
 let isVideo=false, showOriginal=false, hasContent=false, animId=null;
@@ -2836,7 +2885,13 @@ function onGradeSliderCommit(){
   if(gradeApplyingSnapshot)return;
   commitGradeSnapshot(); updateGradeIndicators(); scheduleGradeRender();
 }
-function gradeCanCaptureKeyboard(event){
+function localMaskCanCaptureKeyboard(){
+  return appState.mode==='photo' && activeSidebarTab==='mask' && localMasks.length>0 && !maskLayerBusy;
+}
+function localMaskStepHistory(direction){
+  return direction<0 ? localMaskUndo() : localMaskRedo();
+}
+function gradeCanCaptureKeyboard(){
   const target=event.target;
   return !target?.closest?.('input,textarea,select,[contenteditable="true"],.numericEditor,[role="textbox"]');
 }
@@ -3503,7 +3558,10 @@ function initializeColorGrading(){
     }
     if(isGradeCompareKey(event)&&appState.mode==='photo'&&gradeCanCaptureKeyboard(event)&&hasContent&&!event.repeat){event.preventDefault();gradeBeforeCompare(true);return;}
     if(appState.mode!=='photo'||!(event.ctrlKey||event.metaKey)||event.altKey||event.key.toLowerCase()!=='z'||!gradeCanCaptureKeyboard(event))return;
-    event.preventDefault();stepGradeHistory(event.shiftKey?1:-1);
+    event.preventDefault();
+    const historyStep=event.shiftKey?1:-1;
+    if(localMaskCanCaptureKeyboard()&&localMaskStepHistory(historyStep)) return;
+    stepGradeHistory(historyStep);
   });
   document.addEventListener('keyup',event=>{if(isGradeCompareKey(event)&&gradeBeforeActive)gradeBeforeCompare(false);});
   window.addEventListener('blur',()=>{if(gradeBeforeActive)gradeBeforeCompare(false);});
@@ -3939,6 +3997,9 @@ uniform int u_maskEnabled; uniform int u_backgroundMode; uniform int u_maskInver
 uniform vec2 u_maskTexelSize;
 uniform float u_maskFeatherPixels; uniform float u_maskExpandPixels; uniform float u_backgroundBlurPixels; uniform float u_gradientAngle;
 uniform vec3 u_backgroundColor; uniform vec3 u_gradientStart; uniform vec3 u_gradientEnd;
+uniform sampler2D u_localMasksA; uniform sampler2D u_localMasksB;
+uniform float u_localMaskOn; uniform float u_localMaskCount;
+uniform vec4 u_localAdjustA[8]; uniform vec4 u_localAdjustB[8]; uniform vec4 u_localAdjustC[8];
 out vec4 outColor;
 float grainHash(vec2 p,float seed){
   p=fract(p*vec2(123.34,345.45)+vec2(seed*0.013,seed*0.071));
@@ -3955,6 +4016,67 @@ float grainValueNoise(vec2 p,float seed){
 float sampleKeepMask(vec2 uv){
   float value=texture(u_maskBackground,clamp(uv,vec2(0.0),vec2(1.0))).r;
   return u_maskInvert==1?1.0-value:value;
+}
+// Local masks: up to eight selections, four packed into each RGBA texture channel set.
+vec4 localMaskPack(int index){
+  if(index<4) return vec4(index==0?1.0:0.0,index==1?1.0:0.0,index==2?1.0:0.0,index==3?1.0:0.0);
+  int slot=index-4;
+  return vec4(slot==0?1.0:0.0,slot==1?1.0:0.0,slot==2?1.0:0.0,slot==3?1.0:0.0);
+}
+float localMaskAlpha(int index,vec2 uv){
+  vec2 packed=clamp(uv,vec2(0.0),vec2(1.0));
+  return index<4 ? dot(texture(u_localMasksA,packed),localMaskPack(index)) : dot(texture(u_localMasksB,packed),localMaskPack(index));
+}
+float localLuma(vec3 c){ return clamp(dot(c,vec3(0.2126,0.7152,0.0722)),0.0,1.0); }
+vec3 localBlurTap(vec2 uv,float radius){
+  vec2 step=max(1.0/max(u_resolution,vec2(1.0)),vec2(0.0))*max(radius,0.0);
+  vec3 sum=texture(u_base,clamp(uv,vec2(0.0),vec2(1.0))).rgb;
+  sum+=texture(u_base,clamp(uv+vec2(-step.x,-step.y),vec2(0.0),vec2(1.0))).rgb;
+  sum+=texture(u_base,clamp(uv+vec2( step.x,-step.y),vec2(0.0),vec2(1.0))).rgb;
+  sum+=texture(u_base,clamp(uv+vec2(-step.x, step.y),vec2(0.0),vec2(1.0))).rgb;
+  sum+=texture(u_base,clamp(uv+vec2( step.x, step.y),vec2(0.0),vec2(1.0))).rgb;
+  return sum*0.2;
+}
+// One mask's ten adjustments. All-neutral returns the exact source colour: every
+// branch is skipped, so an untouched photo stays pixel-identical.
+vec3 localAdjust(vec3 col,vec4 pa,vec4 pb,vec4 pc,vec2 uv){
+  float exposure=pa.x, contrast=pa.y, highlights=pa.z, shadows=pa.w;
+  float temperature=pb.x, tint=pb.y, saturation=pb.z, clarity=pb.w;
+  float sharpness=pc.x, blur=pc.y;
+  if(abs(exposure)>0.0001) col*=exp2(exposure);
+  if(abs(contrast)>0.0001) col=(col-0.5)*(1.0+contrast)+0.5;
+  if(abs(highlights)>0.0001){
+    float l=localLuma(col);
+    col+=highlights*(1.0-smoothstep(0.45,0.95,l))*col;
+  }
+  if(abs(shadows)>0.0001){
+    float l=localLuma(col);
+    col+=shadows*(1.0-smoothstep(0.05,0.5,l))*(1.0-col);
+  }
+  if(abs(temperature)>0.0001){
+    col.r+=temperature*0.10; col.g+=temperature*0.03; col.b-=temperature*0.09;
+  }
+  if(abs(tint)>0.0001){
+    col.r+=tint*0.03; col.g-=tint*0.08; col.b+=tint*0.03;
+  }
+  if(abs(saturation)>0.0001){
+    float l=localLuma(col);
+    col=mix(vec3(l),col,1.0+saturation);
+  }
+  if(abs(clarity)>0.0001){
+    vec3 wide=localBlurTap(uv,10.0);
+    float protect=(1.0-abs(localLuma(col)*2.0-1.0))*0.6+0.4;
+    col+=(col-wide)*clarity*1.5*protect;
+  }
+  if(abs(sharpness)>0.0001){
+    vec3 tight=localBlurTap(uv,1.4);
+    col+=(col-tight)*sharpness*1.8;
+  }
+  if(blur>0.0001){
+    vec3 soft=localBlurTap(uv,blur*26.0);
+    col=mix(col,soft,blur);
+  }
+  return max(col,vec3(0.0));
 }
 void main(){
   vec4 base=texture(u_base, v_texCoord);
@@ -4022,6 +4144,20 @@ void main(){
     else col+=vec3(0.12,0.04,-0.075)*u_highlightTone*highlight; // amber
     col+=vec3(0.075,-0.07,0.09)*u_highlightTint*highlight; // green ↔ magenta highlights
     lum=dot(col,vec3(0.2126,0.7152,0.0722));
+  }
+
+  // Local masks sit above the global grade and below the looks, grain and dither,
+  // so every slider moves the preview and the export in exactly the same way.
+  if(u_localMaskOn>0.0){
+    for(int index=0; index<8; index++){
+      if(float(index)>=u_localMaskCount) break;
+      vec4 pa=u_localAdjustA[index]; vec4 pb=u_localAdjustB[index]; vec4 pc=u_localAdjustC[index];
+      if(pc.z<0.5) continue;
+      float alpha=localMaskAlpha(index,v_texCoord);
+      if(alpha<=0.0005) continue;
+      vec3 adjusted=localAdjust(col,pa,pb,pc,v_texCoord);
+      col=mix(col,adjusted,clamp(alpha,0.0,1.0));
+    }
   }
 
   // Signed Amount inverts the same film-like pattern when negative.
@@ -4302,6 +4438,13 @@ maskBgBackgroundTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE4); gl.bi
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+localMaskTextureA=gl.createTexture(); localMaskTextureB=gl.createTexture();
+for(const localTexture of [localMaskTextureA,localMaskTextureB]){
+  gl.bindTexture(gl.TEXTURE_2D,localTexture);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+}
 maskBgCleanTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D,maskBgCleanTexture);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
@@ -4323,11 +4466,13 @@ function previewFrameKey(){
   return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,sourceFrame,gradeStateKey(),
     ids.map(id=>sliders[id]?.value??'').join(','),Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),
     ditherScope,JSON.stringify(getDitherSettings()),subjectMaskRevision,showOriginal,splitPreview,
-    appState.mode==='photo'&&maskBgActive,maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
+    appState.mode==='photo'&&maskBgActive,maskBgReplaceActive(),maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
+    localMaskRenderKey(),
     isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,renderAtFullResolution].join('|');
 }
 function render(timeMs){
   if(!sourceTexture || !fboSharpened || !fboComposite) return;
+  if(localMasksDirty){ localMasksDirty=false; localMaskRebuildAlphas(); uploadLocalMaskTextures(); }
   const cacheable=!exportBusy, frameKey=cacheable?previewFrameKey():null;
   if(cacheable && frameKey===lastPreviewRenderKey) return;
   if(showOriginal){
@@ -4535,7 +4680,7 @@ function render(timeMs){
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,gradeSourceTexture); gl.uniform1i(gl.getUniformLocation(progComposite,'u_base'),0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D,fboBloomBlurV2.tex); gl.uniform1i(gl.getUniformLocation(progComposite,'u_bloom'),1);
   gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D,fboHallBlurV.tex); gl.uniform1i(gl.getUniformLocation(progComposite,'u_hallation'),2);
-  const maskBgEnabled=appState.mode==='photo' && !isVideo && !!maskBgActive && !!maskBgCanvas;
+  const maskBgEnabled=appState.mode==='photo' && !isVideo && !!maskBgActive && !!maskBgCanvas && maskBgReplaceActive();
   gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D,maskBgTexture); gl.uniform1i(gl.getUniformLocation(progComposite,'u_maskBackground'),3);
   gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,maskBgBackgroundTexture); gl.uniform1i(gl.getUniformLocation(progComposite,'u_backgroundImage'),4);
   gl.uniform1i(gl.getUniformLocation(progComposite,'u_maskEnabled'),maskBgEnabled?1:0);
@@ -4569,6 +4714,17 @@ function render(timeMs){
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_grainSeed'),isVideo ? videoGrainSeed : (currentPhoto?.grainSeed??1));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_time'),isVideo ? (timeMs??performance.now())*0.001 : 0);
   gl.uniform2f(gl.getUniformLocation(progComposite,'u_resolution'),canvas.width,canvas.height);
+  const localUniforms=localMaskUniforms();
+  gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D,localMaskTextureA);
+  gl.uniform1i(gl.getUniformLocation(progComposite,'u_localMasksA'),6);
+  gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D,localMaskTextureB);
+  gl.uniform1i(gl.getUniformLocation(progComposite,'u_localMasksB'),7);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_localMaskOn'),localUniforms.any);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_localMaskCount'),Math.min(LOCAL_MASK_LIMIT,localMasks.length));
+  gl.uniform4fv(gl.getUniformLocation(progComposite,'u_localAdjustA'),localUniforms.a);
+  gl.uniform4fv(gl.getUniformLocation(progComposite,'u_localAdjustB'),localUniforms.b);
+  gl.uniform4fv(gl.getUniformLocation(progComposite,'u_localAdjustC'),localUniforms.c);
+
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_exposure'),effectValue('color',params.exposure));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_contrast'),effectValue('color',params.contrast,1));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_saturation'),effectValue('color',params.saturation,1));
@@ -4674,7 +4830,8 @@ function floydStateKey(timeMs,dither,backgroundOnly,strength){
   return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,isVideo?videoSourceFile?.name:'photo',currentPhoto?.id||'',frame,gradeStateKey(),
     isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,ids.map(id=>sliders[id].value).join(','),
     Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),ditherScope,subjectMaskRevision,
-    appState.mode==='photo'&&maskBgActive,maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
+    appState.mode==='photo'&&maskBgActive,maskBgReplaceActive(),maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
+    localMaskRenderKey(),
     strength,backgroundOnly,JSON.stringify(dither)].join('|');
 }
 function updateFloydTexture(timeMs,dither,backgroundOnly,strength){
@@ -4814,6 +4971,19 @@ let segmenterPromise=null, maskQueue=Promise.resolve(), activeMaskRequest=0, mas
 // Photo-only Mask & Background state is separate from Dither's white-subject mask.
 let maskBgCanvas=null, maskBgCtx=null, maskBgAutoCanvas=null, maskBgStrokes=[], maskBgStroke=null;
 let maskBgActive=false, maskBgBaseValue=255, maskBgPaintMode=null, maskBgUndoStack=[], maskBgUploadFrame=0, maskBgProcessing=false, maskBrushCursorPoint=null;
+/* Which mask surface the user is working in decides whether the background
+   composite shows: the legacy Background panel and the Mask layers panel keep
+   their cutout behaviour, while the Local masks panel only adjusts pixels. */
+let maskBgSurfaceLocal=false, maskBgUserEngaged=false;
+function maskBgMarkLegacySurface(){ maskBgUserEngaged=true; maskBgSurfaceLocal=false; }
+function maskBgMarkLocalSurface(){ maskBgSurfaceLocal=true; }
+function maskBgReplaceActive(){ return !(maskBgSurfaceLocal && !maskBgUserEngaged); }
+function maskBgTrackSurface(event){
+  const target=event.target;
+  if(!target||!target.closest) return;
+  if(target.closest('#localMasksDetails')) maskBgMarkLocalSurface();
+  else if(target.closest('#maskLayersDetails,#maskBackgroundDetails')) maskBgMarkLegacySurface();
+}
 let maskBgRevision=0, maskBgAutoRequestId=0, maskBgAutoTimeout=null, maskBgModelPromise=null, maskBgModelState='idle', maskBgModelLoadId=0, maskBgSegmentationHandler=null;
 let maskBgWorker=null, maskBgWorkerRequestId=0, maskBgWorkerPending=new Map();
 let maskBgBackgroundImage=null, maskBgImageCanvas=null, maskBgImageRevision=0, maskBgImageDataUrl='', maskBgImageName='No image selected', maskBgPresetImageRequest=0;
@@ -5108,7 +5278,7 @@ function magicSelectMask(point){
     if(x>0)add(index-1);if(x+1<width)add(index+1);if(y>0)add(index-width);if(y+1<height)add(index+width);
   }
   selection.getContext('2d').putImageData(out,0,0);
-  maskBgStrokes.push({mode:'magic',selection,points:[],radius:0}); maskBgActive=true;
+  maskBgStrokes.push({mode:'magic',selection,points:[],radius:0}); maskBgActive=true; maskBgMarkLegacySurface();
   rebuildMaskBackgroundCanvas(); updateMaskBgControls(); forceMaskBackgroundPng(); updateSocialUI(); markMaskBgPresetChanged();
   setMaskBgStatus(`Magic select kept ${Math.max(1,Math.round(selected/total*100))}% of the image. Paint or erase to refine.`);
 }
@@ -5131,7 +5301,7 @@ function floodFillMaskBackground(point,mode){
     if(x>0)add(index-1);if(x+1<width)add(index+1);if(y>0)add(index-width);if(y+1<height)add(index+width);
   }
   selection.getContext('2d').putImageData(output,0,0);
-  maskBgStrokes.push({mode:'flood',floodMode:mode,selection,points:[],radius:0});maskBgActive=true;
+  maskBgStrokes.push({mode:'flood',floodMode:mode,selection,points:[],radius:0});maskBgActive=true;maskBgMarkLegacySurface();
   rebuildMaskBackgroundCanvas();updateMaskBgControls();forceMaskBackgroundPng();updateSocialUI();markMaskBgPresetChanged();
   const action=mode==='paint'?'kept':'removed';setMaskBgStatus(`Flood fill ${action} the connected mask region.`);
 }
@@ -5141,9 +5311,11 @@ function undoMaskBackground(){
   setMaskBgStatus('Undid the last mask edit.');
 }
 function saveActiveMaskBackground(){
+  if(!isVideo) currentPhoto.maskLocal=localMaskSave();
   if(!currentPhoto||isVideo) return;
   currentPhoto.maskBackground=maskBgCanvas&&(maskBgActive||maskBgAutoCanvas||maskBgStrokes.length)?{
     canvas:maskBgCanvas,auto:maskBgAutoCanvas,strokes:maskBgStrokes,active:maskBgActive,baseValue:maskBgBaseValue,undoStack:maskBgUndoStack,
+    localOnly:maskBgSurfaceLocal&&!maskBgUserEngaged,
     layers:maskLayerSave()
   }:null;
 }
@@ -5157,15 +5329,21 @@ function restoreMaskBackgroundForPhoto(item){
     maskBgAutoCanvas=saved.auto||null;
     maskBgStrokes=(saved.strokes||[]).map(stroke=>({...stroke,points:(stroke.points||[]).map(point=>({...point}))}));
     maskBgActive=!!saved.active;maskBgBaseValue=saved.baseValue===0?0:255;maskBgUndoStack=saved.undoStack||[];
+    if(saved.active){
+      if(saved.localOnly){maskBgUserEngaged=false;maskBgSurfaceLocal=true;}
+      else maskBgMarkLegacySurface();
+    }else{maskBgUserEngaged=false;maskBgSurfaceLocal=false;}
   }else{
     maskBgCanvas=document.createElement('canvas');maskBgCanvas.width=width;maskBgCanvas.height=height;maskBgCtx=maskBgCanvas.getContext('2d');
     maskBgCtx.fillStyle='#fff';maskBgCtx.fillRect(0,0,width,height);
-    maskBgAutoCanvas=null;maskBgStrokes=[];maskBgActive=false;maskBgBaseValue=255;maskBgUndoStack=[];
+    maskBgAutoCanvas=null;maskBgStrokes=[];maskBgActive=false;maskBgBaseValue=255;maskBgUndoStack=[];maskBgUserEngaged=false;maskBgSurfaceLocal=false;
   }
   maskBgCtx=maskBgCanvas.getContext('2d');
   maskLayerRestore(saved?.layers);
   if(maskBgBackgroundImage&&maskBgSettings.mode==='image')fitMaskBgImageToPhoto();else uploadMaskBgBackgroundImage();
   uploadMaskBackground();updateMaskBgControls();
+  localMaskRestore(item?.maskLocal);
+  maskLayerQueueComposite();
   if(maskBgSettings.mode==='blur')requestMaskBgBlur(true);
 }
 function rotateMaskBgState(saved,degrees){
@@ -5199,6 +5377,7 @@ function applyMaskBackground(){
 }
 function setMaskBgSetting(key,value){
   if(!maskBgPhotoReady())return;
+  maskBgMarkLegacySurface();
   maskBgSettings[key]=value;updateMaskBgControls();markMaskBgPresetChanged();
   if(key==='mode'){
     if(value==='blur')requestMaskBgBlur(true);
@@ -5366,9 +5545,10 @@ async function autoRemoveMaskBackground(){
 const maskStackApi=()=>window.FilmMaskStack||null;
 let maskStack=null, maskLayerCompositeAlpha=null, maskLayerSelectedId=null, maskLayerOverlayOn=true;
 let maskLayerToken=0, maskLayerRefineTimer=null, maskLayerCompositeQueued=false, maskLayerBusy=false;
-let maskLayerStroke=null, maskLayerDrag=null, maskLayerSampleMode=false, maskLayerOverlayFrame=0, maskLayerOverlayDirty=true;
-let maskLayerPickPending=false, maskLayerSourceCache=null, maskLayerSourceKey='';
+let maskLayerStroke=null, maskLayerDrag=null, maskLayerSampleMode=false, maskLayerOverlayFrame=0, maskLayerOverlayDirty=true, maskLayerLocalSyncTimer=0;
+let maskLayerPickPending=false, maskLayerSourceCache=null, maskLayerSourceKey='', localMasksDirty=true;
 let maskEngineMode='fast', maskEnginePrevious='fast';
+let localMasks=[];
 let maskProWorker=null, maskProWorkerRequestId=0, maskProWorkerPending=new Map(), maskProReady=false, maskProDevice='wasm', maskProDownloading=false;
 const MASK_PRO_BYTES={webgpu:115*1024*1024,wasm:224*1024*1024};
 const MASK_PICK_LIMIT=6;
@@ -5384,6 +5564,7 @@ function maskLayerEnsureStack(){
   const api=maskStackApi();
   if(!api){ console.warn('Film Lab mask layers are unavailable: mask-stack.js did not load'); return null; }
   maskStack=api.createStack({historyLimit:40});
+  localMaskAdoptStack(maskStack);
   return maskStack;
 }
 function maskLayerDimensions(){
@@ -5595,6 +5776,7 @@ function maskLayerRenderSettings(){
 
 /* ---------- composite ---------- */
 function maskLayerAfterChange(message){
+  localMaskHistoryPush();
   maskLayerRenderList(); maskLayerRenderSettings();
   maskLayerOverlayKick();
   if(message) setMaskBgStatus(message);
@@ -5602,6 +5784,7 @@ function maskLayerAfterChange(message){
   maskLayerQueueComposite();
 }
 function maskLayerQueueComposite(){
+  if(!maskLayerLocalSyncTimer) maskLayerLocalSyncTimer=setTimeout(()=>{maskLayerLocalSyncTimer=0;localMaskTexturesDirty();},90);
   maskLayerOverlayDirty=true;
   if(maskLayerCompositeQueued) return;
   maskLayerCompositeQueued=true;
@@ -5626,6 +5809,8 @@ function maskLayerApplyComposite(){
   }
   const hadLayers=maskStack.layers.length>0;
   maskLayerCompositeAlpha=alpha;
+  const activeLocalMask=localMaskActive();
+  if(activeLocalMask) activeLocalMask.alpha=alpha;
   if(hadLayers||maskBgActive){
     maskBgAutoCanvas=maskLayerRasterFromAlpha(alpha,width,height);
     maskBgBaseValue=0;
@@ -5634,6 +5819,7 @@ function maskLayerApplyComposite(){
   rebuildMaskBackgroundCanvas();
   maskLayerRequestRefine('layers');
   maskLayerOverlayDirty=true; maskLayerOverlayKick();
+  uploadLocalMaskTextures();
   updateMaskBgControls(); forceMaskBackgroundPng(); updateSocialUI();
   setMaskBgAiStatus(hadLayers?'Mask layers composited on this device.':'No mask layers yet.',hadLayers,false);
 }
@@ -5667,6 +5853,7 @@ function maskLayerRequestRefine(reason){
       maskBgActive=true;
       rebuildMaskBackgroundCanvas(); forceMaskBackgroundPng(); updateSocialUI();
       maskLayerOverlayDirty=true;
+      localMaskTexturesDirty();
       maskRequestEdgeCleanup(result.mask,result.width,result.height);
       if(status) status.textContent='Edges refined. Smooth, feather, expand and invert stay live.';
     }catch(error){
@@ -5908,6 +6095,8 @@ function maskLayerPointerMove(event){
   }
   maskLayerOverlayDirty=true;
   maskLayerQueueComposite();
+  const activeLocal=localMaskActive();
+  if(activeLocal) activeLocal.selectedLayerId=maskLayerSelectedId;
   return true;
 }
 function maskLayerPointerUp(event){
@@ -5916,6 +6105,581 @@ function maskLayerPointerUp(event){
   if(!hasStroke&&!hasDrag) return;
   maskLayerEndStroke(event);
   if(hasDrag) maskLayerAfterChange('Gradient updated');
+}
+
+/* =====================================================================
+   Local masks — Lightroom-style per-mask adjustments.
+   Every mask owns its own layer stack (the selection) plus ten neutral
+   adjustments. Up to eight masks per photo; their alphas are packed into
+   the channels of two RGBA textures (four masks per texture) so the
+   composite shader can apply each mask's adjustments as
+   mix(base, adjusted(base), maskAlpha) after the global grade and before
+   grain/dither. Slider moves only refresh uniforms; the textures are
+   re-uploaded only when a mask's alpha actually changes.
+   ===================================================================== */
+const LOCAL_MASK_LIMIT=8;
+let activeLocalMaskId=null, localMaskIdSeed=0, localMaskRenameTarget=null;
+let localMaskHistory=[], localMaskHistoryIndex=-1, localMaskHistoryKey='', localMaskApplyingSnapshot=false;
+
+const LOCAL_ADJUSTMENTS=[
+  {id:'exposure',label:'Exposure',min:-100,max:100,step:1},
+  {id:'contrast',label:'Contrast',min:-100,max:100,step:1},
+  {id:'highlights',label:'Highlights',min:-100,max:100,step:1},
+  {id:'shadows',label:'Shadows',min:-100,max:100,step:1},
+  {id:'temperature',label:'Temperature',min:-100,max:100,step:1},
+  {id:'tint',label:'Tint',min:-100,max:100,step:1},
+  {id:'saturation',label:'Saturation',min:-100,max:100,step:1},
+  {id:'clarity',label:'Clarity',min:-100,max:100,step:1},
+  {id:'sharpness',label:'Sharpness',min:-100,max:100,step:1},
+  {id:'blur',label:'Blur',min:0,max:100,step:1},
+];
+
+function localMaskDefaults(){
+  const values={};
+  for(const def of LOCAL_ADJUSTMENTS) values[def.id]=0;
+  return values;
+}
+function localMaskHasAdjustments(mask){
+  if(!mask) return false;
+  for(const def of LOCAL_ADJUSTMENTS) if(Math.abs(Number(mask.adjustments[def.id])||0)>0.0001) return true;
+  return false;
+}
+function localMaskById(id){ return localMasks.find(mask=>mask.id===id)||null; }
+function localMaskActive(){ return localMaskById(activeLocalMaskId)||null; }
+function localMaskPhotoReady(){ return maskBgPhotoReady() && photos.length>0; }
+
+/* Every stack belongs to a mask: a layer added from the Mask layers panel gets
+   its own local-mask entry so the list, the adjustments and apply-to-all see it. */
+function localMaskAdoptStack(stack){
+  if(!stack) return null;
+  if(localMasks.some(mask=>mask.stack===stack)) return localMaskActive();
+  const mask=localMaskCreate();
+  if(!mask) return null;
+  mask.stack=stack;
+  activeLocalMaskId=mask.id;
+  localMaskRenderList();
+  return mask;
+}
+function localMaskCreate(name,adjustments,visible=true){
+  const api=maskStackApi();
+  if(!api) return null;
+  if(localMasks.length>=LOCAL_MASK_LIMIT){
+    setMaskBgStatus(`Up to ${LOCAL_MASK_LIMIT} local masks per photo. Delete or merge one to add another.`);
+    return null;
+  }
+  const mask={
+    id:`local-mask-${++localMaskIdSeed}`,
+    name:(name&&String(name).trim())||`Mask ${localMasks.length+1}`,
+    visible:visible!==false,
+    adjustments:{...localMaskDefaults(),...(adjustments||{})},
+    selectedLayerId:null,
+    alpha:null,
+    stack:api.createStack({historyLimit:40}),
+  };
+  localMasks.push(mask);
+  return mask;
+}
+function localMaskSelect(id){
+  const mask=localMaskById(id);
+  if(!mask) return;
+  const current=localMaskActive();
+  if(current) current.selectedLayerId=maskLayerSelectedId;
+  activeLocalMaskId=mask.id;
+  maskStack=mask.stack;
+  maskLayerSelectedId=mask.selectedLayerId&&mask.stack.layers.some(layer=>layer.id===mask.selectedLayerId)
+    ?mask.selectedLayerId
+    :(mask.stack.layers.at(-1)?.id||null);
+  localMaskRenderList(); localMaskRenderSliders();
+  maskLayerRenderList(); maskLayerRenderSettings();
+  maskLayerOverlayDirty=true; maskLayerOverlayKick();
+}
+function localMaskRenderList(){
+  const list=$('localMaskList'); if(!list) return;
+  list.innerHTML='';
+  const count=$('localMaskCount'); if(count) count.textContent=`${localMasks.length} / ${LOCAL_MASK_LIMIT}`;
+  const empty=$('localMaskEmpty'); if(empty) empty.hidden=localMasks.length>0;
+  localMasks.forEach(mask=>{
+    const row=document.createElement('div');
+    row.className='maskLayerRow localMaskRow';
+    row.setAttribute('role','listitem');
+    row.dataset.maskId=mask.id;
+    row.dataset.selected=String(mask.id===activeLocalMaskId);
+    row.dataset.visible=String(mask.visible!==false);
+    const visibility=document.createElement('button');
+    visibility.type='button'; visibility.className='maskLayerVisibility';
+    visibility.textContent=mask.visible!==false?'◉':'○';
+    visibility.setAttribute('aria-label',`${mask.visible!==false?'Hide':'Show'} ${mask.name}`);
+    visibility.setAttribute('aria-pressed',String(mask.visible!==false));
+    visibility.addEventListener('click',event=>{event.stopPropagation();localMaskToggleVisible(mask.id);});
+    if(localMaskRenameTarget===mask.id){
+      const input=document.createElement('input');
+      input.type='text'; input.className='localMaskNameInput'; input.id='localMaskNameInput';
+      input.value=mask.name; input.maxLength=40; input.setAttribute('aria-label','Mask name');
+      const commit=()=>{localMaskRenameTarget=null;localMaskRename(mask.id,input.value);};
+      input.addEventListener('keydown',event=>{
+        if(event.key==='Enter'){event.preventDefault();commit();}
+        else if(event.key==='Escape'){event.preventDefault();localMaskRenameTarget=null;localMaskRenderList();}
+      });
+      input.addEventListener('blur',commit);
+      row.append(visibility,input);
+      requestAnimationFrame(()=>{input.focus();input.select();});
+    }else{
+      const name=document.createElement('button');
+      name.type='button'; name.className='maskLayerName';
+      name.innerHTML=`${mask.name}<small>${localMaskHasAdjustments(mask)?'adjusted':'neutral'} · ${mask.stack.layers.length} layer${mask.stack.layers.length===1?'':'s'}</small>`;
+      name.addEventListener('click',()=>localMaskSelect(mask.id));
+      name.addEventListener('dblclick',()=>{localMaskRenameTarget=mask.id;localMaskRenderList();});
+      row.append(visibility,name);
+    }
+    const actions=document.createElement('div'); actions.className='maskLayerActions';
+    const remove=document.createElement('button');
+    remove.type='button'; remove.textContent='✕'; remove.title='Delete mask';
+    remove.setAttribute('aria-label',`Delete ${mask.name}`);
+    remove.addEventListener('click',event=>{event.stopPropagation();localMaskDelete(mask.id);});
+    actions.append(remove);
+    row.append(actions);
+    list.append(row);
+  });
+  const undo=$('localMaskUndoBtn'),redo=$('localMaskRedoBtn');
+  if(undo) undo.disabled=localMaskHistoryIndex<=0;
+  if(redo) redo.disabled=localMaskHistoryIndex>=localMaskHistory.length-1;
+}
+function localMaskRenderSliders(){
+  const host=$('localMaskSliders'); if(!host) return;
+  const mask=localMaskActive();
+  const panel=$('localMaskAdjust');
+  if(panel) panel.hidden=!mask;
+  if(!mask){host.innerHTML='';return;}
+  const name=$('localMaskAdjustName'); if(name) name.textContent=mask.name;
+  host.innerHTML='';
+  for(const def of LOCAL_ADJUSTMENTS){
+    const row=document.createElement('div');
+    row.className='maskBgRangeRow localMaskSlider';
+    row.dataset.adjustment=def.id;
+    const label=document.createElement('label');
+    label.setAttribute('for',`localAdjust-${def.id}`);
+    const output=document.createElement('output');
+    output.id=`localAdjustValue-${def.id}`;
+    const value=Number(mask.adjustments[def.id])||0;
+    output.textContent=def.id==='blur'?`${Math.round(value)}`:(value>0?`+${Math.round(value)}`:String(Math.round(value)));
+    label.append(document.createTextNode(def.label),output);
+    const input=document.createElement('input');
+    input.type='range'; input.className='subSlider'; input.id=`localAdjust-${def.id}`;
+    input.min=String(def.min); input.max=String(def.max); input.step=String(def.step);
+    input.value=String(value);
+    input.setAttribute('aria-label',`${def.label} for ${mask.name}`);
+    input.addEventListener('input',()=>localMaskSetAdjustment(mask.id,def.id,Number(input.value)));
+    input.addEventListener('change',()=>localMaskHistoryPush());
+    input.addEventListener('dblclick',event=>{event.preventDefault();localMaskResetAdjustment(mask.id,def.id);});
+    row.append(label,input);
+    host.append(row);
+    applySliderFill(input);
+  }
+}
+function localMaskSliderOutput(def,value){
+  const output=$(`localAdjustValue-${def.id}`);
+  if(!output) return;
+  output.textContent=def.id==='blur'?`${Math.round(value)}`:(value>0?`+${Math.round(value)}`:String(Math.round(value)));
+  output.classList.toggle('negative',value<0);
+  output.classList.toggle('positive',value>0);
+}
+function localMaskSetAdjustment(maskId,key,value){
+  const mask=localMaskById(maskId); const def=LOCAL_ADJUSTMENTS.find(entry=>entry.id===key);
+  if(!mask||!def) return;
+  const numeric=Number.isFinite(value)?value:0;
+  mask.adjustments[key]=Math.max(def.min,Math.min(def.max,numeric));
+  const input=$(`localAdjust-${key}`);
+  if(input && Number(input.value)!==mask.adjustments[key]) input.value=String(mask.adjustments[key]);
+  if(input) applySliderFill(input);
+  localMaskSliderOutput(def,mask.adjustments[key]);
+  localMaskRenderList();
+  // Uniforms only: the packed mask textures are untouched, so the GPU work is a single draw.
+  lastPreviewRenderKey=null;
+  if(hasContent) render(performance.now());
+}
+function localMaskResetAdjustment(maskId,key){
+  localMaskSetAdjustment(maskId,key,0);
+  localMaskHistoryPush();
+  const def=LOCAL_ADJUSTMENTS.find(entry=>entry.id===key);
+  setMaskBgStatus(`${def?def.label:key} reset to neutral.`);
+}
+function applySliderFill(input){
+  if(!input) return;
+  // Same bipolar thumb language as the grade sliders: white when neutral, red or grey away from it.
+  const value=Number(input.value)||0;
+  input.style.setProperty('--slider-thumb',value<0?'var(--negative)':value>0?'var(--accent)':'var(--slider-neutral)');
+}
+function localMaskToggleVisible(id){
+  const mask=localMaskById(id); if(!mask) return;
+  mask.visible=mask.visible===false;
+  localMaskRenderList();
+  localMaskTexturesDirty();
+  setMaskBgStatus(mask.visible?`${mask.name} shown.`:`${mask.name} hidden.`);
+}
+function localMaskDelete(id){
+  const mask=localMaskById(id); if(!mask) return;
+  maskBgMarkLocalSurface();
+  localMasks=localMasks.filter(entry=>entry.id!==id);
+  if(activeLocalMaskId===id){
+    activeLocalMaskId=localMasks[0]?.id||null;
+    maskStack=localMaskActive()?.stack||null;
+    maskLayerSelectedId=maskStack?.layers.at(-1)?.id||null;
+  }
+  localMaskRenderList(); localMaskRenderSliders(); maskLayerRenderList(); maskLayerRenderSettings();
+  localMaskTexturesDirty();
+  setMaskBgStatus(`${mask.name} deleted.`);
+  localMaskHistoryPush();
+}
+function localMaskDuplicate(){
+  const source=localMaskActive();
+  if(!source) return;
+  maskBgMarkLocalSurface();
+  const copy=localMaskCreate(`${source.name} copy`,{...source.adjustments},source.visible);
+  if(!copy){localMasks=localMasks.filter(mask=>mask!==copy);return;}
+  for(const layer of source.stack.layers){
+    const added=copy.stack.addLayer(layer.type,{name:layer.name,operation:layer.operation,invert:layer.invert,visible:layer.visible,params:{...layer.params}});
+    if(layer.raster) copy.stack.setLayerRaster(added.id,new Uint8ClampedArray(layer.raster.data),layer.raster.width,layer.raster.height);
+  }
+  localMaskSelect(copy.id);
+  localMaskTexturesDirty();
+  setMaskBgStatus(`${source.name} duplicated.`);
+  localMaskHistoryPush();
+}
+function localMaskRename(id,value){
+  const mask=localMaskById(id); if(!mask) return;
+  const next=String(value||'').trim().slice(0,40)||mask.name;
+  if(next===mask.name){localMaskRenderList();return;}
+  mask.name=next;
+  localMaskRenderList(); localMaskRenderSliders();
+  setMaskBgStatus(`Mask renamed to ${mask.name}.`);
+  localMaskHistoryPush();
+}
+function localMaskRenameActive(){
+  const mask=localMaskActive();
+  if(!mask){setMaskBgStatus('Add a mask before renaming it.');return;}
+  localMaskRenameTarget=mask.id;
+  localMaskRenderList();
+}
+
+/* ---------- alpha compositing and RGBA packing ---------- */
+function localMaskCompositeAlpha(mask){
+  const api=maskStackApi();
+  if(!api||!maskBgCanvas) return null;
+  const {width,height}=maskLayerDimensions();
+  try{
+    return api.compositeLayers(mask.stack.layers,width,height,maskLayerSourceRgba());
+  }catch(error){
+    console.warn('Film Lab could not composite a local mask',error);
+    return null;
+  }
+}
+function localMaskRebuildAlphas(){
+  window.__filmLabDebug=window.__filmLabDebug||{localMaskTextureUploads:0,localMaskRebuilds:0};
+  window.__filmLabDebug.localMaskRebuilds++;
+  for(const mask of localMasks) mask.alpha=localMaskCompositeAlpha(mask);
+}
+function localMaskHasAny(){
+  return localMasks.some(mask=>mask.visible!==false&&!!mask.alpha&&localMaskHasAdjustments(mask));
+}
+function localMaskUniforms(){
+  const count=Math.min(LOCAL_MASK_LIMIT,localMasks.length);
+  const a=new Float32Array(32),b=new Float32Array(32),c=new Float32Array(32);
+  for(let index=0;index<count;index++){
+    const mask=localMasks[index],params=mask.adjustments,base=index*4;
+    const active=mask.visible!==false&&!!mask.alpha&&localMaskHasAdjustments(mask)?1:0;
+    a[base]=(Number(params.exposure)||0)/100*2;      // stops, ±2 EV
+    a[base+1]=(Number(params.contrast)||0)/100;
+    a[base+2]=(Number(params.highlights)||0)/100;
+    a[base+3]=(Number(params.shadows)||0)/100;
+    b[base]=(Number(params.temperature)||0)/100;
+    b[base+1]=(Number(params.tint)||0)/100;
+    b[base+2]=(Number(params.saturation)||0)/100;
+    b[base+3]=(Number(params.clarity)||0)/100;
+    c[base]=(Number(params.sharpness)||0)/100;
+    c[base+1]=(Number(params.blur)||0)/100;
+    c[base+2]=active;
+    c[base+3]=0;
+  }
+  return {a,b,c,any:localMaskHasAny()?1:0};
+}
+function localMaskRenderKey(){
+  if(!localMasks.length) return 'none';
+  return localMasks.map(mask=>[
+    mask.id,
+    mask.visible!==false?1:0,
+    mask.alpha?1:0,
+    LOCAL_ADJUSTMENTS.map(def=>Number(mask.adjustments[def.id])||0).join(','),
+  ].join(':')).join('|');
+}
+/* Textures are re-uploaded only here: masks 1-4 in the channels of texture A, 5-8 in texture B. */
+function uploadLocalMaskTextures(){
+  if(!localMaskTextureA||!localMaskTextureB) return;
+  const {width,height}=maskLayerDimensions();
+  const count=width*height;
+  /* A typed-array upload keeps every channel exactly as packed: canvas sources
+     are premultiplied, which would zero the RGB data wherever alpha is zero. */
+  const build=(from)=>{
+    const packed=new Uint8Array(count*4);
+    for(let channel=0;channel<4;channel++){
+      const mask=localMasks[from+channel];
+      if(!mask||!mask.alpha) continue;
+      const alpha=mask.alpha;
+      for(let pixel=0;pixel<count;pixel++) packed[pixel*4+channel]=alpha[pixel];
+    }
+    const flipped=new Uint8Array(count*4), rowBytes=width*4;
+    for(let y=0;y<height;y++) flipped.set(packed.subarray(y*rowBytes,(y+1)*rowBytes),(height-1-y)*rowBytes);
+    return flipped;
+  };
+  const upload=(texture,unit,data)=>{
+    gl.activeTexture(unit); gl.bindTexture(gl.TEXTURE_2D,texture);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,data);
+  };
+  upload(localMaskTextureA,gl.TEXTURE6,build(0));
+  upload(localMaskTextureB,gl.TEXTURE7,build(4));
+  gl.activeTexture(gl.TEXTURE0);
+  window.__filmLabDebug=window.__filmLabDebug||{localMaskTextureUploads:0,localMaskRebuilds:0};
+  window.__filmLabDebug.localMaskTextureUploads++;
+  lastPreviewRenderKey=null;
+  if(hasContent) render(performance.now());
+}
+function localMaskTexturesDirty(){
+  localMaskRebuildAlphas();
+  uploadLocalMaskTextures();
+  lastPreviewRenderKey=null;
+  if(hasContent) render(performance.now());
+}
+
+/* ---------- persistence, history, apply to all ---------- */
+function localMaskSnapshot(){
+  return {
+    activeId:activeLocalMaskId,
+    masks:localMasks.map(mask=>({
+      id:mask.id,
+      name:mask.name,
+      visible:mask.visible!==false,
+      adjustments:{...mask.adjustments},
+      selectedLayerId:mask.selectedLayerId||null,
+      layers:mask.stack.layers.map(layer=>({
+        id:layer.id, type:layer.type, name:layer.name, operation:layer.operation,
+        invert:!!layer.invert, visible:layer.visible!==false, params:{...layer.params},
+        raster:layer.raster?{data:layer.raster.data, width:layer.raster.width, height:layer.raster.height}:null,
+      })),
+    })),
+  };
+}
+function localMaskApplySnapshot(snapshot){
+  const api=maskStackApi();
+  if(!api||!snapshot) return;
+  localMaskApplyingSnapshot=true;
+  const previous=new Map(localMasks.map(mask=>[mask.id,mask]));
+  localMasks=[];
+  for(const entry of snapshot.masks||[]){
+    const mask={
+      id:entry.id,
+      name:entry.name,
+      visible:entry.visible!==false,
+      adjustments:{...localMaskDefaults(),...(entry.adjustments||{})},
+      selectedLayerId:entry.selectedLayerId||null,
+      alpha:null,
+      stack:api.createStack({historyLimit:40}),
+    };
+    for(const layer of entry.layers||[]){
+      const added=mask.stack.addLayer(layer.type,{name:layer.name,operation:layer.operation,invert:layer.invert,visible:layer.visible,params:{...layer.params}});
+      if(layer.raster) mask.stack.setLayerRaster(added.id,new Uint8ClampedArray(layer.raster.data),layer.raster.width,layer.raster.height);
+    }
+    localMasks.push(mask);
+    if(entry.id===snapshot.activeId) activeLocalMaskId=entry.id;
+    const live=previous.get(entry.id);
+    if(live) live.stack=null;
+  }
+  if(!localMaskById(activeLocalMaskId)) activeLocalMaskId=localMasks[0]?.id||null;
+  const active=localMaskActive();
+  maskStack=active?active.stack:null;
+  maskLayerSelectedId=active?.selectedLayerId||active?.stack.layers.at(-1)?.id||null;
+  localMaskRenderList();
+  localMaskRenderSliders();
+  maskLayerRenderList();
+  maskLayerRenderSettings();
+  localMaskApplyingSnapshot=false;
+  localMaskTexturesDirty();
+}
+function localMaskHistorySignature(snapshot){
+  return JSON.stringify((snapshot.masks||[]).map(mask=>({n:mask.name,v:mask.visible,a:mask.adjustments,l:mask.layers.map(layer=>({t:layer.type,o:layer.operation,i:layer.invert,s:layer.visible,p:layer.params,r:!!layer.raster}))})));
+}
+function localMaskHistoryPush(){
+  if(localMaskApplyingSnapshot) return;
+  const snapshot=localMaskSnapshot();
+  const signature=localMaskHistorySignature(snapshot);
+  if(signature===localMaskHistoryKey) return;
+  localMaskHistoryKey=signature;
+  localMaskHistory=localMaskHistory.slice(0,localMaskHistoryIndex+1);
+  localMaskHistory.push(snapshot);
+  if(localMaskHistory.length>24) localMaskHistory.shift();
+  localMaskHistoryIndex=localMaskHistory.length-1;
+  localMaskRenderList();
+}
+function localMaskHistoryReset(){
+  localMaskHistory=[]; localMaskHistoryIndex=-1; localMaskHistoryKey='';
+  localMaskHistoryPush();
+}
+function localMaskUndo(){
+  if(localMaskHistoryIndex<=0) return false;
+  localMaskHistoryIndex--;
+  localMaskHistoryKey=localMaskHistorySignature(localMaskHistory[localMaskHistoryIndex]);
+  localMaskApplySnapshot(localMaskHistory[localMaskHistoryIndex]);
+  setMaskBgStatus('Undid the last mask change.');
+  return true;
+}
+function localMaskRedo(){
+  if(localMaskHistoryIndex>=localMaskHistory.length-1) return false;
+  localMaskHistoryIndex++;
+  localMaskHistoryKey=localMaskHistorySignature(localMaskHistory[localMaskHistoryIndex]);
+  localMaskApplySnapshot(localMaskHistory[localMaskHistoryIndex]);
+  setMaskBgStatus('Redid the mask change.');
+  return true;
+}
+function localMaskProgress(visible,ratio,text){
+  const wrap=$('localMaskProgress');
+  if(wrap) wrap.hidden=!visible;
+  const bar=$('localMaskProgressBar'),fill=$('localMaskProgressFill'),label=$('localMaskProgressText');
+  if(bar&&Number.isFinite(ratio)) bar.setAttribute('aria-valuenow',String(Math.round(Math.max(0,Math.min(1,ratio))*100)));
+  if(fill&&Number.isFinite(ratio)) fill.style.width=`${Math.round(Math.max(0,Math.min(1,ratio))*100)}%`;
+  if(label&&text) label.textContent=text;
+}
+/* Segments one photo with the Fast engine and returns its alpha, without touching the UI layers. */
+async function localMaskDetectAlpha(){
+  const {width,height}=maskLayerDimensions();
+  if(!photoForMask) throw new Error('The photo is not ready for detection yet');
+  await withTimeout(ensureMaskBgModel(),90000,'AI model loading timed out after 90 seconds');
+  const image=await createImageBitmap(photoForMask);
+  const result=await withTimeout(requestMaskBgWorker('segment',{image,width,height}),30000,'Image segmentation timed out after 30 seconds');
+  return {alpha:new Uint8ClampedArray(result.mask), width:result.width, height:result.height};
+}
+async function applyLocalMasksToAllPhotos(){
+  if(!localMaskPhotoReady()){setMaskBgStatus('Open a photo with masks before applying them to all.');return;}
+  if(localMasks.length===0){setMaskBgStatus('Add at least one mask before applying to all photos.');return;}
+  const targets=photos.filter(item=>item!==currentPhoto);
+  if(!targets.length){setMaskBgStatus('There is only one photo in this carousel.');return;}
+  if(maskBgProcessing){setMaskBgStatus('Wait for the current detection to finish before applying to all photos.');return;}
+  const template=localMaskSnapshot();
+  const needsDetection=template.masks.some(mask=>mask.layers.some(layer=>layer.type==='subject'||layer.type==='background'));
+  let skippedBrush=0;
+  for(const mask of template.masks) for(const layer of mask.layers) if(layer.type==='brush'||layer.type==='pick') skippedBrush++;
+  const restoreIndex=activePhotoIndex;
+  const applied=[];
+  const failures=[];
+  localMaskProgress(true,0,`Starting · ${targets.length} photo${targets.length===1?'':'s'}`);
+  setMaskBgStatus(`Applying ${template.masks.length} mask${template.masks.length===1?'':'s'} to ${targets.length} photos…`);
+  try{
+    for(let index=0;index<targets.length;index++){
+      const item=targets[index];
+      const label=`Photo ${index+1}/${targets.length}`;
+      localMaskProgress(true,index/targets.length,`${label} · copying masks`);
+      saveActivePhotoMask();
+      const img=await decodePhoto(item);
+      uploadPhoto(item,img,false);
+      localMasks=[];
+      activeLocalMaskId=null;
+      maskStack=null;
+      let photoFailed=false;
+      for(const entry of template.masks){
+        const mask=localMaskCreate(entry.name,{...entry.adjustments},entry.visible);
+        if(!mask) break;
+        const pendingDetection=[];
+        for(const layer of entry.layers){
+          if(layer.type==='brush'||layer.type==='pick') continue;
+          if(layer.type==='subject'){
+            const added=mask.stack.addLayer('subject',{name:layer.name,operation:layer.operation,invert:layer.invert,visible:layer.visible,params:{...layer.params}});
+            pendingDetection.push({layer:added,auto:true});
+            continue;
+          }
+          if(layer.type==='background'){
+            const added=mask.stack.addLayer('background',{name:layer.name,operation:layer.operation,invert:layer.invert,visible:layer.visible,params:{...layer.params}});
+            pendingDetection.push({layer:added,auto:true,subtract:true});
+            continue;
+          }
+          mask.stack.addLayer(layer.type,{name:layer.name,operation:layer.operation,invert:layer.invert,visible:layer.visible,params:{...layer.params}});
+        }
+        if(pendingDetection.length){
+          localMaskProgress(true,(index+0.4)/targets.length,`${label} · finding the subject`);
+          try{
+            const detected=await localMaskDetectAlpha();
+            for(const entryLayer of pendingDetection) mask.stack.setLayerRaster(entryLayer.layer.id,new Uint8ClampedArray(detected.alpha),detected.width,detected.height);
+          }catch(error){
+            photoFailed=true;
+            failures.push(`${item.file?.name||`Photo ${index+1}`}: ${error?.message||error}`);
+            for(const entryLayer of pendingDetection) mask.stack.removeLayer(entryLayer.layer.id);
+          }
+        }
+      }
+      maskLayerSelectedId=null;
+      localMaskRebuildAlphas();
+      saveActiveMaskBackground();
+      if(!photoFailed) applied.push(item.file?.name||`Photo ${index+1}`);
+      localMaskProgress(true,(index+1)/targets.length,`${label} · done`);
+      await new Promise(resolve=>setTimeout(resolve,0));
+    }
+  }catch(error){
+    console.warn('Apply to all photos failed',error);
+    failures.push(error?.message||String(error));
+  }finally{
+    try{
+      const item=photos[restoreIndex];
+      if(item){
+        const img=await decodePhoto(item);
+        activePhotoIndex=restoreIndex;
+        uploadPhoto(item,img,false);
+      }
+    }catch(error){ console.error('Preview restore failed',error); }
+    localMaskProgress(false,1,'');
+    localMaskHistoryReset();
+  }
+  const notes=[];
+  if(applied.length) notes.push(`Applied to ${applied.length} photo${applied.length===1?'':'s'}.`);
+  else notes.push('No photos were updated.');
+  if(needsDetection&&failures.length) notes.push(`${failures.length} automatic selection${failures.length===1?'':'s'} could not run (${failures[0]}).`);
+  if(skippedBrush) notes.push(`${skippedBrush} Brush or Pick object layer${skippedBrush===1?'':'s'} could not be copied — brush strokes and picked objects are specific to each photo.`);
+  const message=notes.join(' ');
+  setMaskBgStatus(message,true,false);
+  setMaskBgAiStatus(message,true,false);
+  showToast(message,Math.min(9000,3600+notes.length*600));
+}
+function localMaskSave(){
+  if(!localMasks.length) return null;
+  return localMaskSnapshot();
+}
+function localMaskRestore(saved){
+  localMaskIdSeed=Math.max(localMaskIdSeed,1);
+  localMaskHistory=[];
+  localMaskHistoryIndex=-1;
+  localMaskHistoryKey='';
+  localMasks=[];
+  activeLocalMaskId=null;
+  maskStack=null;
+  maskLayerSelectedId=null;
+  const payload=Array.isArray(saved)?{activeId:saved[0]?.id,masks:saved}:(saved&&Array.isArray(saved.masks)?saved:null);
+  if(payload&&payload.masks.length) localMaskApplySnapshot(payload);
+  else{
+    if(maskStack&&maskStack.layers.length) localMaskAdoptStack(maskStack);
+    localMaskRenderList(); localMaskRenderSliders();
+    uploadLocalMaskTextures();
+  }
+  localMaskHistoryReset();
+}
+function localMaskReset(reason='The photo changed'){
+  localMasks=[];
+  activeLocalMaskId=null;
+  maskStack=null;
+  maskLayerSelectedId=null;
+  localMaskRenameTarget=null;
+  localMaskProgress(false,1,'');
+  localMaskRenderList(); localMaskRenderSliders();
+  localMaskHistoryReset();
+  if(maskLayerOverlayCanvas) maskLayerOverlayCanvas.classList.remove('visible');
+  const status=$('localMaskStatus');
+  if(status) status.textContent=reason==='no photo'
+    ?'Double-click a slider to reset it to neutral. Brush and Pick object masks stay specific to each photo.'
+    :`Local masks cleared (${reason}).`;
 }
 
 /* ---------- red selection overlay ---------- */
@@ -6238,6 +7002,7 @@ function maskLayerReset(reason='The photo changed'){
   maskProDownloading=false; maskProReady=false;
   maskLayerSampleMode=false; maskLayerStroke=null; maskLayerDrag=null; maskLayerPickPending=false;
   maskLayerCompositeAlpha=null; maskLayerSourceCache=null; maskLayerSourceKey='';
+  localMaskReset(isVideo?'video':'no photo');
   maskLayerSelectedId=null; maskLayerOverlayDirty=true;
   if(maskStack) maskStack.clear();
   maskStack=null;
@@ -6358,7 +7123,56 @@ function downloadMaskPng(){
   window.addEventListener('resize',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});
   window.addEventListener('orientationchange',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)maskLayerOverlayKick();});
+  /* Each add button creates a new mask; the Mask layers panel below edits the active mask. */
+  const localMaskNewMask=(type)=>{
+    if(!localMaskPhotoReady()){setMaskBgStatus('Open a photo before adding a local mask.');return;}
+    maskBgMarkLocalSurface();
+    const target=localMaskCreate();
+    if(!target) return;
+    activeLocalMaskId=target.id; maskStack=target.stack; maskLayerSelectedId=null;
+    const added=maskLayerAdd(type||'linear');
+    if(!added){ localMaskDelete(target.id); return; }
+    target.selectedLayerId=maskLayerSelectedId;
+    maskLayerRenderList(); maskLayerRenderSettings();
+    localMaskRenderList(); localMaskRenderSliders();
+  };
+  on('localMaskAddSubjectBtn',()=>{
+    if(!localMaskPhotoReady()){setMaskBgStatus('Open a photo before adding a local mask.');return;}
+    maskBgMarkLocalSurface();
+    const target=localMaskCreate();
+    if(!target) return;
+    activeLocalMaskId=target.id; maskStack=target.stack; maskLayerSelectedId=null;
+    localMaskRenderList(); localMaskRenderSliders();
+    setMaskEngine('fast');
+    maskEngineRunFast(false);
+  });
+  on('localMaskAddBackgroundBtn',()=>{
+    if(!localMaskPhotoReady()){setMaskBgStatus('Open a photo before adding a local mask.');return;}
+    maskBgMarkLocalSurface();
+    const target=localMaskCreate();
+    if(!target) return;
+    activeLocalMaskId=target.id; maskStack=target.stack; maskLayerSelectedId=null;
+    localMaskRenderList(); localMaskRenderSliders();
+    maskLayerAddBackground();
+    maskLayerRenderSettings();
+    localMaskRenderList(); localMaskRenderSliders();
+  });
+  on('localMaskAddLinearBtn',()=>localMaskNewMask('linear'));
+  on('localMaskAddRadialBtn',()=>localMaskNewMask('radial'));
+  on('localMaskAddColorBtn',()=>localMaskNewMask('color'));
+  on('localMaskAddLuminanceBtn',()=>localMaskNewMask('luminance'));
+  on('localMaskAddBrushBtn',()=>localMaskNewMask('brush'));
+  on('localMaskDuplicateBtn',localMaskDuplicate);
+  on('localMaskRenameBtn',localMaskRenameActive);
+  on('localMaskUndoBtn',()=>localMaskUndo());
+  on('localMaskRedoBtn',()=>localMaskRedo());
+  on('localMaskApplyAllBtn',applyLocalMasksToAllPhotos);
+  if(localMaskTextureA) localMaskRenderList();
+  ['localMasksDetails'].forEach(id=>{const node=$(id); if(node) node.addEventListener('toggle',()=>{localMaskRenderList();localMaskRenderSliders();});});
   ['maskBackgroundDetails','maskLayersDetails','maskRefineDetails'].forEach(id=>{const node=$(id); if(node) node.addEventListener('toggle',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});});
+  document.addEventListener('pointerdown',maskBgTrackSurface,true);
+  document.addEventListener('input',maskBgTrackSurface,true);
+  document.addEventListener('change',maskBgTrackSurface,true);
   const cleanupToggle=$('maskEdgeCleanupToggle');
   if(cleanupToggle) cleanupToggle.addEventListener('change',()=>{
     maskCleanSettings.enabled=cleanupToggle.checked;
@@ -6368,7 +7182,7 @@ function downloadMaskPng(){
     if(hasContent) render(performance.now());
     setMaskBgStatus(maskCleanSettings.enabled?'Edge colour cleanup on: semi-transparent edges blend to the foreground colour.':'Edge colour cleanup off.');
   });
-  ['maskBgMode','maskBgInvert'].forEach(id=>{const node=$(id); if(node) node.addEventListener('input',()=>{lastPreviewRenderKey=null;});});
+  ['maskBgMode','maskBgInvert'].forEach(id=>{const node=$(id); if(node) node.addEventListener('input',()=>{maskBgMarkLegacySurface();lastPreviewRenderKey=null;});});
   maskLayerRenderList(); maskLayerRenderSettings(); maskProRefreshButtons();
 })();
 function uploadMaskBgCleanCanvas(){
@@ -6792,7 +7606,7 @@ async function activatePhoto(index){
   try{
     const img=await decodePhoto(item);
     if(token!==fileLoadId || photos[index]!==item) return;
-    saveActivePhotoMask(); activePhotoIndex=index; uploadPhoto(item,img); setMediaLoading(false); renderPhotoStrip();
+    saveActivePhotoMask(); localMaskReset('photo changed'); activePhotoIndex=index; uploadPhoto(item,img); setMediaLoading(false); renderPhotoStrip();
     render(performance.now()); startLoop();
   }catch(error){ console.error(error); showToast(`Could not open ${item.file.name}`,5000); }
   finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); } }
@@ -8097,7 +8911,7 @@ $('sidebarCollapseToggle').addEventListener('click',()=>{
   $('app').classList.toggle('sidebar-collapsed',collapsed);
   requestAnimationFrame(()=>{if(isVideo) updateCaptionOverlay();});
 });
-function needsTransparentMaskPng(){ return appState.mode==='photo'&&!isVideo&&maskBgActive&&maskBgSettings.mode==='transparent'; }
+function needsTransparentMaskPng(){ return appState.mode==='photo'&&!isVideo&&maskBgActive&&maskBgReplaceActive()&&maskBgSettings.mode==='transparent'; }
 function forceMaskBackgroundPng(showNotice=false){
   if(!needsTransparentMaskPng()||exportOptions.type==='png')return false;
   exportOptions.type='png';photoExportOptions={...photoExportOptions,type:'png'};
@@ -8548,7 +9362,7 @@ async function exportPhoto(){
 async function exportCarousel(){
   if(isVideo || !photos.length || exportBusy || mediaBusy) return;
   saveActivePhotoMask();
-  const selected=activePhotoIndex, hasTransparentMask=maskBgSettings.mode==='transparent'&&photos.some(item=>!!item.maskBackground?.active);
+  const selected=activePhotoIndex, hasTransparentMask=maskBgSettings.mode==='transparent'&&maskBgReplaceActive()&&photos.some(item=>!!item.maskBackground?.active&&!item.maskBackground?.localOnly);
   const options={...exportOptions,type:hasTransparentMask?'png':exportOptions.type}, view=beginExport('Exporting carousel'), entries=[], outputSizes=new Set();
   if(hasTransparentMask&&exportOptions.type!=='png')showToast('Transparent carousel backgrounds require PNG; exporting all photos as PNG',4500);
   let missingMasks=0;
