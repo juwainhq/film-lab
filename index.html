@@ -1455,6 +1455,46 @@ body.toastActive #beforeLabel { opacity: 0; }
   body[data-mode="photo"] .sidebarTab { min-height: 44px; padding: 11px 6px; }
   body[data-mode="photo"] #sidebarViews { padding-bottom: 10px; }
 }
+
+/* Carousel hide/show: the strip folds down to a one-line bar in CSS only. The gallery,
+   the hint and the bulk actions stay in the DOM with every existing handler attached. */
+#carouselStrip { overflow: hidden; max-height: 300px; transition: max-height .26s cubic-bezier(.2,.8,.2,1); }
+#carouselStrip.collapsed { max-height: 52px; min-height: 52px; padding-top: 12px; }
+#carouselToggleBtn { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 20px; height: 20px; min-width: 20px; min-height: 20px; padding: 0; border: 0; background: none; color: var(--text-dim); cursor: pointer; }
+#carouselToggleBtn .panelChevron { border-color: var(--text-dim); transition: transform .22s cubic-bezier(.2,.8,.2,1), border-color .2s; }
+#carouselToggleBtn:hover .panelChevron { border-color: var(--text); }
+#carouselToggleBtn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+#carouselStrip.collapsed .stripHead { justify-content: flex-start; gap: 8px; margin-bottom: 0; }
+#carouselStrip.collapsed .stripActions { flex: 0 0 auto; flex-wrap: nowrap; justify-content: flex-end; margin-left: auto; }
+#carouselStrip.collapsed #carouselToggleBtn .panelChevron { transform: rotate(45deg); }
+/* The bulk actions leave the flow so the slim bar stays a single line. */
+#carouselStrip.collapsed #exportZipBtn,
+#carouselStrip.collapsed #applyAllBtn,
+#carouselStrip.collapsed #removePhotoBtn { display: none !important; }
+/* The gallery keeps its box while collapsing so the height still animates; it is
+   invisible and inert once the strip has folded, and clipped by the strip meanwhile. */
+#carouselStrip.collapsed #photoThumbnails,
+#carouselStrip.collapsed #carouselHint { visibility: hidden; pointer-events: none; transition: visibility 0s linear .26s; }
+/* Phone and portrait-tablet editing keeps the same toggle on one line. */
+body[data-mode="photo"] #carouselStrip .stripHead { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+body[data-mode="photo"] #carouselStrip .stripTitle { flex: 1 1 auto; min-width: 0; }
+body[data-mode="photo"] #carouselStrip .stripActions { flex: 1 1 100%; justify-content: flex-end; }
+body[data-mode="photo"] #app #carouselStrip.collapsed { max-height: 52px; min-height: 52px; padding-top: 12px; }
+body[data-mode="photo"] #carouselStrip.collapsed .stripHead { flex-direction: row; flex-wrap: nowrap; align-items: center; gap: 8px; margin-bottom: 0; }
+body[data-mode="photo"] #carouselStrip.collapsed .stripTitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto; flex-wrap: nowrap; justify-content: flex-end; margin-left: 0; }
+/* Touch: a 44px hit area for the toggle that never changes how it looks. It opens to the
+   right of the button so the strip's own clipped edge cannot eat the target. */
+@media (pointer: coarse) {
+  #carouselStrip #carouselToggleBtn { position: relative; }
+  #carouselStrip #carouselToggleBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translateY(-50%); }
+  body[data-mode="photo"] #app #carouselStrip { padding-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #carouselStrip,
+  #carouselStrip #photoThumbnails,
+  #carouselStrip #carouselHint { transition: none !important; }
+}
 </style>
 </head>
 <body data-mode="empty">
@@ -1550,7 +1590,7 @@ body.toastActive #beforeLabel { opacity: 0; }
         <input type="range" id="videoSeek" min="0" max="60" step="0.01" value="0" aria-label="Video playback position">
       </div>
       <section id="carouselStrip" class="photo-only" aria-label="Carousel photos" hidden>
-        <div class="stripHead"><span class="stripTitle" id="carouselCount">Carousel / 01 of 01</span><div class="stripActions"><button type="button" id="exportZipBtn" disabled>Carousel ZIP <span id="zipCount">0 photos</span></button><button type="button" id="applyAllBtn">↗ Apply to all</button><button type="button" id="addPhotosBtn">+ Add</button><button type="button" id="removePhotoBtn">Remove</button></div></div>
+        <div class="stripHead"><button type="button" id="carouselToggleBtn" class="carouselToggleBtn" aria-expanded="true" aria-controls="photoThumbnails" aria-label="Hide photos" title="Hide photos"><span class="panelChevron" aria-hidden="true"></span></button><span class="stripTitle" id="carouselCount">Carousel / 01 of 01</span><div class="stripActions"><button type="button" id="exportZipBtn" disabled>Carousel ZIP <span id="zipCount">0 photos</span></button><button type="button" id="applyAllBtn">↗ Apply to all</button><button type="button" id="addPhotosBtn">+ Add</button><button type="button" id="removePhotoBtn">Remove</button></div></div>
         <div id="photoThumbnails" role="group" aria-label="Switch photo"></div>
         <p id="carouselHint" class="socialHint">One shared edit. Reposition the crop on each photo.</p>
       </section>
@@ -7025,6 +7065,51 @@ function renderPhotoStrip(){
   });
   schedulePreviewFit();
 }
+// Carousel hide/show. The folded look is pure CSS; this only remembers the choice and
+// refits the photo into the space the strip frees. renderPhotoStrip itself stays untouched.
+const CAROUSEL_COLLAPSED_KEY='filmlab-carousel-collapsed';
+let carouselCollapsedPref=null; // null until the user folds or unfolds the strip by hand
+try{
+  const savedCarouselChoice=localStorage.getItem(CAROUSEL_COLLAPSED_KEY);
+  if(savedCarouselChoice==='1')carouselCollapsedPref=true;
+  else if(savedCarouselChoice==='0')carouselCollapsedPref=false;
+}catch(error){ carouselCollapsedPref=null; }
+function carouselDefaultCollapsed(){ return photos.length<=1; } // one photo folds, two or more stay open
+function applyCarouselCollapsed(collapsed,remember){
+  const strip=$('carouselStrip'), toggle=$('carouselToggleBtn');
+  if(!strip||!toggle) return;
+  const folded=!!collapsed;
+  strip.classList.toggle('collapsed',folded);
+  toggle.setAttribute('aria-expanded',String(!folded));
+  toggle.setAttribute('aria-label',folded?'Show photos':'Hide photos');
+  toggle.title=folded?'Show photos':'Hide photos';
+  if(!remember) return;
+  carouselCollapsedPref=folded;
+  try{ localStorage.setItem(CAROUSEL_COLLAPSED_KEY,folded?'1':'0'); }
+  catch(error){ console.warn('The carousel hide/show choice could not be saved.',error); }
+}
+function syncCarouselCollapse(){
+  applyCarouselCollapsed(carouselCollapsedPref===null?carouselDefaultCollapsed():carouselCollapsedPref,false);
+}
+function toggleCarouselCollapse(){
+  const strip=$('carouselStrip');
+  applyCarouselCollapsed(!(strip&&strip.classList.contains('collapsed')),true);
+  refreshCanvasAfterSheetLayout(); // the existing fit/resize routine; the photo grows into the freed space
+}
+const carouselStripEl=$('carouselStrip'), carouselToggleBtn=$('carouselToggleBtn');
+if(carouselToggleBtn)carouselToggleBtn.addEventListener('click',toggleCarouselCollapse);
+if(carouselStripEl){
+  carouselStripEl.addEventListener('transitionend',event=>{
+    if(event.target===carouselStripEl&&event.propertyName==='max-height')refreshCanvasAfterSheetLayout();
+  });
+}
+// Photos only change through renderPhotoStrip, and its rebuilt list is the signal that the
+// one-photo default has to be re-evaluated (the user's own choice always wins over it).
+const carouselThumbList=$('photoThumbnails');
+if(carouselThumbList&&typeof MutationObserver==='function'){
+  try{ new MutationObserver(()=>{ syncCarouselCollapse(); schedulePreviewFit(); }).observe(carouselThumbList,{childList:true}); }catch(error){}
+}
+syncCarouselCollapse();
 $('cropPanelToggle').addEventListener('click',()=>setCropPanelOpen($('cropPanelBody').hidden));
 $('settingsToolsToggle').addEventListener('click',()=>{
   const body=$('settingsToolsBody'), open=body.hidden;
