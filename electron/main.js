@@ -34,6 +34,8 @@ const MIME_TYPES = {
   '.wasm': 'application/wasm',
   '.data': 'application/octet-stream',
   '.tflite': 'application/octet-stream',
+  '.task': 'application/octet-stream',
+  '.onnx': 'application/octet-stream',
   '.binarypb': 'application/octet-stream',
   '.mp3': 'audio/mpeg',
   '.mp4': 'video/mp4',

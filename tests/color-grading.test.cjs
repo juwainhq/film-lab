@@ -256,6 +256,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v6'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v7'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

@@ -752,6 +752,40 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 .maskBgRangeRow output,.maskBgControl output { color: var(--text); font: 9px 'JetBrains Mono',monospace; white-space: nowrap; }
 .maskBgRangeRow .subSlider,.maskBgControl .subSlider { margin-top: 1px; }
 .maskBgInvertLabel { min-height: 34px; margin-top: 2px; font-size: 10px; }
+.maskEngineGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin: 4px 0 6px; }
+.maskEngineGrid label { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; min-height: 44px; gap: 2px; padding: 6px 7px; border: 1px solid var(--panel-border); color: var(--text-dim); font-size: 10px; letter-spacing: .04em; cursor: pointer; }
+.maskEngineGrid label:has(input:checked) { border-color: var(--text); color: var(--text); background: var(--soft-bg); }
+.maskEngineGrid label small { color: var(--text-dim2); font-size: 8px; letter-spacing: .05em; text-transform: uppercase; }
+.maskEngineGrid input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.maskLayerList { display: flex; flex-direction: column; gap: 5px; margin: 8px 0; }
+.maskLayerList:empty { display: none; }
+.maskLayerRow { display: grid; grid-template-columns: 26px minmax(0,1fr) auto; align-items: center; gap: 6px; min-height: 44px; padding: 4px 5px; border: 1px solid var(--panel-border); background: var(--soft-bg); }
+.maskLayerRow[data-selected="true"] { border-color: var(--text); }
+.maskLayerRow[data-visible="false"] .maskLayerName { opacity: .45; }
+.maskLayerVisibility { width: 26px; min-height: 34px; padding: 0; border: 0; background: none; color: var(--text-dim); font: inherit; font-size: 13px; cursor: pointer; }
+.maskLayerName { min-width: 0; padding: 4px 2px; overflow: hidden; border: 0; background: none; color: var(--text); font: inherit; font-size: 10px; letter-spacing: .04em; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.maskLayerName small { display: block; color: var(--text-dim2); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.maskLayerActions { display: flex; align-items: center; gap: 4px; }
+.maskLayerActions button { min-width: 30px; min-height: 34px; padding: 0 5px; border: 1px solid var(--panel-border); background: transparent; color: var(--text-dim); font: 10px 'JetBrains Mono',monospace; cursor: pointer; }
+.maskLayerActions button[aria-pressed="true"] { border-color: var(--text); color: var(--text); }
+.maskLayerSettings { margin: 4px 0 8px; padding: 8px 9px; border: 1px solid var(--panel-border); }
+.maskLayerSettings .maskBgRangeRow:first-child { margin-top: 0; }
+.maskLayerOps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; margin: 7px 0 2px; }
+.maskLayerOps button { min-height: 34px; padding: 4px; border: 1px solid var(--panel-border); background: transparent; color: var(--text-dim); font-size: 9px; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.maskLayerOps button[aria-pressed="true"] { border-color: var(--text); color: var(--text); background: var(--soft-bg); }
+.maskLayerSampleHint { color: var(--text-dim2); font-size: 9px; }
+.maskProProgress { margin: 8px 0 4px; }
+.maskProBar { height: 4px; overflow: hidden; background: var(--panel-border); }
+.maskProBar > span { display: block; width: 0; height: 100%; background: var(--accent); transition: width .18s linear; }
+#maskProProgressText { margin: 6px 0 0; color: var(--text-dim); font: 9px 'JetBrains Mono',monospace; }
+#maskOverlayCanvas { position: absolute; z-index: 5; inset: 0; display: none; background: transparent; pointer-events: none; }
+#maskOverlayCanvas.visible { display: block; }
+@media (max-width: 900px) {
+  .maskEngineGrid label,.maskLayerRow,.maskLayerVisibility,.maskLayerActions button,.maskLayerOps button,.maskBgButtonRow .toolBtn,.maskLayerSettings .toolBtn { min-height: 44px; }
+  .maskLayerRow { padding: 5px 6px; }
+  .maskLayerActions button { min-width: 44px; }
+  .maskLayerVisibility { min-width: 34px; }
+}
 .maskBgDivider { display: flex; align-items: center; gap: 10px; margin: 15px 0 9px; color: var(--text-dim2); font: 600 8px 'JetBrains Mono',monospace; letter-spacing: .16em; }
 .maskBgDivider::before,.maskBgDivider::after { content: ''; flex: 1; height: 1px; background: var(--panel-border); }
 .maskBgModeGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
@@ -1540,6 +1574,7 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
       </div>
       <div id="canvasWrap" style="display:none">
         <canvas id="glCanvas" title="Scroll to zoom in or out. Drag to pan when zoomed."></canvas>
+        <canvas id="maskOverlayCanvas" aria-hidden="true"></canvas>
         <div id="maskBrushCursor" aria-hidden="true"></div>
         <div id="cropOverlay" hidden><div id="cropFrame" role="group" tabindex="0" aria-label="Crop frame. Drag to reposition, or use arrow keys."><span id="cropFrameLabel"></span></div></div>
         <div id="splitDivider" hidden><span class="splitBadge before">BEFORE</span><span class="splitBadge after">AFTER</span></div>
@@ -2075,6 +2110,79 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
               <button type="button" class="actionBtn primary maskBgApply" id="applyMaskBackgroundBtn"><span>Apply to canvas</span><span aria-hidden="true">↗</span></button>
               <p class="maskBgPrivacy">Local processing · no uploads · transparent exports are PNG.</p>
             </details>
+            <details class="maskBackgroundDetails" id="maskQualityDetails" open>
+              <summary><span>Selection engine</span><span class="maskBgSummaryHint">QUALITY</span></summary>
+              <div class="maskEngineGrid" role="radiogroup" aria-label="Mask selection engine">
+                <label><input type="radio" name="maskEngine" value="fast" checked><span>Fast<small>People · built in</small></span></label>
+                <label><input type="radio" name="maskEngine" value="pick"><span>Pick object<small>Click any subject</small></span></label>
+                <label><input type="radio" name="maskEngine" value="pro"><span>Pro<small>Best edges &amp; hair</small></span></label>
+              </div>
+              <p class="maskBgHint" id="maskEngineHint">Fast segments people on this device. Pick object segments whatever you click. Pro downloads a larger model once.</p>
+              <p class="maskBgHint" id="maskPickHint" hidden>Click an object in the photo to add it as a “Pick object” layer.</p>
+              <div id="maskProPanel" hidden>
+                <p class="maskBgHint" id="maskProSize">Pro uses BiRefNet_lite (MIT). One download of about 115 MB on WebGPU, or 224 MB without it, cached in this browser.</p>
+                <div class="maskBgButtonRow">
+                  <button type="button" class="toolBtn" id="maskProConfirmBtn">Download &amp; use Pro</button>
+                  <button type="button" class="toolBtn" id="maskProCancelBtn" hidden>Cancel</button>
+                </div>
+                <div id="maskProProgress" class="maskProProgress" hidden>
+                  <div class="maskProBar" role="progressbar" aria-labelledby="maskProProgressText" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="maskProBar"><span id="maskProProgressFill"></span></div>
+                  <p id="maskProProgressText" role="status" aria-live="polite">Waiting…</p>
+                </div>
+                <button type="button" class="toolBtn" id="maskProRemoveBtn" hidden>Remove downloaded model</button>
+                <p class="maskBgHint" id="maskProStatus" role="status" aria-live="polite"></p>
+              </div>
+            </details>
+            <details class="maskBackgroundDetails" id="maskLayersDetails" open>
+              <summary><span>Mask layers</span><span class="maskBgSummaryHint" id="maskLayerCount">0 LAYERS</span></summary>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskAddSubjectBtn">＋ Subject</button>
+                <button type="button" class="toolBtn" id="maskAddBackgroundBtn">＋ Background</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskAddPickBtn">＋ Pick object</button>
+                <button type="button" class="toolBtn" id="maskAddLinearBtn">＋ Linear</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskAddRadialBtn">＋ Radial</button>
+                <button type="button" class="toolBtn" id="maskAddBrushBtn">＋ Brush</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskAddLuminanceBtn">＋ Luminance</button>
+                <button type="button" class="toolBtn" id="maskAddColorBtn">＋ Color range</button>
+              </div>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskOverlayBtn" aria-pressed="true" title="Toggle the red selection overlay (O)">◉ Overlay</button>
+                <button type="button" class="toolBtn" id="maskLayerClearBtn">⌫ Clear layers</button>
+              </div>
+              <div class="maskLayerList" id="maskLayerList" role="list" aria-label="Mask layers"></div>
+              <p class="maskBgHint" id="maskLayerEmpty">No layers yet. Add a Subject, a gradient or a colour range to start selecting.</p>
+              <div class="maskBgButtonRow">
+                <button type="button" class="toolBtn" id="maskLayerUndoBtn" disabled>↶ Layer undo</button>
+                <button type="button" class="toolBtn" id="maskLayerRedoBtn" disabled>↷ Layer redo</button>
+              </div>
+              <div id="maskLayerSettings" class="maskLayerSettings" hidden></div>
+              <p class="maskBgHint">Add blends the layer in, Subtract cuts it out, Intersect keeps only the overlap. Drag gradients straight on the photo. The O key toggles the overlay.</p>
+            </details>
+            <details class="maskBackgroundDetails" id="maskRefineDetails" open>
+              <summary><span>Refine</span><span class="maskBgSummaryHint">EDGES</span></summary>
+              <div class="maskBgRangeRow">
+                <label for="maskSmoothRange">Smooth <output id="maskSmoothValue">0 px</output></label>
+                <input class="subSlider" type="range" id="maskSmoothRange" min="0" max="24" value="0">
+              </div>
+              <label class="checkLabel"><input type="checkbox" id="maskEdgeRefineToggle" checked>Edge refine (guided by the photo)</label>
+              <div class="maskBgRangeRow">
+                <label for="maskEdgeRadius">Radius <output id="maskEdgeRadiusValue">12 px</output></label>
+                <input class="subSlider" type="range" id="maskEdgeRadius" min="2" max="40" value="12">
+              </div>
+              <div class="maskBgRangeRow">
+                <label for="maskEdgeStrength">Strength <output id="maskEdgeStrengthValue">60%</output></label>
+                <input class="subSlider" type="range" id="maskEdgeStrength" min="0" max="100" value="60">
+              </div>
+              <label class="checkLabel"><input type="checkbox" id="maskEdgeCleanupToggle" checked>Edge colour cleanup (no halos)</label>
+              <button type="button" class="actionBtn" id="downloadMaskBtn"><span>⤓ Download mask (PNG)</span><span aria-hidden="true">↗</span></button>
+              <p class="maskBgHint" id="maskRefineStatus" role="status" aria-live="polite">Edge refine is debounced and runs at up to 2048 px on the long edge.</p>
+            </details>
           </section>
           <section class="sidebarPanel exportTabPanel" id="exportTabPanel" data-panel="export" role="tabpanel" aria-labelledby="exportTab" hidden>
 <section id="exportPanel" class="socialPanel photo-only" aria-label="Instagram export">
@@ -2305,6 +2413,7 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
 </script>
 <script src="./social-tools.js"></script>
 <script src="./color-grading.js"></script>
+<script src="./mask-stack.js"></script>
 <script>
 const startFilmLab=()=>{
 (() => {
@@ -3825,6 +3934,7 @@ uniform float u_time; uniform vec2 u_resolution;
 uniform float u_exposure; uniform float u_contrast; uniform float u_saturation; uniform float u_temperature; uniform float u_vignStrength; uniform float u_vignSize;
 uniform float u_vibrance; uniform float u_fade; uniform float u_shadowTone; uniform float u_highlightTone; uniform float u_highlightTint;
 uniform sampler2D u_maskBackground; uniform sampler2D u_backgroundImage;
+uniform sampler2D u_cutout; uniform float u_cleanupStrength;
 uniform int u_maskEnabled; uniform int u_backgroundMode; uniform int u_maskInvert;
 uniform vec2 u_maskTexelSize;
 uniform float u_maskFeatherPixels; uniform float u_maskExpandPixels; uniform float u_backgroundBlurPixels; uniform float u_gradientAngle;
@@ -3998,8 +4108,17 @@ void main(){
       float gradientT=clamp(dot(centered,direction)/extent*0.5+0.5,0.0,1.0);
       background=mix(u_gradientStart,u_gradientEnd,gradientT);
     }
-    if(u_backgroundMode==1){ outColor=vec4(clamp(col,0.0,1.0),base.a*keepAlpha); return; }
-    outColor=vec4(mix(background,clamp(col,0.0,1.0),keepAlpha),1.0);
+    // Edge colour cleanup: in the semi-transparent band the pixel colour is a mix of
+    // foreground and background, which reads as a halo. Blend towards the estimated
+    // foreground colour there only, so solid areas stay untouched.
+    vec3 foreground=clamp(col,0.0,1.0);
+    if(u_cleanupStrength>0.001){
+      float band=1.0-abs(keepAlpha*2.0-1.0);
+      vec3 clean=texture(u_cutout,clamp(maskUv,vec2(0.0),vec2(1.0))).rgb;
+      foreground=mix(foreground,clean,clamp(band*u_cleanupStrength,0.0,1.0));
+    }
+    if(u_backgroundMode==1){ outColor=vec4(foreground,base.a*keepAlpha); return; }
+    outColor=vec4(mix(background,foreground,keepAlpha),1.0);
     return;
   }
   outColor=vec4(clamp(col,0.,1.),base.a);
@@ -4166,6 +4285,8 @@ function refreshPreviewResolution(){
   if(fboComposite.width!==size.width || fboComposite.height!==size.height){ recreateFBOs(canvas.width,canvas.height); render(performance.now()); }
 }
 window.addEventListener('resize',refreshPreviewResolution);
+let maskBgCleanTexture=null, maskBgCleanCanvas=null, maskCleanRequestId=0;
+const maskCleanSettings={enabled:true,radius:6,strength:85};
 sourceTexture=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,sourceTexture); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 // A black mask means every pixel is background until a subject is selected.
 const subjectMaskTexture=gl.createTexture();
@@ -4178,6 +4299,10 @@ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameter
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,255,255,255]));
 maskBgBackgroundTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D,maskBgBackgroundTexture);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
+maskBgCleanTexture=gl.createTexture(); gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D,maskBgCleanTexture);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
 gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
@@ -4420,6 +4545,8 @@ function render(timeMs){
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_maskFeatherPixels'),maskBgSettings.feather);
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_maskExpandPixels'),maskBgSettings.expand);
   gl.uniform1i(gl.getUniformLocation(progComposite,'u_maskInvert'),maskBgSettings.invert?1:0);
+  gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D,maskBgCleanTexture||maskBgTexture); gl.uniform1i(gl.getUniformLocation(progComposite,'u_cutout'),5);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_cleanupStrength'),(maskBgEnabled&&maskCleanSettings.enabled&&maskBgCleanCanvas)?0.85:0);
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_backgroundBlurPixels'),maskBgSettings.blur);
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_gradientAngle'),maskBgSettings.gradientAngle);
   gl.uniform3f(gl.getUniformLocation(progComposite,'u_backgroundColor'),...hexRgb(maskBgSettings.color));
@@ -5016,7 +5143,8 @@ function undoMaskBackground(){
 function saveActiveMaskBackground(){
   if(!currentPhoto||isVideo) return;
   currentPhoto.maskBackground=maskBgCanvas&&(maskBgActive||maskBgAutoCanvas||maskBgStrokes.length)?{
-    canvas:maskBgCanvas,auto:maskBgAutoCanvas,strokes:maskBgStrokes,active:maskBgActive,baseValue:maskBgBaseValue,undoStack:maskBgUndoStack
+    canvas:maskBgCanvas,auto:maskBgAutoCanvas,strokes:maskBgStrokes,active:maskBgActive,baseValue:maskBgBaseValue,undoStack:maskBgUndoStack,
+    layers:maskLayerSave()
   }:null;
 }
 function restoreMaskBackgroundForPhoto(item){
@@ -5035,6 +5163,7 @@ function restoreMaskBackgroundForPhoto(item){
     maskBgAutoCanvas=null;maskBgStrokes=[];maskBgActive=false;maskBgBaseValue=255;maskBgUndoStack=[];
   }
   maskBgCtx=maskBgCanvas.getContext('2d');
+  maskLayerRestore(saved?.layers);
   if(maskBgBackgroundImage&&maskBgSettings.mode==='image')fitMaskBgImageToPhoto();else uploadMaskBgBackgroundImage();
   uploadMaskBackground();updateMaskBgControls();
   if(maskBgSettings.mode==='blur')requestMaskBgBlur(true);
@@ -5049,6 +5178,7 @@ function rotateMaskBgState(saved,degrees){
     return next;
   });
   saved.undoStack=[];
+  if(saved.layers&&Array.isArray(saved.layers.rasters))saved.layers.rasters=saved.layers.rasters.map(entry=>({...entry,canvas:rotate(entry.canvas)}));
 }
 function clearMaskBackground(){
   if(!maskBgCanvas||!maskBgPhotoReady()) return;
@@ -5059,6 +5189,7 @@ function clearMaskBackground(){
   maskBgBackgroundImage=null;maskBgImageCanvas=null;maskBgImageDataUrl='';maskBgImageName='No image selected';
   maskBgCtx.fillStyle='#fff';maskBgCtx.fillRect(0,0,maskBgCanvas.width,maskBgCanvas.height);
   uploadMaskBackground();uploadMaskBgBackgroundImage();updateMaskBgControls();updateSocialUI();
+  maskLayerReset('Mask reset');
   setMaskBgStatus('Mask reset. The original photo is fully visible.');markMaskBgPresetChanged();
 }
 function applyMaskBackground(){
@@ -5220,43 +5351,1057 @@ function withTimeout(promise,ms,message){
   });
 }
 async function autoRemoveMaskBackground(){
-  if(!maskBgPhotoReady()||!photoForMask||!maskBgCanvas||maskBgProcessing)return;
-  const token=++maskBgAutoRequestId,photo=photoForMask,width=maskBgCanvas.width,height=maskBgCanvas.height;
-  maskBgProcessing=true;setMaskBgAiStatus('Loading AI model… this may take a moment.',true,true);
-  setMaskBgStatus('Preparing automatic background removal on this device…');updateMaskBgControls();
-  try{
-    await withTimeout(ensureMaskBgModel(),90000,'AI model loading timed out after 90 seconds');
-    if(token!==maskBgAutoRequestId||photo!==photoForMask)return;
-    setMaskBgAiStatus('Analyzing image…',true,true);
-    setMaskBgStatus('Analyzing image…');
-    const image=await createImageBitmap(photo);
-    if(token!==maskBgAutoRequestId){image.close?.();return;}
-    const result=await withTimeout(requestMaskBgWorker('segment',{image,width,height}),30000,'Image segmentation timed out after 30 seconds');
-    if(token!==maskBgAutoRequestId||photo!==photoForMask)return;
-    const candidate=buildMaskBgCanvasFromPixels(result.width,result.height,result.mask);
-    const probe=document.createElement('canvas');probe.width=32;probe.height=32;
-    const probeContext=probe.getContext('2d');probeContext.drawImage(candidate,0,0,32,32);
-    const pixels=probeContext.getImageData(0,0,32,32).data;let kept=0;
-    for(let i=0;i<pixels.length;i+=4)if(pixels[i]>128)kept++;
-    if(kept<4||kept>=1020)throw new Error('No clear foreground was found in this photo');
-    pushMaskBgUndo();maskBgAutoCanvas=candidate;maskBgStrokes=[];maskBgBaseValue=0;maskBgActive=true;maskBgPaintMode=null;
-    markMaskBgPresetChanged();rebuildMaskBackgroundCanvas();
-    setMaskBgStatus('Background removed — refine edges with the brush');
-    setMaskBgAiStatus('Background removed — refine edges with the brush',true,false);updateMaskBgControls();forceMaskBackgroundPng();updateSocialUI();
-  }catch(error){
-    if(token===maskBgAutoRequestId){
-      console.warn('Automatic background removal unavailable',error);
-      if(error?.name==='TimeoutError')terminateMaskBgWorker(error,'error');
-      const reason=error?.message||String(error||'Unknown error');
-      const failure=`Auto-remove failed: ${reason}. Try Magic select or Paint / keep.`;
-      setMaskBgAiStatus(failure,true,false);
-      setMaskBgStatus(failure);
-    }
-  }finally{
-    if(token===maskBgAutoRequestId){clearTimeout(maskBgAutoTimeout);maskBgAutoTimeout=null;maskBgProcessing=false;updateMaskBgControls();}
-  }
+  // The Fast engine runs the same 90 s model-load / 30 s inference budgets and now
+  // adds its result as a Subject layer in the mask stack.
+  maskEngineRunFast(false);
 }
 
+/* =====================================================================
+   Mask layers — a Lightroom-style selection system that feeds the
+   existing maskBgAutoCanvas / rebuildMaskBackgroundCanvas() pipeline.
+   Add-only: every previous tool (brush, erase, magic select, flood,
+   undo, feather, expand, invert, background modes) keeps its behaviour
+   and simply works on top of the composite these layers produce.
+   ===================================================================== */
+const maskStackApi=()=>window.FilmMaskStack||null;
+let maskStack=null, maskLayerCompositeAlpha=null, maskLayerSelectedId=null, maskLayerOverlayOn=true;
+let maskLayerToken=0, maskLayerRefineTimer=null, maskLayerCompositeQueued=false, maskLayerBusy=false;
+let maskLayerStroke=null, maskLayerDrag=null, maskLayerSampleMode=false, maskLayerOverlayFrame=0, maskLayerOverlayDirty=true;
+let maskLayerPickPending=false, maskLayerSourceCache=null, maskLayerSourceKey='';
+let maskEngineMode='fast', maskEnginePrevious='fast';
+let maskProWorker=null, maskProWorkerRequestId=0, maskProWorkerPending=new Map(), maskProReady=false, maskProDevice='wasm', maskProDownloading=false;
+const MASK_PRO_BYTES={webgpu:115*1024*1024,wasm:224*1024*1024};
+const MASK_PICK_LIMIT=6;
+const maskLayerOverlayCanvas=$('maskOverlayCanvas');
+const maskLayerOverlayCtx=maskLayerOverlayCanvas?maskLayerOverlayCanvas.getContext('2d'):null;
+const maskRefineSettings={smooth:0,edgeRefine:true,radius:12,strength:60};
+
+function maskLayerErrorMessage(error){ return error?.message||String(error||'Unknown error'); }
+function clamp01(value){ return Math.max(0,Math.min(1,value)); }
+
+function maskLayerEnsureStack(){
+  if(maskStack) return maskStack;
+  const api=maskStackApi();
+  if(!api){ console.warn('Film Lab mask layers are unavailable: mask-stack.js did not load'); return null; }
+  maskStack=api.createStack({historyLimit:40});
+  return maskStack;
+}
+function maskLayerDimensions(){
+  const width=Math.max(1,maskBgCanvas?.width||maskCanvas?.width||1024);
+  const height=Math.max(1,maskBgCanvas?.height||maskCanvas?.height||1024);
+  return {width,height};
+}
+function maskLayerSourceRgba(){
+  const dims=maskLayerDimensions();
+  const key=[currentPhoto?.id||'photo',photoTextureRevision,dims.width,dims.height].join(':');
+  if(maskLayerSourceKey===key&&maskLayerSourceCache) return maskLayerSourceCache;
+  if(!photoForMask) return null;
+  try{
+    maskLayerSourceCache=new Uint8ClampedArray(photoForMask.getContext('2d',{willReadFrequently:true}).getImageData(0,0,dims.width,dims.height).data);
+    maskLayerSourceKey=key;
+  }catch(error){ console.warn('Film Lab could not read the photo for luminance and colour ranges',error); maskLayerSourceCache=null; }
+  return maskLayerSourceCache;
+}
+function maskLayerRasterFromAlpha(alpha,width,height){
+  const canvas=document.createElement('canvas'); canvas.width=width; canvas.height=height;
+  const ctx=canvas.getContext('2d'),image=ctx.createImageData(width,height);
+  for(let i=0;i<width*height;i++){
+    const value=alpha[i],offset=i*4;
+    image.data[offset]=image.data[offset+1]=image.data[offset+2]=value; image.data[offset+3]=255;
+  }
+  ctx.putImageData(image,0,0); return canvas;
+}
+function maskLayerAlphaFromCanvas(source){
+  const dims=maskLayerDimensions();
+  const probe=document.createElement('canvas'); probe.width=dims.width; probe.height=dims.height;
+  const ctx=probe.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(source,0,0,dims.width,dims.height);
+  const pixels=ctx.getImageData(0,0,dims.width,dims.height).data;
+  const alpha=new Uint8ClampedArray(dims.width*dims.height);
+  for(let i=0;i<alpha.length;i++) alpha[i]=pixels[i*4];
+  return alpha;
+}
+
+/* ---------- layer list ---------- */
+const maskLayerNameBase={subject:'Subject',background:'Background',pick:'Pick object',brush:'Brush',linear:'Linear gradient',radial:'Radial gradient',luminance:'Luminance range',color:'Color range'};
+function maskLayerSummary(layer){
+  switch(layer.type){
+    case 'linear': return `${layer.params.flip?'Reversed':'Forward'} · feather ${Math.round((layer.params.feather||0)*100)}%`;
+    case 'radial': return `${layer.params.outside?'Outside':'Inside'} · feather ${Math.round((layer.params.feather||0)*100)}%`;
+    case 'luminance': return `${layer.params.min}–${layer.params.max} · soft ${layer.params.smoothness}`;
+    case 'color': return `rgb(${layer.params.r},${layer.params.g},${layer.params.b}) · tol ${layer.params.tolerance}`;
+    case 'brush': return `${layer.params.size} px · ${layer.params.autoMask?'auto-mask on':'manual'}`;
+    default: return layer.raster?'AI selection':'empty selection';
+  }
+}
+function maskLayerRenderList(){
+  const list=$('maskLayerList'); if(!list) return;
+  list.innerHTML='';
+  const layers=maskStack?maskStack.layers:[];
+  const empty=$('maskLayerEmpty'); if(empty) empty.hidden=layers.length>0;
+  const count=$('maskLayerCount'); if(count) count.textContent=`${layers.length} ${layers.length===1?'LAYER':'LAYERS'}`;
+  layers.forEach((layer,index)=>{
+    const row=document.createElement('div');
+    row.className='maskLayerRow'; row.setAttribute('role','listitem'); row.dataset.layerId=layer.id;
+    row.dataset.selected=String(layer.id===maskLayerSelectedId);
+    row.dataset.visible=String(layer.visible!==false);
+    const visibility=document.createElement('button');
+    visibility.type='button'; visibility.className='maskLayerVisibility';
+    visibility.textContent=layer.visible!==false?'◉':'○';
+    visibility.setAttribute('aria-label',`${layer.visible!==false?'Hide':'Show'} ${layer.name}`);
+    visibility.setAttribute('aria-pressed',String(layer.visible!==false));
+    visibility.addEventListener('click',event=>{event.stopPropagation();maskLayerToggleVisible(layer.id);});
+    const name=document.createElement('button');
+    name.type='button'; name.className='maskLayerName';
+    name.innerHTML=`${layer.name}<small>${layer.operation} · ${maskLayerSummary(layer)}</small>`;
+    name.addEventListener('click',()=>maskLayerSelect(layer.id));
+    const actions=document.createElement('div'); actions.className='maskLayerActions';
+    const up=document.createElement('button');
+    up.type='button'; up.textContent='↑'; up.title='Move layer up'; up.disabled=index===layers.length-1;
+    up.addEventListener('click',event=>{event.stopPropagation();if(maskStack?.moveLayer(layer.id,1))maskLayerAfterChange('Layer order changed');});
+    const down=document.createElement('button');
+    down.type='button'; down.textContent='↓'; down.title='Move layer down'; down.disabled=index===0;
+    down.addEventListener('click',event=>{event.stopPropagation();if(maskStack?.moveLayer(layer.id,-1))maskLayerAfterChange('Layer order changed');});
+    const remove=document.createElement('button');
+    remove.type='button'; remove.textContent='✕'; remove.title='Delete layer';
+    remove.setAttribute('aria-label',`Delete ${layer.name}`);
+    remove.addEventListener('click',event=>{event.stopPropagation();maskLayerRemove(layer.id);});
+    actions.append(up,down,remove);
+    row.append(visibility,name,actions);
+    list.append(row);
+  });
+  const undo=$('maskLayerUndoBtn'),redo=$('maskLayerRedoBtn');
+  if(undo) undo.disabled=!(maskStack&&maskStack.canUndo);
+  if(redo) redo.disabled=!(maskStack&&maskStack.canRedo);
+}
+
+/* ---------- layer settings ---------- */
+function maskLayerRangeRow(label,value,min,max,step){
+  const wrap=document.createElement('div'); wrap.className='maskBgRangeRow';
+  const text=document.createElement('label');
+  const output=document.createElement('output'); output.textContent=String(value);
+  text.append(document.createTextNode(label),output);
+  const input=document.createElement('input');
+  input.type='range'; input.className='subSlider'; input.min=String(min); input.max=String(max); input.step=String(step);
+  input.value=String(parseFloat(value)).replace(/[^\d.-]/g,'');
+  wrap.append(text,input);
+  return {wrap,input,output};
+}
+function maskLayerSettingsRange(host,label,value,min,max,step,apply,format=raw=>raw){
+  const row=maskLayerRangeRow(label,format(value),min,max,step);
+  row.input.addEventListener('input',()=>{const next=Number(row.input.value);row.output.textContent=String(format(next));apply(next);});
+  host.append(row.wrap); return row;
+}
+function maskLayerCheckbox(host,label,checked,onChange){
+  const wrap=document.createElement('label'); wrap.className='checkLabel';
+  const box=document.createElement('input'); box.type='checkbox'; box.checked=!!checked;
+  box.addEventListener('change',()=>onChange(box.checked));
+  wrap.append(box,document.createTextNode(label));
+  host.append(wrap); return box;
+}
+function maskLayerRenderSettings(){
+  const host=$('maskLayerSettings'); if(!host) return;
+  host.innerHTML='';
+  const layer=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+  if(!layer){host.hidden=true;maskLayerRenderOverlayHandles();return;}
+  host.hidden=false;
+  const opRow=document.createElement('div'); opRow.className='maskLayerOps';
+  [['add','Add'],['subtract','Subtract'],['intersect','Intersect']].forEach(pair=>{
+    const value=pair[0],label=pair[1];
+    const button=document.createElement('button');
+    button.type='button'; button.textContent=label; button.dataset.op=value;
+    button.setAttribute('aria-pressed',String(layer.operation===value));
+    button.addEventListener('click',()=>{maskStack?.updateLayer(layer.id,{operation:value});maskLayerAfterChange(`${layer.name} set to ${value}`);});
+    opRow.append(button);
+  });
+  host.append(opRow);
+  maskLayerCheckbox(host,'Invert layer',layer.invert,checked=>{maskStack?.updateLayer(layer.id,{invert:checked});maskLayerAfterChange(checked?'Layer inverted':'Layer restored');});
+  switch(layer.type){
+    case 'linear':
+      maskLayerSettingsRange(host,'Feather',Math.round((layer.params.feather||0)*100),0,100,1,value=>{layer.params.feather=value/100;maskLayerAfterChange();},value=>`${value}%`);
+      maskLayerCheckbox(host,'Reverse direction',layer.params.flip,checked=>{layer.params.flip=checked;maskLayerAfterChange('Gradient reversed');});
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Drag the two handles on the photo to place the gradient.</p>');
+      break;
+    case 'radial':
+      maskLayerSettingsRange(host,'Feather',Math.round((layer.params.feather||0)*100),0,100,1,value=>{layer.params.feather=value/100;maskLayerAfterChange();},value=>`${value}%`);
+      maskLayerSettingsRange(host,'Rotation',Math.round(layer.params.rotation||0),-180,180,1,value=>{layer.params.rotation=value;maskLayerAfterChange();},value=>`${value}°`);
+      maskLayerCheckbox(host,'Select outside the ellipse',layer.params.outside,checked=>{layer.params.outside=checked;maskLayerAfterChange();});
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Drag the centre to move it, drag the edge to resize.</p>');
+      break;
+    case 'luminance':
+      maskLayerSettingsRange(host,'Minimum',Math.round(layer.params.min||0),0,255,1,value=>{layer.params.min=value;maskLayerAfterChange();});
+      maskLayerSettingsRange(host,'Maximum',Math.round(layer.params.max||0),0,255,1,value=>{layer.params.max=value;maskLayerAfterChange();});
+      maskLayerSettingsRange(host,'Smoothness',Math.round(layer.params.smoothness||0),0,80,1,value=>{layer.params.smoothness=value;maskLayerAfterChange();});
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Selects tones between the two limits with a soft roll-off.</p>');
+      break;
+    case 'color': {
+      const swatch=document.createElement('div'); swatch.className='maskBgDivider';
+      swatch.textContent=`RGB ${layer.params.r}, ${layer.params.g}, ${layer.params.b}`;
+      host.append(swatch);
+      const sample=document.createElement('button');
+      sample.type='button'; sample.className='toolBtn';
+      sample.textContent=maskLayerSampleMode?'Click the photo…':'Pick colour from photo';
+      sample.addEventListener('click',()=>{
+        maskLayerSampleMode=!maskLayerSampleMode; maskLayerRenderSettings();
+        setMaskBgStatus(maskLayerSampleMode?'Click the photo to sample a colour for the colour range.':'Colour sampling cancelled.');
+      });
+      host.append(sample);
+      maskLayerSettingsRange(host,'Tolerance',Math.round(layer.params.tolerance||0),0,128,1,value=>{layer.params.tolerance=value;maskLayerAfterChange();});
+      maskLayerSettingsRange(host,'Smoothness',Math.round(layer.params.smoothness||0),0,80,1,value=>{layer.params.smoothness=value;maskLayerAfterChange();});
+      break;
+    }
+    case 'brush':
+      maskLayerSettingsRange(host,'Brush size',Math.round(layer.params.size||20),4,160,1,value=>{
+        layer.params.size=value;
+        if(maskBgSettings) maskBgSettings.brushSize=value;
+        if($('maskBgBrushSize')) $('maskBgBrushSize').value=String(value);
+        if($('maskBgBrushSizeValue')) $('maskBgBrushSizeValue').textContent=`${value} px`;
+        updateMaskBrushCursor();
+      });
+      maskLayerSettingsRange(host,'Hardness',Math.round(layer.params.hardness??65),0,100,1,value=>{
+        layer.params.hardness=value;
+        if(maskBgSettings) maskBgSettings.hardness=value;
+        if($('maskBgHardness')) $('maskBgHardness').value=String(value);
+        if($('maskBgHardnessValue')) $('maskBgHardnessValue').textContent=`${value}%`;
+        updateMaskBrushCursor();
+      },value=>`${value}%`);
+      maskLayerCheckbox(host,'Auto-mask (only similar colours)',layer.params.autoMask,checked=>{
+        layer.params.autoMask=checked; maskLayerRenderList();
+        setMaskBgStatus(checked?'Auto-mask on: strokes only affect colours similar to the pixel under the brush centre.':'Auto-mask off: strokes paint freely.');
+      });
+      maskLayerSettingsRange(host,'Auto-mask tolerance',Math.round(layer.params.autoTolerance??30),4,120,1,value=>{layer.params.autoTolerance=value;});
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Paint or erase straight on the photo while this layer is selected.</p>');
+      break;
+    case 'subject':
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Detected on this device. Edge refine is on for AI masks; tune it under Refine.</p>');
+      break;
+    case 'background':
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Selects everything outside the subject and subtracts it from the mask.</p>');
+      break;
+    case 'pick':
+      host.insertAdjacentHTML('beforeend','<p class="maskBgHint maskLayerSampleHint">Click the photo to repick this object, or add another Pick object layer.</p>');
+      break;
+    default: break;
+  }
+  const row=document.createElement('div'); row.className='maskBgButtonRow';
+  const duplicate=document.createElement('button');
+  duplicate.type='button'; duplicate.className='toolBtn'; duplicate.textContent='⧉ Duplicate';
+  duplicate.addEventListener('click',()=>maskLayerDuplicate(layer.id));
+  const remove=document.createElement('button');
+  remove.type='button'; remove.className='toolBtn'; remove.textContent='✕ Delete layer';
+  remove.addEventListener('click',()=>maskLayerRemove(layer.id));
+  row.append(duplicate,remove); host.append(row);
+}
+
+/* ---------- composite ---------- */
+function maskLayerAfterChange(message){
+  maskLayerRenderList(); maskLayerRenderSettings();
+  maskLayerOverlayKick();
+  if(message) setMaskBgStatus(message);
+  markMaskBgPresetChanged();
+  maskLayerQueueComposite();
+}
+function maskLayerQueueComposite(){
+  maskLayerOverlayDirty=true;
+  if(maskLayerCompositeQueued) return;
+  maskLayerCompositeQueued=true;
+  requestAnimationFrame(()=>{maskLayerCompositeQueued=false;maskLayerApplyComposite();});
+}
+function maskLayoutEnsureCanvas(){
+  if(!maskLayerOverlayCanvas||!maskBgCanvas) return;
+  if(maskLayerOverlayCanvas.width!==maskBgCanvas.width||maskLayerOverlayCanvas.height!==maskBgCanvas.height){
+    maskLayerOverlayCanvas.width=maskBgCanvas.width; maskLayerOverlayCanvas.height=maskBgCanvas.height;
+    maskLayerOverlayDirty=true;
+  }
+}
+function maskLayerApplyComposite(){
+  const api=maskStackApi(); if(!api||!maskStack||!maskBgCanvas) return;
+  const {width,height}=maskLayerDimensions();
+  let alpha;
+  try{
+    alpha=api.compositeLayers(maskStack.layers,width,height,maskLayerSourceRgba());
+  }catch(error){
+    console.warn('Film Lab mask layers could not be composited; keeping the previous mask',error);
+    return;
+  }
+  const hadLayers=maskStack.layers.length>0;
+  maskLayerCompositeAlpha=alpha;
+  if(hadLayers||maskBgActive){
+    maskBgAutoCanvas=maskLayerRasterFromAlpha(alpha,width,height);
+    maskBgBaseValue=0;
+    maskBgActive=true;
+  }
+  rebuildMaskBackgroundCanvas();
+  maskLayerRequestRefine('layers');
+  maskLayerOverlayDirty=true; maskLayerOverlayKick();
+  updateMaskBgControls(); forceMaskBackgroundPng(); updateSocialUI();
+  setMaskBgAiStatus(hadLayers?'Mask layers composited on this device.':'No mask layers yet.',hadLayers,false);
+}
+/* Refine runs on the segmentation worker so the UI never blocks. */
+function maskLayerRequestRefine(reason){
+  clearTimeout(maskLayerRefineTimer);
+  const status=$('maskRefineStatus');
+  if(!maskBgCanvas) return;
+  const wait=reason==='ai'?280:120;
+  maskLayerRefineTimer=setTimeout(async()=>{
+    if(maskLayerBusy||!maskBgPhotoReady()||!maskBgAutoCanvas) return;
+    const token=maskLayerToken;
+    const {width,height}=maskLayerDimensions();
+    const options={
+      smooth:maskRefineSettings.smooth,
+      edgeRefine:maskRefineSettings.edgeRefine&&reason==='ai',
+      radius:maskRefineSettings.radius,
+      strength:maskRefineSettings.strength/100
+    };
+    if(!options.smooth&&!options.edgeRefine) return;
+    try{
+      maskLayerBusy=true;
+      if(status) status.textContent='Refining edges…';
+      const image=await createImageBitmap(photoForMask);
+      if(token!==maskLayerToken){image.close?.();return;}
+      const mask=maskLayerAlphaFromCanvas(maskBgAutoCanvas);
+      await requestMaskBgWorker('source',{image,width,height});
+      const result=await withTimeout(requestMaskBgWorker('refine',{mask,width,height,options}),30000,'Mask refinement timed out after 30 seconds');
+      if(token!==maskLayerToken) return;
+      maskBgAutoCanvas=maskLayerRasterFromAlpha(result.mask,result.width,result.height);
+      maskBgActive=true;
+      rebuildMaskBackgroundCanvas(); forceMaskBackgroundPng(); updateSocialUI();
+      maskLayerOverlayDirty=true;
+      maskRequestEdgeCleanup(result.mask,result.width,result.height);
+      if(status) status.textContent='Edges refined. Smooth, feather, expand and invert stay live.';
+    }catch(error){
+      console.warn('Mask refinement unavailable',error);
+      if(status) status.textContent=`Edge refine unavailable: ${maskLayerErrorMessage(error)}`;
+    }finally{
+      maskLayerBusy=false;
+    }
+  },wait);
+}
+
+/* ---------- layer actions ---------- */
+function maskLayerSelect(id){
+  maskLayerSampleMode=false;
+  maskLayerSelectedId=id;
+  maskLayerRenderList(); maskLayerRenderSettings(); maskLayerOverlayDirty=true; maskLayerOverlayKick();
+}
+function maskLayerToggleVisible(id){
+  const layer=maskStack?.layers.find(entry=>entry.id===id); if(!layer) return;
+  maskStack.updateLayer(id,{visible:layer.visible===false});
+  maskLayerAfterChange(layer.visible===false?'Layer shown':'Layer hidden');
+}
+function maskLayerRemove(id){
+  const layer=maskStack?.layers.find(entry=>entry.id===id);
+  if(!maskStack?.removeLayer(id)) return;
+  if(maskLayerSelectedId===id) maskLayerSelectedId=maskStack.layers.at(-1)?.id||null;
+  maskLayerAfterChange(`${layer?.name||'Layer'} deleted`);
+}
+function maskLayerDuplicate(id){
+  const layer=maskStack?.layers.find(entry=>entry.id===id); if(!layer) return;
+  const copy=maskStack.addLayer(layer.type,{name:`${layer.name} copy`,operation:layer.operation,invert:layer.invert,params:{...layer.params}});
+  if(layer.raster) maskStack.setLayerRaster(copy.id,new Uint8ClampedArray(layer.raster.data),layer.raster.width,layer.raster.height);
+  maskLayerSelectedId=copy.id;
+  maskLayerAfterChange('Layer duplicated');
+}
+function maskLayerUndo(){ if(maskStack?.undo()){maskLayerRenderList();maskLayerRenderSettings();maskLayerOverlayDirty=true;maskLayerQueueComposite();setMaskBgStatus('Undid the last layer edit.');} }
+function maskLayerRedo(){ if(maskStack?.redo()){maskLayerRenderList();maskLayerRenderSettings();maskLayerOverlayDirty=true;maskLayerQueueComposite();setMaskBgStatus('Redid the layer edit.');} }
+function maskLayerAdd(type,options={}){
+  if(!maskLayerEnsureStack()){showToast('Mask layers are unavailable in this browser');return null;}
+  if(!maskBgPhotoReady()){setMaskBgStatus('Open a photo before adding mask layers.');return null;}
+  if(type==='pick'&&maskStack.layers.filter(entry=>entry.type==='pick').length>=MASK_PICK_LIMIT){
+    showToast(`Up to ${MASK_PICK_LIMIT} picked objects per photo. Delete one to add another.`);
+    return null;
+  }
+  const count=maskStack.layers.filter(entry=>entry.type===type).length;
+  const name=options.name||(count?`${maskLayerNameBase[type]||type} ${count+1}`:(maskLayerNameBase[type]||type));
+  const layer=maskStack.addLayer(type,{...options,name});
+  maskLayerSelectedId=layer.id;
+  ensureMaskBgBase('paint');
+  maskLayerAfterChange(`${layer.name} added`);
+  return layer;
+}
+function maskLayerAddFromAlpha(type,alpha,width,height,options={}){
+  const layer=maskLayerAdd(type,options);
+  if(!layer) return null;
+  const {width:maskWidth,height:maskHeight}=maskLayerDimensions();
+  const api=maskStackApi();
+  const values=alpha instanceof Uint8ClampedArray?alpha:new Uint8ClampedArray(alpha);
+  const sized=width===maskWidth&&height===maskHeight?values:(api?api.resizeMask(values,width,height,maskWidth,maskHeight):values);
+  maskStack.setLayerRaster(layer.id,sized,maskWidth,maskHeight);
+  maskLayerAfterChange(`${layer.name} ready`);
+  maskLayerRequestRefine('ai');
+  return layer;
+}
+function maskLayerAddBackground(){
+  const subject=maskStack?.layers.find(entry=>entry.type==='subject'&&entry.raster);
+  const layer=maskLayerAdd('background',{operation:'subtract'});
+  if(!layer) return null;
+  if(subject){
+    maskStack.setLayerRaster(layer.id,new Uint8ClampedArray(subject.raster.data),subject.raster.width,subject.raster.height);
+    maskLayerAfterChange('Background layer built from the subject selection');
+  }else{
+    setMaskBgStatus('Background layer added. Add a Subject layer first so it can subtract.');
+  }
+  return layer;
+}
+
+/* ---------- brush layers ---------- */
+function maskLayerSelectedBrush(){
+  const layer=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+  return layer&&layer.type==='brush'?layer:null;
+}
+function maskLayerBeginStroke(event){
+  const layer=maskLayerSelectedBrush(); if(!layer||!maskBgPhotoReady()||!maskBgCanvas) return false;
+  if(event.pointerType==='mouse'&&event.button!==0) return false;
+  const {width,height}=maskLayerDimensions();
+  if(!layer.raster||layer.raster.width!==width||layer.raster.height!==height) maskStack.setLayerRaster(layer.id,new Uint8ClampedArray(width*height),width,height);
+  event.preventDefault();
+  maskStack.commit();
+  const point=subjectPoint(event);
+  const radius=Math.max(1,(layer.params.size||20)/2);
+  const mode=maskBgPaintMode==='erase'?'erase':'paint';
+  maskLayerStroke={id:event.pointerId,layerId:layer.id,mode,radius,autoMask:!!layer.params.autoMask,tolerance:(layer.params.autoTolerance??30)*2.55,points:[point]};
+  canvas.setPointerCapture(event.pointerId);
+  maskLayerStamp(point.x,point.y,radius,mode);
+  setMaskBgStatus(mode==='erase'?'Erasing from the selected brush layer.':'Painting on the selected brush layer.');
+  maskLayerQueueComposite();
+  return true;
+}
+function maskLayerSampleSeed(stroke,x,y){
+  if(stroke.seed) return stroke.seed;
+  const source=maskLayerSourceRgba(); if(!source) return [128,128,128];
+  const {width,height}=maskLayerDimensions();
+  const px=Math.max(0,Math.min(width-1,Math.round(x*width))),py=Math.max(0,Math.min(height-1,Math.round(y*height)));
+  const offset=(py*width+px)*4;
+  stroke.seed=[source[offset],source[offset+1],source[offset+2]];
+  return stroke.seed;
+}
+function maskLayerStamp(x,y,radius,mode){
+  const stroke=maskLayerStroke;
+  const layer=maskStack?.layers.find(entry=>entry.id===(stroke?.layerId||maskLayerSelectedId));
+  if(!layer?.raster) return;
+  const {width,height}=maskLayerDimensions(),data=layer.raster.data;
+  const auto=stroke?.autoMask;
+  const source=auto?maskLayerSourceRgba():null;
+  const seed=auto?maskLayerSampleSeed(stroke,x,y):null;
+  const cx=x*width,cy=y*height,feather=Math.max(0.05,1-(layer.params.hardness??65)/100);
+  const inner=radius*(1-feather);
+  const minX=Math.max(0,Math.floor(cx-radius)),maxX=Math.min(width-1,Math.ceil(cx+radius));
+  const minY=Math.max(0,Math.floor(cy-radius)),maxY=Math.min(height-1,Math.ceil(cy+radius));
+  const tolerance=(stroke?.tolerance??60);
+  for(let py=minY;py<=maxY;py++){
+    for(let px=minX;px<=maxX;px++){
+      const distance=Math.hypot(px+0.5-cx,py+0.5-cy);
+      if(distance>radius) continue;
+      let strength=1;
+      if(distance>inner) strength=Math.max(0,Math.min(1,1-(distance-inner)/Math.max(0.0001,radius-inner)));
+      if(auto&&source&&seed){
+        const offset=(py*width+px)*4;
+        const distanceSq=(source[offset]-seed[0])**2+(source[offset+1]-seed[1])**2+(source[offset+2]-seed[2])**2;
+        if(distanceSq>tolerance*tolerance) continue;
+      }
+      const index=py*width+px,current=data[index];
+      const next=mode==='erase'?current*(1-strength):current+(255-current)*strength;
+      data[index]=Math.round(Math.max(0,Math.min(255,next)));
+    }
+  }
+}
+function maskLayerPaintStroke(event){
+  const stroke=maskLayerStroke; if(!stroke||stroke.id!==event.pointerId) return;
+  const point=subjectPoint(event),previous=stroke.points.at(-1);
+  const travel=Math.hypot((point.x-previous.x)*(maskBgCanvas?.width||1),(point.y-previous.y)*(maskBgCanvas?.height||1));
+  const steps=Math.max(1,Math.min(48,Math.ceil(travel/Math.max(1.5,stroke.radius*0.35))));
+  for(let step=1;step<=steps;step++){
+    const t=step/steps;
+    maskLayerStamp(previous.x+(point.x-previous.x)*t,previous.y+(point.y-previous.y)*t,stroke.radius,stroke.mode);
+  }
+  stroke.points.push(point);
+  maskLayerOverlayDirty=true;
+  maskLayerQueueComposite();
+}
+function maskLayerEndStroke(event){
+  if(maskLayerStroke&&(!event||maskLayerStroke.id===event.pointerId)){
+    maskLayerStroke=null;
+    maskLayerRequestRefine('stroke');
+  }
+  maskLayerDrag=null;
+}
+
+/* ---------- gradient handles ---------- */
+function maskLayerHandleAt(point){
+  const layer=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+  if(!layer) return null;
+  const near=(ax,ay)=>Math.hypot(point.x-ax,point.y-ay)<0.05;
+  if(layer.type==='linear'){
+    if(near(layer.params.x1,layer.params.y1)) return 'p1';
+    if(near(layer.params.x2,layer.params.y2)) return 'p2';
+    if(near((layer.params.x1+layer.params.x2)/2,(layer.params.y1+layer.params.y2)/2)) return 'move';
+    return null;
+  }
+  if(layer.type==='radial'){
+    const dx=point.x-layer.params.x,dy=point.y-layer.params.y;
+    const distance=Math.hypot(dx/Math.max(0.01,layer.params.rx||0.3),dy/Math.max(0.01,layer.params.ry||0.3));
+    if(distance<0.4) return 'move';
+    if(Math.abs(distance-1)<0.4) return 'resize';
+    return null;
+  }
+  return null;
+}
+function maskLayerPointerDown(event){
+  if(exportBusy||mediaBusy||!maskBgPhotoReady()) return false;
+  if(event.pointerType==='mouse'&&event.button!==0) return false;
+  const point=subjectPoint(event);
+  if(maskLayerSampleMode){
+    const source=maskLayerSourceRgba(),layer=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+    if(source&&layer){
+      const {width,height}=maskLayerDimensions();
+      const px=Math.max(0,Math.min(width-1,Math.round(point.x*width))),py=Math.max(0,Math.min(height-1,Math.round(point.y*height)));
+      const offset=(py*width+px)*4;
+      layer.params.r=source[offset]; layer.params.g=source[offset+1]; layer.params.b=source[offset+2];
+      maskLayerSampleMode=false;
+      maskLayerAfterChange(`Colour sampled: rgb(${layer.params.r},${layer.params.g},${layer.params.b})`);
+    }
+    event.preventDefault();
+    return true;
+  }
+  if(maskEngineMode==='pick'&&!maskBgPaintMode){
+    event.preventDefault();
+    maskEngineRunPick(point);
+    return true;
+  }
+  const handle=maskBgPaintMode?null:maskLayerHandleAt(point);
+  if(handle&&maskStack){
+    const layer=maskStack.layers.find(entry=>entry.id===maskLayerSelectedId);
+    if(layer){
+      event.preventDefault();
+      canvas.setPointerCapture(event.pointerId);
+      maskLayerDrag={id:event.pointerId,handle,layerId:layer.id,start:point,origin:{...layer.params}};
+      return true;
+    }
+  }
+  if(maskBgPaintMode&&maskBgPaintMode!=='magic'&&maskLayerSelectedBrush()&&maskLayerBeginStroke(event)) return true;
+  return false;
+}
+function maskLayerPointerMove(event){
+  if(maskLayerStroke&&maskLayerStroke.id===event.pointerId){ maskLayerPaintStroke(event); return true; }
+  if(!maskLayerDrag||maskLayerDrag.id!==event.pointerId) return false;
+  const layer=maskStack?.layers.find(entry=>entry.id===maskLayerDrag.layerId); if(!layer) return false;
+  const origin=maskLayerDrag.origin,start=maskLayerDrag.start;
+  const box=canvas.getBoundingClientRect();
+  const nx=Math.max(0,Math.min(1,(event.clientX-box.left)/box.width)),ny=Math.max(0,Math.min(1,(event.clientY-box.top)/box.height));
+  const mx=nx-start.x,my=ny-start.y;
+  if(layer.type==='linear'){
+    if(maskLayerDrag.handle==='move'){
+      layer.params.x1=clamp01(origin.x1+mx);layer.params.y1=clamp01(origin.y1+my);
+      layer.params.x2=clamp01(origin.x2+mx);layer.params.y2=clamp01(origin.y2+my);
+    }else if(maskLayerDrag.handle==='p1'){
+      layer.params.x1=nx;layer.params.y1=ny;
+    }else{
+      layer.params.x2=nx;layer.params.y2=ny;
+    }
+  }else if(layer.type==='radial'){
+    if(maskLayerDrag.handle==='move'){
+      layer.params.x=clamp01(origin.x+mx);layer.params.y=clamp01(origin.y+my);
+    }else{
+      layer.params.rx=Math.max(0.02,Math.abs(nx-layer.params.x));
+      layer.params.ry=Math.max(0.02,Math.abs(ny-layer.params.y));
+    }
+  }
+  maskLayerOverlayDirty=true;
+  maskLayerQueueComposite();
+  return true;
+}
+function maskLayerPointerUp(event){
+  const hasStroke=maskLayerStroke&&maskLayerStroke.id===event.pointerId;
+  const hasDrag=maskLayerDrag&&maskLayerDrag.id===event.pointerId;
+  if(!hasStroke&&!hasDrag) return;
+  maskLayerEndStroke(event);
+  if(hasDrag) maskLayerAfterChange('Gradient updated');
+}
+
+/* ---------- red selection overlay ---------- */
+function maskLayerToggleOverlay(force){
+  maskLayerOverlayOn=typeof force==='boolean'?force:!maskLayerOverlayOn;
+  const button=$('maskOverlayBtn');
+  if(button) button.setAttribute('aria-pressed',String(maskLayerOverlayOn));
+  if(!maskLayerOverlayOn&&maskLayerOverlayCanvas) maskLayerOverlayCanvas.classList.remove('visible');
+  else {maskLayerOverlayDirty=true;maskLayerOverlayKick();}
+  setMaskBgStatus(maskLayerOverlayOn?'Red selection overlay on.':'Red selection overlay off.');
+}
+function maskLayerOverlayKick(){
+  if(maskLayerOverlayFrame) return;
+  maskLayerOverlayFrame=requestAnimationFrame(maskLayerOverlayTick);
+}
+function maskLayerOverlayTick(){
+  maskLayerOverlayFrame=0;
+  if(!maskLayerOverlayCanvas) return;
+  const active=appState.mode==='photo'&&!isVideo&&activeSidebarTab==='mask'&&maskBgPhotoReady()&&maskLayerOverlayOn&&maskBgActive&&hasContent;
+  if(!active){maskLayerOverlayCanvas.classList.remove('visible');return;}
+  const rect=canvas.getBoundingClientRect(),wrap=canvasWrap.getBoundingClientRect();
+  const box=[Math.round(rect.left-wrap.left),Math.round(rect.top-wrap.top),Math.round(rect.width),Math.round(rect.height)];
+  if(box[2]<1||box[3]<1){maskLayerOverlayCanvas.classList.remove('visible');return;}
+  const style=maskLayerOverlayCanvas.style;
+  const nextLeft=`${box[0]}px`,nextTop=`${box[1]}px`,nextWidth=`${box[2]}px`,nextHeight=`${box[3]}px`;
+  const geometryChanged=style.left!==nextLeft||style.top!==nextTop||style.width!==nextWidth||style.height!==nextHeight;
+  if(geometryChanged){style.left=nextLeft;style.top=nextTop;style.width=nextWidth;style.height=nextHeight;}
+  maskLayerOverlayCanvas.classList.add('visible');
+  if(geometryChanged||maskLayerOverlayDirty) maskLayerRenderOverlay();
+  maskLayerOverlayFrame=requestAnimationFrame(maskLayerOverlayTick);
+}
+function maskLayerRenderOverlay(){
+  if(!maskLayerOverlayCtx||!maskLayerCompositeAlpha||!maskBgCanvas) return;
+  maskLayerOverlayDirty=false;
+  const width=maskBgCanvas.width,height=maskBgCanvas.height;
+  if(maskLayerOverlayCanvas.width!==width||maskLayerOverlayCanvas.height!==height){maskLayerOverlayCanvas.width=width;maskLayerOverlayCanvas.height=height;}
+  const image=maskLayerOverlayCtx.createImageData(width,height);
+  const alpha=maskLayerCompositeAlpha;
+  for(let i=0;i<alpha.length;i++){
+    const offset=i*4,value=alpha[i];
+    image.data[offset]=220; image.data[offset+1]=58; image.data[offset+2]=58;
+    image.data[offset+3]=Math.round(value*0.5);
+  }
+  maskLayerOverlayCtx.putImageData(image,0,0);
+  maskLayerRenderOverlayHandles();
+}
+function maskLayerRenderOverlayHandles(){
+  if(!maskLayerOverlayCtx) return;
+  const layer=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+  if(!layer||(layer.type!=='linear'&&layer.type!=='radial')) return;
+  const ctx=maskLayerOverlayCtx,width=maskLayerOverlayCanvas.width,height=maskLayerOverlayCanvas.height;
+  ctx.save();
+  ctx.strokeStyle='#f2f0ea'; ctx.fillStyle='#f2f0ea'; ctx.lineWidth=Math.max(1.5,width/700);
+  if(layer.type==='linear'){
+    const x1=layer.params.x1*width,y1=layer.params.y1*height,x2=layer.params.x2*width,y2=layer.params.y2*height;
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    for(const point of [[x1,y1],[x2,y2]]){ctx.beginPath();ctx.arc(point[0],point[1],Math.max(4,width/160),0,Math.PI*2);ctx.fill();}
+  }else{
+    ctx.beginPath();
+    ctx.ellipse(layer.params.x*width,layer.params.y*height,(layer.params.rx||0.3)*width,(layer.params.ry||0.3)*height,(layer.params.rotation||0)*Math.PI/180,0,Math.PI*2);
+    ctx.stroke();
+    ctx.beginPath();ctx.arc(layer.params.x*width,layer.params.y*height,Math.max(4,width/160),0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---------- engines: Fast / Pick object / Pro ---------- */
+function maskEngineSetHint(message){ const hint=$('maskEngineHint'); if(hint&&message) hint.textContent=message; }
+function maskProRemoveVisible(visible){ const button=$('maskProRemoveBtn'); if(button) button.hidden=!visible; }
+function maskProRefreshButtons(){
+  const confirm=$('maskProConfirmBtn'),cancel=$('maskProCancelBtn');
+  if(confirm) confirm.textContent=maskProReady?'Segment with Pro':'Download & use Pro';
+  if(cancel) cancel.hidden=!maskProDownloading;
+}
+function setMaskEngine(mode){
+  if(!['fast','pick','pro'].includes(mode)) return;
+  if(mode!==maskEngineMode) maskEnginePrevious=maskEngineMode;
+  maskEngineMode=mode;
+  document.querySelectorAll('input[name="maskEngine"]').forEach(input=>{input.checked=input.value===mode;});
+  const pickHint=$('maskPickHint'),proPanel=$('maskProPanel');
+  if(pickHint) pickHint.hidden=mode!=='pick';
+  if(proPanel) proPanel.hidden=mode!=='pro';
+  if(mode==='fast'){
+    maskEngineSetHint('Fast segments people on this device with the bundled model and works offline.');
+    setMaskBgStatus('Fast engine selected. Use Auto-remove subject or add a Subject layer.');
+  }else if(mode==='pick'){
+    maskEngineSetHint('Click an object in the photo; the selection is added as a Pick object layer.');
+    setMaskBgStatus('Pick object selected. Click the object you want.');
+  }else{
+    const webgpu=maskProDevice==='webgpu';
+    const size=$('maskProSize');
+    if(size) size.textContent=`Pro uses BiRefNet_lite (MIT). One download of about ${webgpu?'115':'224'} MB on ${webgpu?'WebGPU':'WASM/CPU'}, cached in this browser.`;
+    if(!maskProReady){
+      maskEngineSetHint('Pro needs a one-time model download before it can segment.');
+      setMaskBgStatus(`Pro selected. Download about ${Math.round(MASK_PRO_BYTES[webgpu?'webgpu':'wasm']/(1024*1024))} MB once to continue.`);
+    }else{
+      maskEngineSetHint('Pro is ready. Add a Subject layer to segment with BiRefNet_lite.');
+      setMaskBgStatus('Pro engine ready.');
+    }
+    maskProProbe();
+  }
+  maskProRefreshButtons();
+  maskLayerOverlayDirty=true; maskLayerOverlayKick();
+}
+function maskProStatus(message,kind='info'){
+  const node=$('maskProStatus'); if(node) node.textContent=message;
+  if(kind==='error') console.warn('Film Lab Pro mask engine:',message);
+}
+function maskProShowProgress(ratio,text){
+  const wrap=$('maskProProgress'),bar=$('maskProBar'),fill=$('maskProProgressFill'),label=$('maskProProgressText');
+  if(wrap) wrap.hidden=false;
+  const clamped=Math.max(0,Math.min(1,ratio));
+  if(bar) bar.setAttribute('aria-valuenow',String(Math.round(clamped*100)));
+  if(fill) fill.style.width=`${Math.round(clamped*100)}%`;
+  if(label&&text) label.textContent=text;
+}
+function maskProHideProgress(){ const wrap=$('maskProProgress'); if(wrap) wrap.hidden=true; }
+function maskProEnsureWorker(){
+  if(maskProWorker) return maskProWorker;
+  let worker;
+  try{ worker=new Worker(new URL('mask-pro-worker.mjs',document.baseURI),{type:'module'}); }
+  catch(error){ maskProStatus(`Pro engine unavailable: ${maskLayerErrorMessage(error)}`,'error'); return null; }
+  worker.onmessage=event=>{
+    const data=event.data||{};
+    if(data.type==='progress'){
+      if(data.phase==='download'&&data.total) maskProShowProgress(data.loaded/data.total,`Downloading ${data.file||'model'} · ${(data.loaded/1048576).toFixed(1)} of ${(data.total/1048576).toFixed(1)} MB`);
+      else if(data.message) maskProShowProgress(0.06,data.message);
+      return;
+    }
+    const pending=maskProWorkerPending.get(data.requestId);
+    if(!pending) return;
+    maskProWorkerPending.delete(data.requestId);
+    if(data.type==='error') pending.reject(new Error(data.error||'The Pro engine failed'));
+    else pending.resolve(data);
+  };
+  worker.onerror=event=>{
+    const error=new Error(event.message||'The Pro engine worker crashed');
+    for(const pending of maskProWorkerPending.values()) pending.reject(error);
+    maskProWorkerPending.clear();
+    if(maskProWorker) maskProWorker.terminate();
+    maskProWorker=null; maskProReady=false; maskProDownloading=false;
+    maskProStatus(`Pro engine stopped: ${error.message}`,'error');
+    maskProRefreshButtons();
+    if(maskEngineMode==='pro') maskEngineFallback(maskEnginePrevious==='pro'?'fast':maskEnginePrevious,error.message);
+  };
+  maskProWorker=worker; return worker;
+}
+function maskProRequest(type,payload={}){
+  const worker=maskProEnsureWorker();
+  if(!worker) return Promise.reject(new Error('The Pro engine is unavailable'));
+  const requestId=++maskProWorkerRequestId;
+  return new Promise((resolve,reject)=>{
+    maskProWorkerPending.set(requestId,{resolve,reject});
+    try{worker.postMessage({type,requestId,...payload},payload.image?[payload.image]:[]);}
+    catch(error){maskProWorkerPending.delete(requestId);payload.image?.close?.();reject(error);}
+  });
+}
+function maskProProbe(){
+  if(!maskProWorker||maskProReady||maskProDownloading) return;
+  maskProRequest('probe').then(result=>{
+    maskProDevice=result.webgpu?'webgpu':'wasm';
+    const size=$('maskProSize');
+    if(size) size.textContent=`Pro uses BiRefNet_lite (MIT). One download of about ${result.webgpu?'115':'224'} MB on ${result.webgpu?'WebGPU':'WASM/CPU'}, cached in this browser.`;
+  }).catch(()=>{});
+}
+function maskProCancel(){
+  if(maskProWorker){maskProWorker.terminate();maskProWorker=null;}
+  for(const pending of maskProWorkerPending.values()) pending.reject(new Error('Cancelled'));
+  maskProWorkerPending.clear();
+  maskProDownloading=false; maskProReady=false;
+  maskProHideProgress(); maskProRemoveVisible(false); maskProRefreshButtons();
+  maskProStatus('Download cancelled. Pick object and Fast still work without any download.');
+  setMaskEngine(maskEnginePrevious==='pro'?'fast':maskEnginePrevious);
+}
+function maskProConfirm(){
+  if(maskProDownloading) return;
+  if(maskProReady){ if(maskBgPhotoReady()) maskEngineRunPro(); return; }
+  maskProDownloading=true;
+  maskProRemoveVisible(false); maskProRefreshButtons();
+  maskProShowProgress(0.02,'Starting the model download…');
+  maskProStatus('Downloading BiRefNet_lite. Keep this tab open; the model is cached afterwards.');
+  maskProRequest('load',{webgpu:maskProDevice==='webgpu'}).then(result=>{
+    maskProReady=true; maskProDownloading=false;
+    maskProDevice=result.device||maskProDevice;
+    maskProShowProgress(1,`Model ready on ${result.device||'wasm'} (${result.dtype||'fp32'}).`);
+    maskProStatus(`Pro ready on ${result.device||'wasm'}. The model stays cached in this browser.`);
+    maskProRemoveVisible(true); maskProRefreshButtons();
+    if(maskBgPhotoReady()) maskEngineRunPro();
+  }).catch(error=>{
+    maskProDownloading=false;
+    maskProHideProgress(); maskProRefreshButtons();
+    maskProStatus(`Pro model download failed: ${maskLayerErrorMessage(error)}`,'error');
+    maskEngineFallback('fast',maskLayerErrorMessage(error));
+  });
+}
+function maskProPurge(){
+  maskProRequest('purge').then(result=>{
+    maskProReady=false;
+    maskProRemoveVisible(false); maskProHideProgress(); maskProRefreshButtons();
+    maskProStatus(`Removed ${result.removed||0} cached model file${result.removed===1?'':'s'}. Pro can be downloaded again at any time.`);
+  }).catch(error=>maskProStatus(`Could not remove the cached model: ${maskLayerErrorMessage(error)}`,'error'));
+}
+function maskEngineFallback(mode,reason){
+  setMaskEngine(mode);
+  const message=`Pro engine unavailable (${reason}). Switched to ${mode==='pick'?'Pick object':'Fast'}.`;
+  maskProStatus(message,'error');
+  setMaskBgStatus(message);
+  setMaskBgAiStatus(message,true,false);
+}
+function maskEngineRunFast(redetect=false){
+  if(!maskBgPhotoReady()) return;
+  const token=++maskLayerToken;
+  const {width,height}=maskLayerDimensions();
+  maskBgProcessing=true;
+  setMaskBgAiStatus('Loading AI model… this may take a moment.',true,true);
+  setMaskBgStatus('Preparing automatic background removal on this device…');
+  updateMaskBgControls();
+  withTimeout(ensureMaskBgModel(),90000,'AI model loading timed out after 90 seconds').then(()=>{
+    if(token!==maskLayerToken) return null;
+    setMaskBgAiStatus('Analyzing image…',true,true);
+    setMaskBgStatus('Analyzing image…');
+    return createImageBitmap(photoForMask).then(image=>{
+      if(token!==maskLayerToken){image.close?.();return null;}
+      return withTimeout(requestMaskBgWorker('segment',{image,width,height}),30000,'Image segmentation timed out after 30 seconds');
+    });
+  }).then(result=>{
+    if(!result||token!==maskLayerToken) return;
+    const alpha=new Uint8ClampedArray(result.mask);
+    let kept=0; for(let i=0;i<alpha.length;i++) if(alpha[i]>128) kept++;
+    if(kept<alpha.length*0.004||kept>=alpha.length*0.996) throw new Error('No clear subject was found in this photo');
+    const selected=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId);
+    if(redetect&&selected&&(selected.type==='subject'||selected.type==='background')){
+      maskStack.setLayerRaster(selected.id,alpha,result.width,result.height);
+      maskLayerAfterChange('Subject re-detected');
+      maskLayerRequestRefine('ai');
+    }else{
+      maskLayerAddFromAlpha('subject',alpha,result.width,result.height);
+    }
+    setMaskBgStatus('Subject selected — refine edges with the brush or the Refine controls');
+    setMaskBgAiStatus('Subject selected on this device.',true,false);
+  }).catch(error=>{
+    if(token!==maskLayerToken) return;
+    console.warn('Automatic subject selection unavailable',error);
+    if(error?.name==='TimeoutError') terminateMaskBgWorker(error,'error');
+    const failure=`Auto-remove failed: ${maskLayerErrorMessage(error)}. Try Magic select or Paint / keep.`;
+    setMaskBgAiStatus(failure,true,false);
+    setMaskBgStatus(failure);
+  }).finally(()=>{
+    if(token===maskLayerToken){clearTimeout(maskBgAutoTimeout);maskBgAutoTimeout=null;maskBgProcessing=false;updateMaskBgControls();}
+  });
+}
+function maskEngineRunPick(point){
+  if(!maskBgPhotoReady()||maskLayerPickPending) return;
+  const token=++maskLayerToken;
+  const {width,height}=maskLayerDimensions();
+  maskLayerPickPending=true;
+  setMaskBgAiStatus('Finding the object under the click…',true,true);
+  setMaskBgStatus('Picking the object under the click…');
+  requestMaskBgWorker('init-pick').then(()=>createImageBitmap(photoForMask)).then(image=>{
+    if(token!==maskLayerToken){image.close?.();return null;}
+    return withTimeout(requestMaskBgWorker('pick',{image,point,width,height}),90000,'Picking an object timed out after 90 seconds');
+  }).then(result=>{
+    if(!result||token!==maskLayerToken) return;
+    const selected=maskStack?.layers.find(entry=>entry.id===maskLayerSelectedId&&entry.type==='pick');
+    if(selected){
+      maskStack.setLayerRaster(selected.id,new Uint8ClampedArray(result.mask),result.width,result.height);
+      maskLayerAfterChange('Picked object updated');
+      maskLayerRequestRefine('ai');
+    }else{
+      maskLayerAddFromAlpha('pick',new Uint8ClampedArray(result.mask),result.width,result.height);
+    }
+    setMaskBgAiStatus('Object selected — refine edges with the brush or the Refine controls.',true,false);
+    setMaskBgStatus('Object selected. Click another object to add another layer.');
+  }).catch(error=>{
+    if(token!==maskLayerToken) return;
+    const reason=maskLayerErrorMessage(error);
+    console.warn('Pick object unavailable',error);
+    if(error?.name==='TimeoutError') terminateMaskBgWorker(error,'error');
+    const message=`Pick object failed here: ${reason}. Fast still works offline.`;
+    setMaskBgAiStatus(message,true,false);
+    setMaskBgStatus(message);
+  }).finally(()=>{ maskLayerPickPending=false; });
+}
+function maskEngineRunPro(){
+  if(!maskProReady){ maskProConfirm(); return; }
+  if(!maskBgPhotoReady()||maskLayerBusy) return;
+  const token=++maskLayerToken;
+  maskLayerBusy=true;
+  setMaskBgAiStatus('Segmenting with BiRefNet_lite…',true,true);
+  setMaskBgStatus('Segmenting with BiRefNet_lite…');
+  maskProShowProgress(0.06,'Segmenting with BiRefNet_lite…');
+  const {width,height}=maskLayerDimensions();
+  createImageBitmap(photoForMask).then(image=>{
+    if(token!==maskLayerToken){image.close?.();return null;}
+    return maskProRequest('segment',{image,width,height,webgpu:maskProDevice==='webgpu'});
+  }).then(result=>{
+    if(!result||token!==maskLayerToken) return;
+    maskLayerAddFromAlpha('subject',new Uint8ClampedArray(result.mask),result.width,result.height,{name:'Pro subject'});
+    maskProHideProgress();
+    maskProStatus('Pro selection added as a layer.');
+    setMaskBgAiStatus('Pro selection added on this device.',true,false);
+  }).catch(error=>{
+    if(token!==maskLayerToken) return;
+    maskProHideProgress();
+    const reason=maskLayerErrorMessage(error);
+    maskProStatus(`Pro segmentation failed: ${reason}`,'error');
+    maskEngineFallback('fast',reason);
+  }).finally(()=>{
+    if(token===maskLayerToken){maskLayerBusy=false;updateMaskBgControls();}
+  });
+}
+
+/* ---------- photo lifecycle ---------- */
+function maskLayerReset(reason='The photo changed'){
+  maskLayerToken++;
+  clearTimeout(maskLayerRefineTimer); maskLayerRefineTimer=null;
+  if(maskProWorker){ maskProWorker.terminate(); maskProWorker=null; }
+  for(const pending of maskProWorkerPending.values()) pending.reject(new Error(reason));
+  maskProWorkerPending.clear();
+  maskProDownloading=false; maskProReady=false;
+  maskLayerSampleMode=false; maskLayerStroke=null; maskLayerDrag=null; maskLayerPickPending=false;
+  maskLayerCompositeAlpha=null; maskLayerSourceCache=null; maskLayerSourceKey='';
+  maskLayerSelectedId=null; maskLayerOverlayDirty=true;
+  if(maskStack) maskStack.clear();
+  maskStack=null;
+  maskProRemoveVisible(false); maskProHideProgress(); maskProRefreshButtons();
+  maskLayerRenderList(); maskLayerRenderSettings();
+  if(maskLayerOverlayCanvas) maskLayerOverlayCanvas.classList.remove('visible');
+  const status=$('maskRefineStatus');
+  if(status) status.textContent='Edge refine is debounced and runs at up to 2048 px on the long edge.';
+}
+function maskLayerSave(){
+  if(!maskStack||!maskStack.layers.length) return null;
+  const rasters=[];
+  for(const layer of maskStack.layers){
+    if(!layer.raster) continue;
+    rasters.push({id:layer.id,width:layer.raster.width,height:layer.raster.height,canvas:maskLayerRasterFromAlpha(layer.raster.data,layer.raster.width,layer.raster.height)});
+  }
+  return {json:maskStack.serialize(),selected:maskLayerSelectedId,rasters};
+}
+function maskLayerRestore(saved){
+  maskLayerReset('A different photo was opened');
+  if(!saved?.json?.layers?.length) return;
+  const stack=maskLayerEnsureStack(); if(!stack) return;
+  stack.restore(saved.json);
+  const {width,height}=maskLayerDimensions();
+  for(const entry of saved.rasters||[]){
+    const layer=stack.layers.find(item=>item.id===entry.id); if(!layer||!entry.canvas) continue;
+    const probe=document.createElement('canvas'); probe.width=width; probe.height=height;
+    const ctx=probe.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(entry.canvas,0,0,width,height);
+    const pixels=ctx.getImageData(0,0,width,height).data;
+    const alpha=new Uint8ClampedArray(width*height);
+    for(let i=0;i<alpha.length;i++) alpha[i]=pixels[i*4];
+    stack.setLayerRaster(layer.id,alpha,width,height);
+  }
+  maskLayerSelectedId=saved.selected||stack.layers.at(-1)?.id||null;
+  maskLayerRenderList(); maskLayerRenderSettings();
+  maskLayerApplyComposite();
+}
+
+/* ---------- mask PNG download ---------- */
+function downloadMaskPng(){
+  if(!maskBgCanvas||!maskBgPhotoReady()){setMaskBgStatus('Open a photo and create a mask before downloading it.');return;}
+  const source=maskBgAutoCanvas||maskBgCanvas;
+  const width=source.width,height=source.height;
+  const probe=document.createElement('canvas'); probe.width=width; probe.height=height;
+  const probeCtx=probe.getContext('2d',{willReadFrequently:true});
+  probeCtx.drawImage(source,0,0,width,height);
+  const pixels=probeCtx.getImageData(0,0,width,height).data;
+  const output=document.createElement('canvas'); output.width=width; output.height=height;
+  const ctx=output.getContext('2d'),image=ctx.createImageData(width,height);
+  for(let i=0;i<width*height;i++){
+    const offset=i*4,value=pixels[offset];
+    image.data[offset]=image.data[offset+1]=image.data[offset+2]=value; image.data[offset+3]=255;
+  }
+  ctx.putImageData(image,0,0);
+  const name=`mask-${(currentPhoto?.name||'film-lab').replace(/\.[^.]+$/,'')}.png`;
+  const details={format:'PNG · 8-bit mask (white keeps the subject)',resolution:`${width} × ${height}`};
+  setMaskBgStatus('Preparing the mask PNG…');
+  canvasBlob(output,'image/png').then(blob=>{requestDownload(blob,name,details);setMaskBgStatus('Mask PNG ready — white keeps the subject, black removes it.');})
+    .catch(error=>setMaskBgStatus(`Mask PNG failed: ${maskLayerErrorMessage(error)}`));
+}
+
+/* ---------- wiring ---------- */
+(function maskLayerWiring(){
+  if(!maskStackApi()) console.warn('Film Lab mask layers are unavailable: mask-stack.js did not load');
+  const on=(id,handler)=>{const node=$(id); if(node) node.addEventListener('click',handler);};
+  on('maskAddSubjectBtn',()=>{setMaskEngine('fast');maskEngineRunFast(false);});
+  on('maskAddBackgroundBtn',()=>maskLayerAddBackground());
+  on('maskAddPickBtn',()=>{
+    setMaskEngine('pick');
+    setMaskBgStatus('Click the object in the photo — it is added as a Pick object layer.');
+    maskEngineSetHint('Click an object in the photo; the selection is added as a Pick object layer.');
+  });
+  on('maskLayerClearBtn',()=>{
+    if(!maskStack?.layers.length){setMaskBgStatus('No mask layers to clear.');return;}
+    maskStack.clear();
+    maskLayerSelectedId=null;
+    maskLayerAfterChange('All mask layers cleared');
+  });
+  on('maskAddLinearBtn',()=>maskLayerAdd('linear'));
+  on('maskAddRadialBtn',()=>maskLayerAdd('radial'));
+  on('maskAddLuminanceBtn',()=>maskLayerAdd('luminance'));
+  on('maskAddColorBtn',()=>maskLayerAdd('color'));
+  on('maskAddBrushBtn',()=>{const layer=maskLayerAdd('brush');if(layer)setMaskBgPaintMode('paint');});
+  on('maskLayerUndoBtn',maskLayerUndo);
+  on('maskLayerRedoBtn',maskLayerRedo);
+  on('maskOverlayBtn',()=>maskLayerToggleOverlay());
+  on('maskProConfirmBtn',maskProConfirm);
+  on('maskProCancelBtn',maskProCancel);
+  on('maskProRemoveBtn',maskProPurge);
+  document.querySelectorAll('input[name="maskEngine"]').forEach(input=>input.addEventListener('change',()=>{if(input.checked)setMaskEngine(input.value);}));
+  const smooth=$('maskSmoothRange');
+  if(smooth) smooth.addEventListener('input',()=>{
+    maskRefineSettings.smooth=Number(smooth.value);
+    if($('maskSmoothValue')) $('maskSmoothValue').textContent=`${maskRefineSettings.smooth} px`;
+    if(maskBgPhotoReady()&&maskBgAutoCanvas) maskLayerRequestRefine('ai');
+  });
+  const edgeToggle=$('maskEdgeRefineToggle');
+  if(edgeToggle) edgeToggle.addEventListener('change',()=>{
+    maskRefineSettings.edgeRefine=edgeToggle.checked;
+    if(maskBgPhotoReady()&&maskBgAutoCanvas) maskLayerRequestRefine('ai');
+  });
+  const radius=$('maskEdgeRadius');
+  if(radius) radius.addEventListener('input',()=>{
+    maskRefineSettings.radius=Number(radius.value);
+    if($('maskEdgeRadiusValue')) $('maskEdgeRadiusValue').textContent=`${maskRefineSettings.radius} px`;
+    if(maskBgPhotoReady()&&maskBgAutoCanvas) maskLayerRequestRefine('ai');
+  });
+  const strength=$('maskEdgeStrength');
+  if(strength) strength.addEventListener('input',()=>{
+    maskRefineSettings.strength=Number(strength.value);
+    if($('maskEdgeStrengthValue')) $('maskEdgeStrengthValue').textContent=`${maskRefineSettings.strength}%`;
+    if(maskBgPhotoReady()&&maskBgAutoCanvas) maskLayerRequestRefine('ai');
+  });
+  on('downloadMaskBtn',downloadMaskPng);
+  canvas.addEventListener('pointerup',maskLayerPointerUp);
+  canvas.addEventListener('pointercancel',maskLayerPointerUp);
+  window.addEventListener('resize',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});
+  window.addEventListener('orientationchange',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)maskLayerOverlayKick();});
+  ['maskBackgroundDetails','maskLayersDetails','maskRefineDetails'].forEach(id=>{const node=$(id); if(node) node.addEventListener('toggle',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();});});
+  const cleanupToggle=$('maskEdgeCleanupToggle');
+  if(cleanupToggle) cleanupToggle.addEventListener('change',()=>{
+    maskCleanSettings.enabled=cleanupToggle.checked;
+    if(!maskCleanSettings.enabled){ maskBgCleanCanvas=null; maskCleanRequestId++; }
+    lastPreviewRenderKey=null;
+    if(maskBgAutoCanvas) maskRequestEdgeCleanup(maskLayerAlphaFromCanvas(maskBgAutoCanvas),maskBgCanvas.width,maskBgCanvas.height);
+    if(hasContent) render(performance.now());
+    setMaskBgStatus(maskCleanSettings.enabled?'Edge colour cleanup on: semi-transparent edges blend to the foreground colour.':'Edge colour cleanup off.');
+  });
+  ['maskBgMode','maskBgInvert'].forEach(id=>{const node=$(id); if(node) node.addEventListener('input',()=>{lastPreviewRenderKey=null;});});
+  maskLayerRenderList(); maskLayerRenderSettings(); maskProRefreshButtons();
+})();
+function uploadMaskBgCleanCanvas(){
+  if(!maskBgCleanTexture||!maskBgCleanCanvas) return;
+  gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D,maskBgCleanTexture);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,maskBgCleanCanvas);
+  gl.activeTexture(gl.TEXTURE0);
+  lastPreviewRenderKey=null;
+  if(hasContent) render(performance.now());
+}
+/* Blur-Fusion style foreground estimation at semi-transparent edges (no halos). */
+function maskRequestEdgeCleanup(alpha,width,height){
+  if(!maskCleanSettings.enabled||!maskBgPhotoReady()||!photoForMask||!alpha) return;
+  const token=++maskCleanRequestId;
+  const {width:maskWidth,height:maskHeight}=maskLayerDimensions();
+  const api=maskStackApi();
+  const sized=width===maskWidth&&height===maskHeight?new Uint8ClampedArray(alpha):(api?api.resizeMask(new Uint8ClampedArray(alpha),width,height,maskWidth,maskHeight):new Uint8ClampedArray(alpha));
+  const image=createImageBitmap(photoForMask);
+  image.then(bitmap=>{
+    if(token!==maskCleanRequestId){bitmap.close?.();return null;}
+    return requestMaskBgWorker('source',{image:bitmap,width:maskWidth,height:maskHeight}).then(()=>
+      requestMaskBgWorker('foreground',{mask:sized,width:maskWidth,height:maskHeight,radius:maskCleanSettings.radius}));
+  }).then(result=>{
+    if(!result||token!==maskCleanRequestId) return;
+    const canvas=document.createElement('canvas'); canvas.width=result.width; canvas.height=result.height;
+    const ctx=canvas.getContext('2d'),imageData=ctx.createImageData(result.width,result.height);
+    imageData.data.set(new Uint8ClampedArray(result.pixels));
+    ctx.putImageData(imageData,0,0);
+    maskBgCleanCanvas=canvas;
+    uploadMaskBgCleanCanvas();
+  }).catch(error=>console.warn('Edge colour cleanup unavailable',error));
+}
 function setMaskBgBackgroundMode(mode){
   if(!['transparent','color','blur','image','gradient'].includes(mode))return;
   setMaskBgSetting('mode',mode);
@@ -5966,6 +7111,7 @@ canvas.addEventListener('pointerdown',e=>{
   if(maskBgPaintMode==='magic' && maskBgPhotoReady() && (e.pointerType!=='mouse' || e.button===0)){
     e.preventDefault();magicSelectMask(subjectPoint(e));return;
   }
+  if(maskLayerPointerDown(e)) return;
   if(beginMaskBgStroke(e)) return;
   if(maskPaintMode && ditherScope==='background' && maskCanvas && !isVideo && (e.pointerType!=='mouse' || e.button===0)){
     e.preventDefault();
@@ -5999,6 +7145,7 @@ canvas.addEventListener('pointermove',e=>{
   const touchPoint=touchZoomPointers.get(e.pointerId);
   if(touchPoint){ touchPoint.x=e.clientX; touchPoint.y=e.clientY; }
   if(pinchZoom && pinchZoom.ids.includes(e.pointerId)){ e.preventDefault(); updatePinchZoom(); return; }
+  if(maskLayerStroke||maskLayerDrag){ maskLayerPointerMove(e); return; }
   if(maskBgStroke){ paintMaskBackground(e); return; }
   if(maskStroke){ paintSubject(e); return; }
   if(!previewDrag || previewDrag.id!==e.pointerId) return;
@@ -7688,6 +8835,8 @@ window.addEventListener('keydown',e=>{
   if(e.key==='?'){e.preventDefault();$('shortcutsHelpBtn').click();return;}
   // C is safe on focused buttons; text fields and native selects retain their typing keys.
   if(e.key.toLowerCase()==='c' && !['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName) && !e.target.isContentEditable){ e.preventDefault(); setCropPanelOpen($('cropPanelBody').hidden); return; }
+  // O toggles the mask overlay anywhere in photo mode, including on a focused button.
+  if(e.key.toLowerCase()==='o'&&appState.mode==='photo'){ e.preventDefault(); maskLayerToggleOverlay(); return; }
   // Space on a focused button must activate that button, not the Before shortcut.
   if(['INPUT','BUTTON','TEXTAREA','SELECT'].includes(e.target.tagName) || e.target.isContentEditable) return;
   if(e.code==='Space'){ e.preventDefault(); isVideo?toggleVideoPlayback():toggleBeforeAfter(); }
@@ -7992,6 +9141,7 @@ function selectSidebarTab(name){
   if(name==='grade'){drawGradeCurve();scheduleGradeHistogram();}
 }
 document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{userSelectedSidebarTab=true;selectSidebarTab(button.dataset.tab);}));
+document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{maskLayerOverlayDirty=true;maskLayerOverlayKick();}));
 // The peek bar is tappable: choosing a tab on a collapsed sheet opens it on that tab.
 document.querySelectorAll('.sidebarTab').forEach(button=>button.addEventListener('click',()=>{
   const sheet=$('sidebar');

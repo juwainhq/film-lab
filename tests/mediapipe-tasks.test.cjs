@@ -132,6 +132,6 @@ test('MediaPipe assets use the pinned local package first, have CDN fallbacks, a
   assert.match(workerSource, /LOCAL_SELFIE_MULTICLASS_MODEL_URL/);
   assert.match(electronMain, /'\.wasm': 'application\/wasm'/);
   assert.match(electronMain, /'\.tflite': 'application\/octet-stream'/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v6'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v7'/);
   assert.doesNotMatch(precache, /\.wasm|\.tflite/i);
 });

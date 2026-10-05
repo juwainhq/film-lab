@@ -22,6 +22,7 @@ const SKIP = new Set([
   '.git',
   '.github',
   '.arena',
+  '.arena-tmp',
   'android',
   'ios',
   'dist-electron',
