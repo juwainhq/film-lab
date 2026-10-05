@@ -132,6 +132,61 @@ test('MediaPipe assets use the pinned local package first, have CDN fallbacks, a
   assert.match(workerSource, /LOCAL_SELFIE_MULTICLASS_MODEL_URL/);
   assert.match(electronMain, /'\.wasm': 'application\/wasm'/);
   assert.match(electronMain, /'\.tflite': 'application\/octet-stream'/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v8'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v9'/);
   assert.doesNotMatch(precache, /\.wasm|\.tflite/i);
+});
+
+test('the fast engine never waits on a slow network: 8 s remote budget, offline skips it outright', async () => {
+  assert.match(workerSource, /const FAST_REMOTE_MODEL_TIMEOUT_MS = 8000;/);
+  assert.match(workerSource, /function isDeviceOffline\(\)/);
+  assert.match(workerSource, /return self\.navigator && self\.navigator\.onLine === false;/);
+  assert.match(workerSource, /function withFastModelTimeout\(promise, label\)/);
+  // Only the network candidate is put on the short leash; the vendored file is not.
+  assert.match(workerSource, /return isRemoteAssetUrl\(modelAssetPath\) \? await withFastModelTimeout\(attempt,/);
+  assert.match(workerSource, /function isRemoteAssetUrl\(url\)/);
+
+  // Offline: the remote URL is not offered at all, so the caller falls through immediately.
+  const offline = createWorkerContext();
+  offline.sandbox.navigator = {onLine: false};
+  let offlineFetchCalls = 0;
+  offline.sandbox.fetch = async () => { offlineFetchCalls++; return {ok: false}; };
+  const offlinePaths = [...await vm.runInContext("modelPathCandidates('vendor/mediapipe-tasks/selfie_multiclass_256x256.tflite', 'https://storage.googleapis.com/selfie.tflite')", offline.context)];
+  assert.equal(offlineFetchCalls, 1, 'only the local candidate is probed while offline');
+  assert.deepEqual(offlinePaths, [], 'offline with no vendored file offers no candidate');
+  offline.sandbox.fetch = async () => ({ok: true}); // the vendored file is present on disk
+  const offlineWithLocal = [...await vm.runInContext("modelPathCandidates('vendor/mediapipe-tasks/x.tflite', 'https://example.test/x.tflite')", offline.context)];
+  assert.deepEqual(offlineWithLocal, ['vendor/mediapipe-tasks/x.tflite'], 'offline uses the vendored file only');
+
+  // Online: the vendored file still comes first and the remote URL stays reachable as fallback.
+  const online = createWorkerContext();
+  online.sandbox.navigator = {onLine: true};
+  online.sandbox.fetch = async () => ({ok: false});
+  // The timeout helper needs a timer, exactly like a real worker host provides.
+  online.sandbox.setTimeout = setTimeout; online.sandbox.clearTimeout = clearTimeout;
+  const onlinePaths = [...await vm.runInContext("modelPathCandidates('vendor/mediapipe-tasks/x.tflite', 'https://example.test/x.tflite')", online.context)];
+  assert.deepEqual(onlinePaths, ['https://example.test/x.tflite', 'vendor/mediapipe-tasks/x.tflite']);
+
+  // The deadline really rejects: a promise that never settles must fail inside the budget.
+  const started = Date.now();
+  await assert.rejects(
+    () => vm.runInContext("withFastModelTimeout(new Promise(() => {}), 'Remote model')", online.context),
+    /did not finish within 8 s/
+  );
+  const elapsed = Date.now() - started;
+  assert.ok(elapsed >= 7000 && elapsed < 12000, `deadline fired after ${elapsed} ms`);
+
+  // The two fast paths that used to hang on the network now skip it.
+  assert.match(workerSource, /if \(fastBackend !== 'onnx' && !isDeviceOffline\(\)\) \{/);
+  assert.match(workerSource, /No fast segmentation engine is available offline\./);
+  assert.match(workerSource, /Offline: using the bundled segmentation model\./);
+});
+
+test('the missing MediaPipe model file is documented instead of silently absent', () => {
+  const readme = fs.readFileSync(path.join(root, 'vendor/mediapipe-tasks/README.md'), 'utf8');
+  assert.match(readme, /### Missing file: `selfie_multiclass_256x256\.tflite`/);
+  assert.match(readme, /storage\.googleapis\.com\/mediapipe-models\/image_segmenter\/selfie_multiclass_256x256\/float32\/latest\/selfie_multiclass_256x256\.tflite/);
+  assert.match(readme, /vendor\/models\/selfie_multiclass_256x256\.onnx/);
+  assert.match(readme, /interactive_segmentation_magic_touch\.tflite/);
+  assert.equal(fs.existsSync(path.join(root, 'vendor/mediapipe-tasks/selfie_multiclass_256x256.tflite')), false,
+    'the .tflite is not vendored in this build, so the README note is the contract');
 });

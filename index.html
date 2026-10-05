@@ -1539,6 +1539,17 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
   #carouselStrip #photoThumbnails,
   #carouselStrip #carouselHint { transition: none !important; }
 }
+/* Look cards, second pass: the preview is a photo-shaped thumbnail (4:3, cover, centred) and the
+   look's name sits under it. The card is a reversed column flexbox so the preview (the element the
+   renderer appends last) reads first and the label keeps its own line instead of hiding under the
+   image; the white curve is kept only as a small corner mark. Nothing above is removed. */
+body #presetChips .chip,
+body #savedPresetChips .chip { display: flex; flex-direction: column-reverse; align-items: stretch; justify-content: flex-start; gap: 7px; height: auto; min-height: 0; padding: 8px 9px 9px; }
+body #savedPresetChips .chip { padding: 8px 8px 9px; }
+body #presetChips .chip .presetColorSwatch,
+body #savedPresetChips .chip .presetColorSwatch { position: relative; top: auto; right: auto; bottom: auto; left: auto; display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; flex: 0 0 auto; margin: 0; border: 1px solid var(--panel-border); background-size: cover; background-position: center; background-repeat: no-repeat; }
+body #presetChips .chip .presetColorSwatch::after,
+body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px auto; width: 18px; height: 11px; opacity: .5; background-position: center; background-repeat: no-repeat; background-size: 100% 100%; }
 </style>
 </head>
 <body data-mode="empty">
@@ -3022,6 +3033,12 @@ function createGradeLutTexture(record){
   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,texture);
   gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+  // WebGL 2 rejects a 3D upload while UNPACK_FLIP_Y_WEBGL / UNPACK_PREMULTIPLY_ALPHA_WEBGL are
+  // set or UNPACK_ALIGNMENT does not fit the row (error 1282), and the 2D paths leave those flags
+  // behind. The LUT is a byte array, so the pixel-store state is reset just for this upload.
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);
   gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,record.size,record.size,record.size,0,gl.RGBA,gl.UNSIGNED_BYTE,record.data);
   const error=gl.getError();gl.activeTexture(gl.TEXTURE0);
   if(error!==gl.NO_ERROR){gl.deleteTexture(texture);throw new Error(`WebGL could not upload this ${record.size}³ LUT (error ${error}).`);}
@@ -3786,6 +3803,7 @@ void main(){
 }`;
 const fsGradeFinish=`#version 300 es
 precision highp float;
+precision highp sampler3D;
 in vec2 v_texCoord;
 uniform sampler2D u_image;
 uniform sampler3D u_lut;
@@ -4339,12 +4357,34 @@ void main(){
 function compile(t,s){ const sh=gl.createShader(t); gl.shaderSource(sh,s); gl.compileShader(sh); if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS)){ console.error(gl.getShaderInfoLog(sh)); throw new Error('compile'); } return sh; }
 function createProgram(vs,fs){ const p=gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER,vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(p); if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ console.error(gl.getProgramInfoLog(p)); throw new Error('link'); } return p; }
 const progPassthrough=createProgram(vsSrc, fsPassthrough);
+// Any grading shader that fails to compile leaves those controls without an effect, so the user
+// is told instead of silently wondering why a wheel does nothing. The message is queued when the
+// toast helper is not ready yet (shader setup can run before the app finishes wiring its DOM).
+let gradingUnavailableNoticeShown=false, gradingUnavailableNoticePending=false;
+function showGradingUnavailableNotice(){
+  if(gradingUnavailableNoticeShown) return;
+  gradingUnavailableNoticeShown=true;
+  const message='Some color grading features are unavailable on this device';
+  try{
+    if(typeof showToast==='function'){ showToast(message,6000); return; }
+  }catch(error){}
+  gradingUnavailableNoticePending=true;
+  try{
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',flushGradingUnavailableNotice,{once:true});
+    else setTimeout(flushGradingUnavailableNotice,0);
+  }catch(error){}
+}
+function flushGradingUnavailableNotice(){
+  if(!gradingUnavailableNoticePending) return;
+  gradingUnavailableNoticePending=false;
+  try{ if(typeof showToast==='function') showToast('Some color grading features are unavailable on this device',6000); }catch(error){}
+}
 let progColorGrade=null;
 try{ progColorGrade=createProgram(vsSrc,fsColorGrade); }
-catch(error){ console.warn('Color grading shader unavailable; falling back to the ungraded image.',error); }
+catch(error){ console.warn('Color grading shader unavailable; falling back to the ungraded image.',error); showGradingUnavailableNotice(); }
 let progGradeFinish=null;
 try{ progGradeFinish=createProgram(vsSrc,fsGradeFinish); }
-catch(error){ console.warn('Extended color grading shader unavailable; those settings will fall back to the ungraded image.',error); }
+catch(error){ console.warn('Extended color grading shader unavailable; those settings will fall back to the ungraded image.',error); showGradingUnavailableNotice(); }
 const progSharpen=createProgram(vsSrc, fsSharpen);
 const progBright=createProgram(vsSrc, fsBright);
 const progHallExtract=createProgram(vsSrc, fsHallExtract);
@@ -4456,6 +4496,7 @@ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Ar
 const gradeNeutralLutTexture=gl.createTexture();gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,gradeNeutralLutTexture);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
 gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_3D,gl.TEXTURE_WRAP_R,gl.CLAMP_TO_EDGE);
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);gl.pixelStorei(gl.UNPACK_ALIGNMENT,4);
 gl.texImage3D(gl.TEXTURE_3D,0,gl.RGBA8,1,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([0,0,0,255]));
 gl.activeTexture(gl.TEXTURE0);
 
@@ -8414,7 +8455,7 @@ function presetSwatchGradient(values={}){
 }
 // Real photo previews for the look cards. The source thumbnail is rebuilt only when a
 // photo loads; every look renders one per animation frame and caches on its preset object.
-const LOOK_PREVIEW_WIDTH=160;
+const LOOK_PREVIEW_WIDTH=320; // one canvas per photo; each look is rendered once from it and cached
 let lookPreviewSource=null, lookPreviewKey='', lookPreviewGeneration=0, lookPreviewFrame=0;
 let lookPreviewQueue=[], lookPreviewQueuedNames=new Set();
 function createLookPreviewSource(item,img){

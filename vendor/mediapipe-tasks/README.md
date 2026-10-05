@@ -226,3 +226,28 @@ described in our [Privacy Policy](https://policies.google.com/privacy).
 **You are responsible for obtaining informed consent from your app users about
 Google's processing of MediaPipe metrics data as required by applicable law.**
 
+---
+
+## Film Lab vendoring notes (this folder)
+
+The bundle, the wasm fileset and `vision.d.ts` here are the pinned
+`@mediapipe/tasks-vision@1.0.1` files, resolved relative to `mask-segmentation-worker.js` so the
+Fast engine works without any CDN.
+
+### Missing file: `selfie_multiclass_256x256.tflite`
+
+`vendor/mediapipe-tasks/selfie_multiclass_256x256.tflite` is **not** in this repository. The build
+sandbox that packaged it cannot reach `storage.googleapis.com`, and the copies available on GitHub
+are Git LFS pointers (133 bytes), not the real model, so the file was deliberately left out rather
+than committed broken.
+
+The offline hop instead comes from the vendored ONNX export of the same multiclass model
+(`vendor/models/selfie_multiclass_256x256.onnx`) through the vendored `onnxruntime-web`, which is
+what the worker falls back to. To restore the MediaPipe path, drop the real `.tflite` file
+(about 16 MB, `float32/latest` from
+`https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite`)
+into this folder: `modelPathCandidates()` prefers a vendored file over the network automatically,
+and the 8 s remote-download budget only applies to the network candidate.
+
+`vendor/mediapipe-tasks/models/interactive_segmentation_magic_touch.tflite` (the Pick object model,
+a `.task` file upstream) is missing for the same reason; pick still has its stroke fallback path.

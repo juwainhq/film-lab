@@ -159,6 +159,33 @@ test('extended grade controls are neutral by default and run after HSL in the sh
   assert.match(html, /id="sliderGradeBwGreen"[^>]*value="72"/);
   assert.match(html, /id="sliderGradeBwBlue"[^>]*value="7"/);
   assert.match(postGradeShader, /uniform sampler3D u_lut/);
+  // GLSL ES 3.00 gives sampler3D no default precision in fragment shaders, and ANGLE rejects the
+  // whole program without it, which used to make the wheels, LUT and B&W mix do nothing.
+  assert.match(postGradeShader, /#version 300 es\nprecision highp float;\nprecision highp sampler3D;\n/);
+  for (const shader of [appScript.match(/const fsGradeFinish=`[\s\S]*?`;/)?.[0] || '']) {
+    const declarations = shader.match(/precision\s+\w+\s+\w+\s*;/g) || [];
+    const samplerTypes = [...new Set((shader.match(/\b[u|i]?sampler\w+\b/g) || []).filter(name => /sampler(3D|2DArray|Cube|2DShadow|CubeShadow)$/.test(name)))];
+    for (const type of samplerTypes) {
+      assert.ok(declarations.some(line => new RegExp(`precision\\s+\\w+\\s+${type}\\s*;`).test(line)),
+        `fragment shader declares ${type} without a precision line`);
+      assert.doesNotMatch(type, /image|integer/);
+    }
+    assert.equal((shader.match(/^uniform sampler3D u_lut;/m) || []).length, 1);
+  }
+  // A grading shader that will not compile has to say so instead of failing silently.
+  assert.match(appScript, /function showGradingUnavailableNotice\(\)/);
+  assert.match(appScript, /Some color grading features are unavailable on this device/);
+  assert.match(appScript, /catch\(error\)\{ console\.warn\('Color grading shader unavailable; falling back to the ungraded image\.',error\); showGradingUnavailableNotice\(\); \}/);
+  assert.match(appScript, /catch\(error\)\{ console\.warn\('Extended color grading shader unavailable; those settings will fall back to the ungraded image\.',error\); showGradingUnavailableNotice\(\); \}/);
+  assert.match(appScript, /if\(typeof showToast==='function'\)\{ showToast\(message,6000\); return; \}/);
+  // WebGL 2 refuses a 3D texture upload while the 2D paths have left UNPACK_FLIP_Y_WEBGL set, so
+  // the LUT upload resets the pixel-store state first (this was a real "LUT does nothing" bug).
+  const lutUpload = appScript.slice(appScript.indexOf('function createGradeLutTexture(record){'), appScript.indexOf('function gradeLutFingerprint(record)'));
+  assert.match(lutUpload, /gl\.pixelStorei\(gl\.UNPACK_FLIP_Y_WEBGL,false\);/);
+  assert.match(lutUpload, /gl\.pixelStorei\(gl\.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false\);/);
+  assert.match(lutUpload, /gl\.pixelStorei\(gl\.UNPACK_ALIGNMENT,4\);/);
+  assert.ok(lutUpload.indexOf('gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);') < lutUpload.indexOf('gl.texImage3D('),
+    'the pixel-store reset has to run before the 3D upload');
   assert.match(postGradeShader, /u_lutEnabled/);
   assert.match(postGradeShader, /u_texture/);
   assert.match(postGradeShader, /u_clarity/);
@@ -259,6 +286,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v8'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v9'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

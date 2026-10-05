@@ -31,7 +31,7 @@ test('the preview fits the stage by itself and stays separate from preview zoom'
 });
 
 test('look cards preview the loaded photo, render one per frame, and cache on the preset', () => {
-  assert.match(script, /const LOOK_PREVIEW_WIDTH=160;/);
+  assert.match(script, /const LOOK_PREVIEW_WIDTH=320; \/\/ one canvas per photo; each look is rendered once from it and cached/);
   assert.match(script, /return thumb\.toDataURL\('image\/jpeg',0\.6\);/);
   assert.match(script, /lookPreviewFrame=requestAnimationFrame\(renderNextLookPreview\);/);
   assert.match(script, /Object\.defineProperty\(next\.values,'lookPreview',\{value:url/);
@@ -45,6 +45,12 @@ test('look cards preview the loaded photo, render one per frame, and cache on th
   // Cards keep their gradient until a real preview exists, and the swatch can show either.
   assert.match(script, /console\.warn\('A look preview could not be rendered; its gradient swatch stays\.',error\);/);
   assert.match(styles, /#presetChips \.chip \.presetColorSwatch,#savedPresetChips \.chip \.presetColorSwatch \{ display: block; width: 100%; height: 46px;/);
+  // Second pass: photo-shaped preview with the look name underneath, curve reduced to a corner mark.
+  assert.match(styles, /body #presetChips \.chip,\nbody #savedPresetChips \.chip \{ display: flex; flex-direction: column-reverse;[^}]*\}/);
+  assert.match(styles, /body #presetChips \.chip \.presetColorSwatch,\nbody #savedPresetChips \.chip \.presetColorSwatch \{[^}]*aspect-ratio: 4 \/ 3;[^}]*\}/);
+  assert.match(styles, /body #presetChips \.chip \.presetColorSwatch::after,\nbody #savedPresetChips \.chip \.presetColorSwatch::after \{ inset: auto 5px 5px auto; width: 18px; height: 11px; opacity: \.5;/);
+  // The card label keeps its own line instead of being clipped away under the preview.
+  assert.doesNotMatch(styles, /body #presetChips \.chip \{ max-height/);
 });
 
 test('the preset dropdown never repeats a label while every distinct look stays available', () => {

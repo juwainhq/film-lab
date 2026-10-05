@@ -3,8 +3,10 @@
  * Engines:
  *  - Fast (people): MediaPipe Tasks ImageSegmenter with the selfie multiclass model, which is
  *    resolved relative to this worker (vendor/mediapipe-tasks/) before the pinned Google URL.
- *    When neither the vendored file nor the network is available the identical model is served
- *    from the vendored ONNX export through onnxruntime-web, so Fast keeps working offline.
+ *    The remote model download is raced against FAST_REMOTE_MODEL_TIMEOUT_MS (8 s) and skipped
+ *    entirely when navigator.onLine is false, so a slow or absent network never keeps the user
+ *    waiting for the full model-load budget: the identical model is served from the vendored
+ *    ONNX export through onnxruntime-web instead and Fast keeps working offline.
  *  - Pick object: MediaPipe Interactive Segmenter with a click keypoint (APIs are read from
  *    vendor/mediapipe-tasks/vision.d.ts: the 1.0.1 build exposes both the keypoint-based
  *    InteractiveSegmenterLegacy.segment(image, {keypoint}, callback) and the newer
@@ -24,6 +26,9 @@ const LOCAL_MAGIC_TOUCH_MODEL_URL = BASE + 'models/interactive_segmentation_magi
 const REMOTE_MAGIC_TOUCH_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task';
 const LOCAL_ONNX_MODEL_URL = 'vendor/models/selfie_multiclass_256x256.onnx';
 const ORT_BASE = 'vendor/onnxruntime-web/';
+// A remote model download that has not produced a segmenter after this long is abandoned in
+// favour of the bundled ONNX export; the model-load budget for the local engines stays at 90 s.
+const FAST_REMOTE_MODEL_TIMEOUT_MS = 8000;
 let segmenterPromise = null;
 let onnxSessionPromise = null;
 let pickerPromise = null;
@@ -76,6 +81,30 @@ async function hasLocalAsset(url) {
   }
 }
 
+function isDeviceOffline() {
+  try {
+    // WorkerNavigator.onLine is the same flag the page reads; false means "known to be offline".
+    return self.navigator && self.navigator.onLine === false;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isRemoteAssetUrl(url) {
+  return /^https?:/i.test(url) && !url.startsWith(APP_BASE) && !url.startsWith(BASE);
+}
+
+function withFastModelTimeout(promise, label) {
+  // Every real worker host has timers; if one does not, the download simply waits as it used to.
+  if (typeof setTimeout !== 'function') return promise;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} did not finish within ${Math.round(FAST_REMOTE_MODEL_TIMEOUT_MS / 1000)} s, so the bundled model is used instead`));
+    }, FAST_REMOTE_MODEL_TIMEOUT_MS);
+    promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+  });
+}
+
 async function getVisionFileset() {
   const {FilesetResolver} = resolveVisionApi();
   const failures = [];
@@ -94,6 +123,9 @@ async function getVisionFileset() {
 
 async function modelPathCandidates(localUrl, remoteUrl) {
   const local = await hasLocalAsset(localUrl);
+  // Offline: only a vendored file can be loaded, so the remote URL is not offered at all and the
+  // caller fails over immediately instead of waiting for a connection that will not come.
+  if (isDeviceOffline()) return local ? [localUrl] : [];
   return local ? [localUrl, remoteUrl] : [remoteUrl, localUrl];
 }
 
@@ -105,14 +137,18 @@ function getImageSegmenter() {
       const {ImageSegmenter} = resolveVisionApi();
       const fileset = await getVisionFileset();
       const failures = [];
-      for (const modelAssetPath of await modelPathCandidates(LOCAL_SELFIE_MULTICLASS_MODEL_URL, REMOTE_SELFIE_MULTICLASS_MODEL_URL)) {
+      const candidates = await modelPathCandidates(LOCAL_SELFIE_MULTICLASS_MODEL_URL, REMOTE_SELFIE_MULTICLASS_MODEL_URL);
+      if (!candidates.length) throw new Error(`The bundled model ${LOCAL_SELFIE_MULTICLASS_MODEL_URL} is missing and the device is offline`);
+      for (const modelAssetPath of candidates) {
         try {
-          return await ImageSegmenter.createFromOptions(fileset, {
+          const attempt = ImageSegmenter.createFromOptions(fileset, {
             baseOptions: {modelAssetPath},
             runningMode: 'IMAGE',
             outputCategoryMask: true,
             outputConfidenceMasks: true
           });
+          // Only the network download is on a short leash; the vendored file is read from disk.
+          return isRemoteAssetUrl(modelAssetPath) ? await withFastModelTimeout(attempt, `The remote selfie model (${modelAssetPath})`) : await attempt;
         } catch (error) {
           failures.push(`${modelAssetPath}: ${error?.message || error}`);
         }
@@ -451,7 +487,7 @@ function compositeRequest(message) {
 /** Fast segmentation with automatic backend fallback. */
 async function runFast(image, targetWidth, targetHeight, report) {
   const failures = [];
-  if (fastBackend !== 'onnx') {
+  if (fastBackend !== 'onnx' && !isDeviceOffline()) {
     try {
       const segmenter = await getImageSegmenter();
       return segmentImage(segmenter, image, targetWidth, targetHeight, () => report('Refining mask edges…'));
@@ -472,6 +508,18 @@ async function runFast(image, targetWidth, targetHeight, report) {
 
 async function ensureFastModel(report) {
   const failures = [];
+  if (isDeviceOffline()) {
+    // Nothing remote can succeed while the device is offline; use the bundled model right away.
+    try {
+      await getOnnxSession();
+      fastBackend = 'onnx';
+      report?.('Offline: using the bundled segmentation model.');
+      return 'onnx';
+    } catch (error) {
+      failures.push(`bundled ONNX model: ${error?.message || error}`);
+      throw new Error(`No fast segmentation engine is available offline. ${failures.join('; ')}`);
+    }
+  }
   try {
     await getImageSegmenter();
     fastBackend = 'mediapipe';
