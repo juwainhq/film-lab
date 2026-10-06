@@ -35,10 +35,11 @@
     lastTick: 0, raf: 0, undo: [], redo: [], initialized: false,
     firstMediaId: null, nextVideoTrack: 3, nextPhotoTrack: 3, lastOverlaySignature: '',
   };
-  // Start with two video lanes, two photo lanes, and the locked source-audio lane.
+  // Start with two video lanes, two photo lanes, the text lane and the locked source-audio lane.
   state.tracks.push(
     { id: 'main', kind: 'video', label: 'V1' }, { id: 'video-2', kind: 'video', label: 'V2' },
     { id: 'photo-1', kind: 'photo', label: 'PHOTO 1' }, { id: 'photo-2', kind: 'photo', label: 'PHOTO 2' },
+    { id: 'text', kind: 'text', label: 'TEXT', editable: false },
     { id: 'audio', kind: 'audio', label: 'AUDIO', editable: false },
   );
   let boundVideoElement = null;
@@ -458,6 +459,13 @@
     state.timelineTime = firstClip.start;
     render();
   }
+  // Video mode owns the timeline: opening it never depends on media being adopted, so a slow or
+  // failing preview helper cannot leave the workspace without its timeline.
+  function reveal() {
+    if (!root.hidden) return;
+    root.hidden = false;
+    try { render(); } catch (error) { console.warn('Timeline layout unavailable', error); }
+  }
   function adoptFirstVideo(file, videoElement, src, duration, trim) {
     root.hidden = false;
     const oldMain = mainClips();
@@ -474,6 +482,7 @@
     state.tracks.splice(0, state.tracks.length,
       { id: 'main', kind: 'video', label: 'V1' }, { id: 'video-2', kind: 'video', label: 'V2' },
       { id: 'photo-1', kind: 'photo', label: 'PHOTO 1' }, { id: 'photo-2', kind: 'photo', label: 'PHOTO 2' },
+      { id: 'text', kind: 'text', label: 'TEXT', editable: false },
       { id: 'audio', kind: 'audio', label: 'AUDIO', editable: false },
     );
     state.nextVideoTrack = 3; state.nextPhotoTrack = 3;
@@ -1507,6 +1516,7 @@
   function buildExportFrames(clips = state.clips) { return getExportPlan(clips); }
   window.multiTimeline = {
     adoptFirstVideo,
+    reveal,
     addMedia: addExternalMedia,
     addClip: addClipFromMedia,
     get clips() { return state.clips.map((clip) => ({ ...clip })); },

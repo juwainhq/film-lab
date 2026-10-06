@@ -137,6 +137,35 @@ test('empty and photo workspaces hide irrelevant video chrome and guard header e
   assert.match(styles, /body\[data-mode="video"\] #app #timeline-module:not\(\[hidden\]\) \{ display: flex; \}/);
 });
 
+test('the video timeline is wired before its previews and cannot be hidden by a failing preview', () => {
+  const load = script.match(/async function handleVideoFile\(file\)\{[\s\S]*?\n\}/)[0];
+  const adoptAt = load.indexOf('window.multiTimeline?.adoptFirstVideo(file,videoEl,videoObjectUrl,dur,videoTrim)');
+  const legacyAt = load.indexOf('window.filmLabTimeline?.setVideo(dur,videoTrim.start,videoTrim.end)');
+  const filmstripAt = load.indexOf('renderVideoFilmstrip(token)');
+  const waveformAt = load.indexOf('renderAudioWaveform(file,token)');
+  assert.ok(adoptAt > 0 && legacyAt > 0 && filmstripAt > 0 && waveformAt > 0, 'the video load path changed shape');
+  // The timeline is adopted before the preview helpers run, the previews are allowed to fail, and
+  // a stalled helper cannot hold up playback: the timeline shows even when they never finish.
+  assert.ok(adoptAt > legacyAt, 'the legacy timeline is wired before the multi-track timeline');
+  assert.ok(adoptAt < filmstripAt && adoptAt < waveformAt, 'the timeline is still adopted after the previews');
+  assert.match(load, /catch\(error=>console\.warn\('Timeline previews are unavailable for this clip'/);
+  assert.match(load, /settleWithin\(previews,TIMELINE_PREVIEW_LIMIT_MS/);
+  assert.match(script, /function settleWithin\(promise,ms,onTimeout\)\{/);
+  assert.ok(script.indexOf('const TIMELINE_PREVIEW_LIMIT_MS=') > 0);
+  // Video mode opens the shell with its default lanes instead of waiting for a clip.
+  const workspace = script.match(/function setWorkspaceMode\(mode\)\{[\s\S]*?\n\}/)[0];
+  assert.match(workspace, /if\(mode==='video'\)window\.multiTimeline\?\.reveal\?\.\(\)/);
+  assert.match(multiTimeline, /function reveal\(\) \{/);
+  assert.match(multiTimeline, /reveal,\n/);
+  assert.match(multiTimeline, /state\.tracks\.push\([\s\S]*?id: 'main', kind: 'video', label: 'V1'[\s\S]*?id: 'video-2', kind: 'video', label: 'V2'/);
+  assert.match(multiTimeline, /\{ id: 'audio', kind: 'audio', label: 'AUDIO', editable: false \}/);
+  assert.match(multiTimeline, /\{ id: 'text', kind: 'text', label: 'TEXT', editable: false \}/);
+  assert.equal((multiTimeline.match(/id: 'text', kind: 'text', label: 'TEXT'/g) || []).length, 2, 'the text lane is missing from a track seed');
+  assert.match(html, /class="mtl-track mtl-text-row" data-track-id="text"/);
+  assert.match(html, /id="mtl-text-track"/);
+  assert.match(html, /\.mtl-audio-row,\.mtl-text-row \{ min-height: 27px; \}/);
+});
+
 test('video timeline is an additive module with trim, cut, history, zoom, waveform and transition controls', () => {
   assert.match(html, /<section id="timeline-module" class="video-only"/);
   for(const id of ['timeline-skip-start','timeline-play','timeline-skip-end','timeline-timecode','timeline-cut','timeline-delete','timeline-undo','timeline-redo','timeline-zoom-minus','timeline-zoom-plus','timeline-ruler','timeline-clips','timeline-audio','timeline-playhead']) assert.match(html,new RegExp(`id="${id}"`));

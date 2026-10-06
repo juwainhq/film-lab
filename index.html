@@ -1122,7 +1122,7 @@ body[data-mode="video"] #app #content .mtl-shell:not([hidden]) { display: flex; 
 .mtl-track-stack { display: contents; }
 .mtl-track { position: relative; display: grid; grid-template-columns: 58px minmax(0,1fr); align-items: stretch; width: 100%; min-height: 31px; border-top: 1px solid var(--panel-border); }
 .mtl-video-row,.mtl-photo-row { min-height: 34px; }
-.mtl-audio-row { min-height: 27px; }
+.mtl-audio-row,.mtl-text-row { min-height: 27px; }
 .mtl-track[hidden] { display: none !important; }
 .mtl-track-name { position: sticky; z-index: 6; left: 0; display: flex; align-items: center; width: 58px; padding-left: 6px; border-right: 1px solid var(--panel-border); background: var(--bg); color: var(--text-dim2); font: 7px 'JetBrains Mono',monospace; letter-spacing: .09em; }
 .mtl-track-content { position: relative; min-width: 0; height: 100%; min-height: 30px; overflow: hidden; background: var(--soft-bg); border-left: 1px solid var(--panel-border); }
@@ -1176,7 +1176,7 @@ body[data-mode="video"] #app #content .mtl-shell:not([hidden]) { display: flex; 
   .mtl-toolbar output { font-size: 7px; }
   .mtl-video-row { min-height: 35px; }
   .mtl-overlay-row { min-height: 29px; }
-  .mtl-audio-row { min-height: 22px; }
+  .mtl-audio-row,.mtl-text-row { min-height: 22px; }
 }
 @media (min-width: 768px) and (max-width: 900px) {
   #app[data-workspace="video"] #content { grid-template-columns: minmax(0,1fr) minmax(300px,42vw); grid-template-rows: minmax(0,1fr) 220px; }
@@ -1205,7 +1205,7 @@ body[data-mode="video"] #app #content .mtl-shell:not([hidden]) { display: flex; 
   .mtl-ruler-scroll,.mtl-ruler { height: 14px; }
   .mtl-scroll { min-height: 58px; }
   .mtl-video-row,.mtl-photo-row { min-height: 28px; }
-  .mtl-audio-row { min-height: 21px; }
+  .mtl-audio-row,.mtl-text-row { min-height: 21px; }
 }
 @media (max-width: 767px) {
   #app[data-workspace="video"] #mainArea { inset: 0 0 108px; }
@@ -1227,6 +1227,8 @@ body[data-mode="video"] #app #content .mtl-shell:not([hidden]) { display: flex; 
   .mtl-track[data-track-id="audio"],.mtl-track[data-track-id^="photo-"] { display: none !important; }
   .mtl-track[data-track-id="main"] { min-height: 32px; }
   .mtl-track[data-track-id="main"] .mtl-track-content { min-height: 30px; }
+  .mtl-track[data-track-id="text"] { min-height: 21px; }
+  .mtl-track[data-track-id="text"] .mtl-track-content { min-height: 20px; }
   .mtl-track-name { font-size: 7px; }
 }
 
@@ -2368,6 +2370,7 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
           <div class="mtl-track mtl-video-row" data-track-id="main"><span class="mtl-track-name">V1</span><div id="mtl-main-track" class="mtl-track-content" data-track="main"></div></div>
           <div class="mtl-track mtl-photo-row" data-track-id="photo-1" hidden><span class="mtl-track-name">PHOTO 1</span><div id="mtl-overlay-track" class="mtl-track-content" data-track="photo-1"></div></div>
           <div id="mtl-extra-photo-tracks" class="mtl-track-stack" aria-label="Additional photo overlay tracks"><div class="mtl-track mtl-photo-row" data-track-id="photo-2"><span class="mtl-track-name">PHOTO 2</span><div class="mtl-track-content" data-track="photo-2"></div></div></div>
+          <div class="mtl-track mtl-text-row" data-track-id="text"><span class="mtl-track-name">TEXT</span><div id="mtl-text-track" class="mtl-track-content" data-track="text" role="note" aria-label="Text and title lane"></div></div>
           <div class="mtl-track mtl-audio-row" data-track-id="audio"><span class="mtl-track-name">AUDIO</span><div id="mtl-audio-track" class="mtl-track-content" role="img" aria-label="Non-editable audio waveform"></div></div>
           <div id="mtl-playhead" class="mtl-playhead" role="slider" tabindex="0" aria-label="Timeline playhead" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></div>
           <div id="mtl-empty" class="mtl-empty">Add media to create clips at the playhead. Secondary video and photos composite over V1.</div>
@@ -7796,6 +7799,13 @@ async function handleFiles(fileList,{append=false}={}){
   }finally{ if(token===fileLoadId){ setMediaLoading(false); mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); } }
 }
 function handleFile(file){ if(file) return handleFiles([file]); }
+// Timeline previews are decoration: a stalled helper may not hold up playback or the render loop.
+function settleWithin(promise,ms,onTimeout){
+  let timer=null;
+  const guard=new Promise(resolve=>{ timer=setTimeout(()=>{ if(typeof onTimeout==='function')onTimeout(); resolve(); },ms); });
+  return Promise.race([promise,guard]).finally(()=>{ if(timer!==null)clearTimeout(timer); });
+}
+const TIMELINE_PREVIEW_LIMIT_MS=8000;
 function waitForVideoData(element,url){
   return new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>finish(new Error('Video loading timed out')),20000);
@@ -7893,9 +7903,16 @@ async function handleVideoFile(file){
     exportOptions.format='original'; exportOptions.comparison=false; cropEditing=false;
     dropZone.style.display='none'; canvasWrap.style.display='flex'; resetPreviewZoom();
     $('processVideoBtn').style.display='flex'; $('downloadBtn').innerHTML='⤓ Original-size frame PNG';
-    updateTrimUI(); renderCaptionKeyframeMarkers(); await Promise.all([renderVideoFilmstrip(token),renderAudioWaveform(file,token)]); if(token!==fileLoadId) return;
+    updateTrimUI(); renderCaptionKeyframeMarkers();
+    // The multi-track timeline belongs to the media, not to the previews: it is wired and shown
+    // first. The filmstrip and the waveform are decoration, so a helper that throws or stalls is
+    // only reported as a warning -- it must never keep the timeline (or playback) off the screen.
     window.filmLabTimeline?.setVideo(dur,videoTrim.start,videoTrim.end);
     window.multiTimeline?.adoptFirstVideo(file,videoEl,videoObjectUrl,dur,videoTrim);
+    const previews=Promise.all([renderVideoFilmstrip(token),renderAudioWaveform(file,token)])
+      .catch(error=>console.warn('Timeline previews are unavailable for this clip',error));
+    await settleWithin(previews,TIMELINE_PREVIEW_LIMIT_MS,()=>console.warn('Timeline previews are taking too long; continuing without them'));
+    if(token!==fileLoadId) return;
     await videoEl.play().catch(()=>{}); startLoop();
     showToast(dur>60?`${dur.toFixed(1)}s video — first 60s selected. Adjust the trim below.`:'Video loaded — drag crop and set trim points',5000);
   }catch(error){
@@ -10162,6 +10179,9 @@ function setWorkspaceMode(mode){
   if(mode!=='empty' && hasContent && typeof setMediaLoading==='function') setMediaLoading(false);
   document.body.dataset.mode=mode;
   $('app').dataset.workspace=mode;
+  // The multi-track timeline is part of the video workspace, so it opens with the workspace
+  // instead of waiting for a clip to be adopted (a failing preview used to leave it hidden).
+  if(mode==='video')window.multiTimeline?.reveal?.();
   $('sidebar').hidden=mode==='empty';
   if(mode!=='empty')setEffectStates(effectEnabled);
   if(mode==='photo')setDitherScope(ditherScope);
