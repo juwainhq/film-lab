@@ -240,12 +240,13 @@ test('at least twenty categorized studio presets include cached previews and loc
 });
 
 test('grading runs in linear light before looks and uses one shared renderer for preview and exports', () => {
-  for (const source of ['srgbToLinear','linearColor.r*=exp2(temperature','linearColor*=exp2(clamp(u_gradeExposure','contrastFactor','u_gradeHighlights','u_gradeWhites','u_gradeCurveMaster','rgbToHsl','u_gradeVibrance','u_gradeSaturation']) assert.ok(gradeShader.includes(source), source);
-  assert.ok(gradeShader.indexOf('srgbToLinear') < gradeShader.indexOf('linearColor.r*=exp2(temperature'));
+  for (const source of ['srgbToLinear','whiteBalanceGain(u_gradeTemperature,u_gradeTint)','linearColor*=whiteBalanceGain','linearColor*=exp2(clamp(u_gradeExposure','contrastFactor','u_gradeHighlights','u_gradeWhites','u_gradeCurveMaster','rgbToHsl','u_gradeVibrance','u_gradeSaturation']) assert.ok(gradeShader.includes(source), source);
+  assert.ok(gradeShader.indexOf('srgbToLinear') < gradeShader.indexOf('linearColor*=whiteBalanceGain'));
+  assert.ok(gradeShader.indexOf('linearColor*=whiteBalanceGain') < gradeShader.indexOf('linearColor*=exp2(clamp(u_gradeExposure'));
   assert.ok(gradeShader.indexOf('linearColor*=exp2(clamp(u_gradeExposure') < gradeShader.indexOf('contrastFactor'));
   const curveSampling=gradeShader.indexOf('color=vec3(',gradeShader.indexOf('vec3 color=linearToSrgb'));
   const hslConversion=gradeShader.indexOf('vec3 hsl=rgbToHsl');
-  const vibranceApplication=gradeShader.indexOf('float vibrance=u_gradeVibrance');
+  const vibranceApplication=gradeShader.indexOf('float vibrance=clamp(u_gradeVibrance');
   assert.ok(curveSampling < hslConversion && hslConversion < vibranceApplication);
   assert.match(gradeShader, /if\(u_gradeActive==0\)\{ outColor=base; return; \}/);
   assert.match(appScript, /let sourceTexture=null, fboComposite=null, fboSharpened=null, fboGraded=null/);
@@ -286,6 +287,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v9'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v10'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

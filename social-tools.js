@@ -111,21 +111,28 @@
     const tenths = Math.round(Math.max(0, finite(seconds, 0)) * 10);
     return `${Math.floor(tenths / 600)}:${String(Math.floor(tenths / 10) % 60).padStart(2, '0')}.${tenths % 10}`;
   }
+  // Version 2 flips the vignette slider to Lightroom's direction (negative darkens, positive
+  // lightens). Version 1 payloads and #look=v1 links are migrated by negating the stored value so
+  // every saved look keeps the corners it had.
+  const SETTINGS_VERSION = 2;
+  const VIGNETTE_ID = 'VignStrength';
   function sanitizeSettings(input, ids, effectNames) {
-    if (!input || typeof input !== 'object' || Array.isArray(input) || input.version !== 1 || !input.values || typeof input.values !== 'object' || Array.isArray(input.values)) {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || ![1, SETTINGS_VERSION].includes(Number(input.version)) || !input.values || typeof input.values !== 'object' || Array.isArray(input.values)) {
       throw new Error('Not a Film Lab settings file');
     }
+    const legacyVignette = Number(input.version) < SETTINGS_VERSION;
     const values = {};
     let recognized = 0;
     for (const id of ids) {
       if (own(input.values, id) && typeof input.values[id] === 'number' && Number.isFinite(input.values[id])) recognized++;
-      values[id] = Math.round(clamp(finite(input.values[id], 0), -100, 100));
+      const value = legacyVignette && id === VIGNETTE_ID ? -finite(input.values[id], 0) : finite(input.values[id], 0);
+      values[id] = Math.round(clamp(value, -100, 100)) + 0; // +0 keeps a negated zero from becoming JSON -0
     }
     if (!recognized) throw new Error('No compatible settings found');
     const effects = {};
     for (const name of effectNames) effects[name] = input.effects?.[name] !== false;
     return {
-      version: 1, values, effects, scope: input.scope === 'background' ? 'background' : 'full',
+      version: SETTINGS_VERSION, values, effects, scope: input.scope === 'background' ? 'background' : 'full',
       preset: typeof input.preset === 'string' ? input.preset.slice(0, 120) : null,
       export: normalizeExport(input.export), dither: normalizeDitherSettings(input.dither),
     };
@@ -135,10 +142,10 @@
     let binary = '';
     for (const byte of bytes) binary += String.fromCharCode(byte);
     const encoded = typeof btoa === 'function' ? btoa(binary) : Buffer.from(bytes).toString('base64');
-    return '#look=v1.' + encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    return '#look=v' + SETTINGS_VERSION + '.' + encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
   function decodeSettings(hash, ids, effectNames) {
-    if (typeof hash !== 'string' || hash.length > 16000 || !/^#look=v1\.[A-Za-z0-9_-]+$/.test(hash)) throw new Error('Invalid look link');
+    if (typeof hash !== 'string' || hash.length > 16000 || !/^#look=v[12]\.[A-Za-z0-9_-]+$/.test(hash)) throw new Error('Invalid look link');
     const encoded = hash.slice(9).replace(/-/g, '+').replace(/_/g, '/');
     const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
     const bytes = typeof atob === 'function'
@@ -220,5 +227,5 @@
     args.push('output.' + container);
     return args;
   }
-  return {FORMATS, COMPARISONS, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
+  return {FORMATS, COMPARISONS, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
 });

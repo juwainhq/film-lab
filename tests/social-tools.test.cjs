@@ -120,10 +120,26 @@ test('MP4 and WebM commands encode the rendered frames and trim the matching sou
   assert.deepEqual(low.slice(low.indexOf('-crf'),low.indexOf('-crf')+2),['-crf','28']);
   assert.deepEqual(high.slice(high.indexOf('-b:v'),high.indexOf('-b:v')+2),['-b:v','8M']);
 });
+test('version 1 settings and look links migrate the vignette direction instead of changing the look', () => {
+  // Version 2 is Lightroom's direction: negative darkens, positive lightens. Old payloads stored
+  // the opposite sign, so loading one has to negate the value (and save it back as version 2).
+  const legacy=social.sanitizeSettings({version:1,values:{VignStrength:60,Exposure:12}},ids,effects);
+  assert.equal(social.SETTINGS_VERSION,2);
+  assert.equal(legacy.version,2);
+  assert.equal(legacy.values.VignStrength,-60);
+  assert.equal(legacy.values.Exposure,12);
+  const current=social.sanitizeSettings({version:2,values:{VignStrength:-60,Exposure:12}},ids,effects);
+  assert.equal(current.values.VignStrength,-60, 'version 2 values are never re-negated');
+  const roundTrip=social.sanitizeSettings(social.sanitizeSettings({version:1,values:{VignStrength:-25}},ids,effects),ids,effects);
+  assert.equal(roundTrip.values.VignStrength,25);
+  assert.deepEqual(social.decodeSettings(social.encodeSettings(legacy),ids,effects),legacy);
+  assert.equal(social.encodeSettings(legacy).slice(0,7),'#look=v');
+});
+
 test('settings and look links round-trip all effect sliders, switches, scope, export options, and Unicode names', () => {
   const input=snapshot(); input.values.Dither=-78; input.values.HighlightTint=68; input.effects.grain=false; input.scope='background';
   const clean=social.sanitizeSettings(input,ids,effects), hash=social.encodeSettings(clean);
-  assert.match(hash,/^#look=v1\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
+  assert.match(hash,/^#look=v2\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
   assert.equal(clean.values.HighlightTint,68); assert.equal(clean.effects.grain,false); assert.equal(clean.preset,'Café / রঙ');
   assert.ok(!hash.includes(' ')); assert.equal(ids.length,44);
 });
@@ -133,7 +149,7 @@ test('settings imports clamp signed values, ignore unknown keys, and reject malf
   const clean=social.sanitizeSettings(input,ids,effects);
   assert.equal(clean.values.Exposure,100); assert.equal(clean.values.Grain,-100); assert.equal(clean.values.Hall,0); assert.equal(clean.values.Sharp,0); assert.equal(clean.values.unknown,undefined);
   assert.throws(()=>social.sanitizeSettings({version:1,values:{unknown:2}},ids,effects),/compatible/);
-  for (const hash of ['#look=v2.abc','#look=v1.not%valid','#look=v1.YQ','#look=v1.'+'a'.repeat(20000)]) assert.throws(()=>social.decodeSettings(hash,ids,effects));
+  for (const hash of ['#look=v3.abc','#look=v2.abc','#look=v1.not%valid','#look=v1.YQ','#look=v1.'+'a'.repeat(20000)]) assert.throws(()=>social.decodeSettings(hash,ids,effects));
   assert.throws(()=>social.sanitizeSettings({version:1,values:[]},ids,effects));
 });
 test('copy/paste has a persistent browser fallback and shared links restore without uploading photos', () => {

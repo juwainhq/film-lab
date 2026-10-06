@@ -214,11 +214,16 @@ test('eighteen complete presets, legacy translations and v4 upgrades retain old 
         assert.ok(Math.abs(Math.cos(old * 3.6 * radians) - Math.cos(mapValue(name) * radians)) < 0.04);
         assert.ok(Math.abs(Math.sin(old * 3.6 * radians) - Math.sin(mapValue(name) * radians)) < 0.04);
       } else {
-        const [min, neutral, max] = range;
-        const previous = name === 'Exposure' ? (old - 50) / 50
+        // Version 3 mirrored the vignette range (0.35 of darkening used to sit on the positive
+        // side) and the shader now multiplies the corners by 1 + distance*strength instead of
+        // 1 - distance*strength. Reconstructing the legacy strength therefore needs the range from
+        // before the flip, and the value that reproduces those corners is its negative.
+        const [min, neutral, max] = name === 'VignStrength' ? [-0.15, 0, 0.35] : range;
+        const legacyValue = name === 'Exposure' ? (old - 50) / 50
           : old < legacyZero
             ? min + old / legacyZero * (neutral - min)
             : neutral + (old - legacyZero) / (100 - legacyZero) * (max - neutral);
+        const previous = name === 'VignStrength' ? -legacyValue : legacyValue;
         assert.ok(Math.abs(previous - mapValue(name)) <= (max - min) / 100 + 1e-10, name);
       }
     }
@@ -229,8 +234,15 @@ test('eighteen complete presets, legacy translations and v4 upgrades retain old 
   assert.equal(migrated.values.Exposure, 20);
   assert.equal(migrated.values.HallDir, -30);
   assert.equal(migrated.values.Bloom, 30);
-  assert.equal(migrated.version, 2);
+  assert.equal(migrated.version, 3);
   assert.equal(upgradeV4Preset(migrated), migrated);
+  // Version 3 flips the vignette slider to Lightroom's direction, so saved values are negated
+  // and pre-version-3 presets keep the exact corners they were saved with.
+  const vignette=upgradeV4Preset({name:'Saved',version:2,values:{VignStrength:60,Exposure:40}});
+  assert.equal(vignette.values.VignStrength, -60);
+  assert.equal(vignette.values.Exposure, 40, 'version 2 exposure is already in range');
+  assert.equal(upgradeV4Preset({name:'Saved',version:3,values:{VignStrength:-60}}).values.VignStrength, -60);
+  assert.equal(upgradeV4Preset({name:'Ancient',values:{Exposure:40,VignStrength:-12}}).values.VignStrength, 12);
   assert.match(script, /const dur=340/);
   assert.match(script, /film_lab_presets_v4/);
 });
@@ -347,7 +359,7 @@ test('selecting, adjusting, saving, and deleting looks keeps both preset control
   assert.match(script, /\$\('presetSelect'\)\.addEventListener\('change',e=>\{[\s\S]*?if\(availablePresets\.has\(name\)\) schedulePresetApplication\(name,availablePresets\.get\(name\),customPresetDither\.get\(name\)\)/);
   assert.match(script, /activePresetName=name;selectedPresetName=name;syncPresetSelection\(\);[\s\S]*?const beginTransition=now=>\{[\s\S]*?if\(ditherOptions\)setDitherSettings\(ditherOptions\);[\s\S]*?setDitherScope/);
   assert.match(script, /activePresetName=null; syncPresetSelection\(\);\n  updateFromSliders/);
-  assert.match(script, /customPresets\.push\(\{name,values,version:2,dither:getDitherSettings\(\)\}\); saveCustom\(\);\n  activePresetName=name; renderChips\(\)/);
+  assert.match(script, /customPresets\.push\(\{name,values,version:3,dither:getDitherSettings\(\)\}\); saveCustom\(\);\n  activePresetName=name; renderChips\(\)/);
   assert.match(script, /\$\('deletePresetBtn'\)\.addEventListener\('click',\(\)=>\{ if\(activePresetName\) deleteCustomPreset\(activePresetName\); \}\)/);
   assert.match(styles, /#deletePresetBtn\[hidden\] \{ display: none; \}/);
 });

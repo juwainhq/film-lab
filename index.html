@@ -1771,7 +1771,7 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
             <div class="subRow"><div class="subHead"><div class="subLabel">Softness <span>blur grain</span></div><div class="subVal" id="valGrainSoft">0</div></div><input class="subSlider" type="range" id="sliderGrainSoft" min="-100" max="100" value="0"></div>
             <div id="grainSeedRow" class="photo-only"><span>Static grain pattern<br>per photo</span><button type="button" id="randomizeGrainBtn">↻ Randomize</button></div>
           </div>
-        </div><div class="creativeVignette photo-only" data-group="vignette"><div class="vignetteHeader"><div class="adjustSectionHeading">Vignette</div><button type="button" class="groupReset" data-reset="vignette" hidden aria-label="Reset Vignette section" title="Reset Vignette">↺</button></div><div class="subRow"><div class="subHead"><div class="subLabel">Vignette Strength <span>brighten → darken</span></div><div class="subVal" id="valVignStrength">0</div></div><input class="subSlider" type="range" id="sliderVignStrength" min="-100" max="100" value="0"></div><div class="subRow"><div class="subHead"><div class="subLabel">Vignette Size</div><div class="subVal" id="valVignSize">0</div></div><input class="subSlider" type="range" id="sliderVignSize" min="-100" max="100" value="0"></div></div>
+        </div><div class="creativeVignette photo-only" data-group="vignette"><div class="vignetteHeader"><div class="adjustSectionHeading">Vignette</div><button type="button" class="groupReset" data-reset="vignette" hidden aria-label="Reset Vignette section" title="Reset Vignette">↺</button></div><div class="subRow"><div class="subHead"><div class="subLabel">Vignette Strength <span>darken → brighten</span></div><div class="subVal" id="valVignStrength">0</div></div><input class="subSlider" type="range" id="sliderVignStrength" min="-100" max="100" value="0"></div><div class="subRow"><div class="subHead"><div class="subLabel">Vignette Size</div><div class="subVal" id="valVignSize">0</div></div><input class="subSlider" type="range" id="sliderVignSize" min="-100" max="100" value="0"></div></div>
 <div class="adjustSectionHeading">Print &amp; detail</div>
 <div class="effectGroup photo-only" data-group="dither">
           <div class="effectHeader">
@@ -2518,6 +2518,9 @@ const gradeLutRegistry=new Map(), gradePresetThumbnailCache=new Map();
 let activeGradeLutId=null, nextGradeLutId=1, gradeWheelDrag=null, gradeWheelTap=null, gradeBlackWhiteEnabled=false;
 let gradePresetFilter='all', activeGradePresetId=null, gradeUserPresets=[];
 const GRADE_PRESET_STORAGE_KEY='film_lab_user_grade_presets_v1';
+// 2 = Lightroom vignette direction (negative darkens, positive lightens). Snapshots saved below
+// this version are migrated by negating sliderGradeVignette, so an old look keeps its corners.
+const GRADE_SNAPSHOT_VERSION=2;
 const GRADE_COPY_STORAGE_KEY='film_lab_grade_copy_v1';
 const dropZone=$('dropZone'), canvasWrap=$('canvasWrap'), fileInput=$('fileInput'), beforeLabel=$('beforeLabel'), toastEl=$('toast');
 let videoEl=$('videoEl');
@@ -2584,7 +2587,10 @@ const advancedControls={
   ShadowTone:{range:[-1,0,1],legacyZero:50},
   HighlightTone:{range:[-1,0,1],legacyZero:50},
   HighlightTint:{range:[-1,0,1],legacyZero:50},
-  VignStrength:{range:[-0.15,0,0.35],legacyZero:0},
+  // Mirrored so the slider keeps Lightroom's direction (left darkens, right lightens) with the
+  // same authority it always had: 0.35 of darkening, 0.15 of lightening. Saved values are
+  // negated on load, so a look that was stored as "+60 darken" stays exactly as dark.
+  VignStrength:{range:[-0.35,0,0.15],legacyZero:0},
   VignSize:{range:[0.4,1.3,2.2],legacyZero:50},
   BloomThresh:{range:[0.3,0.755,0.95],legacyZero:70},
   BloomSpread:{range:[0.2,1.49,4.5],legacyZero:30},
@@ -2802,6 +2808,7 @@ function updateGradeHistoryButtons(){
 }
 function makeGradeSnapshot(){
   return {
+    version:GRADE_SNAPSHOT_VERSION,
     values:Object.fromEntries(gradeSliderList().map(slider=>[slider.id,String(slider.value)])),
     curves:Object.fromEntries(gradeCurveChannels.map(channel=>[channel,gradeCurvePoints[channel].map(point=>({x:point.x,y:point.y}))])),
     wheels:Object.fromEntries(gradeWheelNames.map(name=>[name,{x:gradeWheelState[name].x,y:gradeWheelState[name].y}])),
@@ -3078,14 +3085,18 @@ function serializeGradeSnapshot(snapshot){
   const copy=JSON.parse(JSON.stringify(snapshot));
   const record=copy.lutId?gradeLutRegistry.get(copy.lutId):null;
   copy.lut=record?{name:record.name,size:record.size,domainMin:record.domainMin,domainMax:record.domainMax,data:bytesToBase64(record.data)}:null;
-  delete copy.lutId;return copy;
+  delete copy.lutId;copy.version=GRADE_SNAPSHOT_VERSION;return copy;
 }
-function normalizeGradeSnapshot(input,{portable=true}={}){
+
+function normalizeGradeSnapshot(input,{portable=true,legacyVignette=undefined}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('A grading preset must include a settings object.');
+  // Snapshots written before GRADE_SNAPSHOT_VERSION used the opposite vignette direction.
+  const legacyVignetteValues=legacyVignette===undefined?Number(input.version||0)<GRADE_SNAPSHOT_VERSION:Boolean(legacyVignette);
   const values={};
   for(const slider of gradeSliderList()){
-    const raw=input.values?.[slider.id];const value=raw===undefined?Number(slider.dataset.gradeDefault||0):Number(raw);
+    const raw=input.values?.[slider.id];let value=raw===undefined?Number(slider.dataset.gradeDefault||0):Number(raw);
     if(!Number.isFinite(value))throw new Error(`Preset value for ${slider.id} is not a finite number.`);
+    if(legacyVignetteValues&&slider.id==='sliderGradeVignette')value=-value;
     values[slider.id]=String(Math.max(Number(slider.min),Math.min(Number(slider.max),value)));
   }
   const curves={};
@@ -3110,7 +3121,7 @@ function normalizeGradeSnapshot(input,{portable=true}={}){
     if(domainMin.length!==3||domainMax.length!==3||domainMin.some((v,i)=>!Number.isFinite(v)||!Number.isFinite(Math.fround(v))||!Number.isFinite(domainMax[i])||!Number.isFinite(Math.fround(domainMax[i]))||domainMax[i]<=v||!Number.isFinite(Math.fround(domainMax[i]-v))))throw new Error('Preset LUT domain is invalid.');
     lutId=registerGradeLut(input.lut.name||'Preset LUT',{size,data,domainMin:new Float32Array(domainMin),domainMax:new Float32Array(domainMax)});
   }else if(!portable&&input.lutId&&gradeLutRegistry.has(input.lutId))lutId=input.lutId;
-  return {values,curves,wheels,bwEnabled:!!input.bwEnabled,lutId};
+  return {version:GRADE_SNAPSHOT_VERSION,values,curves,wheels,bwEnabled:!!input.bwEnabled,lutId};
 }
 function readGradeLutFile(file){
   if(!file)return;
@@ -3134,80 +3145,80 @@ function makeBuiltinGradePreset(id,name,category,values={},wheels={},bwEnabled=f
     positions[channel]={x:Number(point.x)||0,y:Number(point.y)||0};
     if(Number(point.amount))values[`sliderGradeWheel${channel[0].toUpperCase()+channel.slice(1)}Intensity`]=Number(point.amount);
   }
-  return {id,name,category,snapshot:{values:{...values},wheels:positions,bwEnabled:!!bwEnabled,lutId:null}};
+  return {id,name,category,snapshot:{version:GRADE_SNAPSHOT_VERSION,values:{...values},wheels:positions,bwEnabled:!!bwEnabled,lutId:null}};
 }
 const BUILTIN_GRADE_PRESETS=[
   makeBuiltinGradePreset('cine-teal-ember','Teal & Ember','Cinematic',{
-    sliderGradeExposure:0.05,sliderGradeContrast:17,sliderGradeHighlights:-20,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeSaturation:-5,sliderGradeVibrance:9,sliderGradeVignette:13
+    sliderGradeExposure:0.05,sliderGradeContrast:17,sliderGradeHighlights:-20,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeSaturation:-5,sliderGradeVibrance:9,sliderGradeVignette:-13
   },{shadows:{x:-0.52,y:0.40,amount:18},highlights:{x:0.72,y:0.42,amount:11}}),
   makeBuiltinGradePreset('cine-night-signal','Night Signal','Cinematic',{
-    sliderGradeExposure:-0.28,sliderGradeContrast:19,sliderGradeHighlights:-18,sliderGradeShadows:-4,sliderGradeTemperature:-12,sliderGradeSaturation:-9,sliderGradeDehaze:8,sliderGradeVignette:18
+    sliderGradeExposure:-0.28,sliderGradeContrast:19,sliderGradeHighlights:-18,sliderGradeShadows:-4,sliderGradeTemperature:-12,sliderGradeSaturation:-9,sliderGradeDehaze:8,sliderGradeVignette:-18
   },{shadows:{x:-0.48,y:-0.68,amount:13},midtones:{x:-0.18,y:-0.54,amount:7}}),
   makeBuiltinGradePreset('cine-dust-west','Dusty Western','Cinematic',{
-    sliderGradeExposure:0.08,sliderGradeContrast:11,sliderGradeHighlights:-13,sliderGradeShadows:16,sliderGradeTemperature:17,sliderGradeSaturation:-15,sliderGradeTexture:8,sliderGradeVignette:17
+    sliderGradeExposure:0.08,sliderGradeContrast:11,sliderGradeHighlights:-13,sliderGradeShadows:16,sliderGradeTemperature:17,sliderGradeSaturation:-15,sliderGradeTexture:8,sliderGradeVignette:-17
   },{shadows:{x:0.18,y:0.22,amount:8},highlights:{x:0.82,y:0.38,amount:16}}),
   makeBuiltinGradePreset('cine-neon-fade','Neon Fade','Cinematic',{
-    sliderGradeExposure:-0.06,sliderGradeContrast:8,sliderGradeHighlights:-25,sliderGradeShadows:21,sliderGradeSaturation:8,sliderGradeVibrance:13,sliderGradeClarity:8,sliderGradeVignette:9
+    sliderGradeExposure:-0.06,sliderGradeContrast:8,sliderGradeHighlights:-25,sliderGradeShadows:21,sliderGradeSaturation:8,sliderGradeVibrance:13,sliderGradeClarity:8,sliderGradeVignette:-9
   },{shadows:{x:-0.32,y:-0.62,amount:14},highlights:{x:0.66,y:-0.35,amount:9}}),
   makeBuiltinGradePreset('portrait-soft-linen','Soft Linen','Portrait',{
-    sliderGradeExposure:0.18,sliderGradeContrast:-8,sliderGradeHighlights:-16,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeTexture:-22,sliderGradeClarity:-9,sliderGradeSaturation:-4,sliderGradeVignette:4
+    sliderGradeExposure:0.18,sliderGradeContrast:-8,sliderGradeHighlights:-16,sliderGradeShadows:12,sliderGradeTemperature:5,sliderGradeTexture:-22,sliderGradeClarity:-9,sliderGradeSaturation:-4,sliderGradeVignette:-4
   },{highlights:{x:0.82,y:0.28,amount:8}}),
   makeBuiltinGradePreset('portrait-golden-hour','Golden Hour','Portrait',{
-    sliderGradeExposure:0.14,sliderGradeContrast:4,sliderGradeHighlights:-14,sliderGradeShadows:9,sliderGradeTemperature:13,sliderGradeTint:3,sliderGradeVibrance:10,sliderGradeTexture:-12,sliderGradeVignette:7
+    sliderGradeExposure:0.14,sliderGradeContrast:4,sliderGradeHighlights:-14,sliderGradeShadows:9,sliderGradeTemperature:13,sliderGradeTint:3,sliderGradeVibrance:10,sliderGradeTexture:-12,sliderGradeVignette:-7
   },{midtones:{x:0.86,y:0.32,amount:9},highlights:{x:0.90,y:0.38,amount:9}}),
   makeBuiltinGradePreset('portrait-clean-studio','Clean Studio','Portrait',{
-    sliderGradeExposure:0.12,sliderGradeContrast:3,sliderGradeHighlights:-8,sliderGradeWhites:6,sliderGradeTexture:-10,sliderGradeClarity:-4,sliderGradeVibrance:5,sliderGradeVignette:-3
+    sliderGradeExposure:0.12,sliderGradeContrast:3,sliderGradeHighlights:-8,sliderGradeWhites:6,sliderGradeTexture:-10,sliderGradeClarity:-4,sliderGradeVibrance:5,sliderGradeVignette:3
   }),
   makeBuiltinGradePreset('portrait-editorial-warm','Editorial Warm','Portrait',{
-    sliderGradeExposure:0.03,sliderGradeContrast:12,sliderGradeHighlights:-20,sliderGradeShadows:7,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeTexture:-8,sliderGradeVignette:11
+    sliderGradeExposure:0.03,sliderGradeContrast:12,sliderGradeHighlights:-20,sliderGradeShadows:7,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeTexture:-8,sliderGradeVignette:-11
   },{shadows:{x:0.25,y:0.14,amount:5},highlights:{x:0.72,y:0.32,amount:7}}),
   makeBuiltinGradePreset('bw-classic-mono','Classic Mono','Black & White',{
-    sliderGradeContrast:12,sliderGradeHighlights:-10,sliderGradeShadows:4,sliderGradeBwRed:24,sliderGradeBwGreen:69,sliderGradeBwBlue:7,sliderGradeVignette:8
+    sliderGradeContrast:12,sliderGradeHighlights:-10,sliderGradeShadows:4,sliderGradeBwRed:24,sliderGradeBwGreen:69,sliderGradeBwBlue:7,sliderGradeVignette:-8
   },{},true),
   makeBuiltinGradePreset('bw-silver-gelatin','Silver Gelatin','Black & White',{
-    sliderGradeExposure:-0.05,sliderGradeContrast:21,sliderGradeHighlights:-18,sliderGradeBlacks:-8,sliderGradeBwRed:30,sliderGradeBwGreen:62,sliderGradeBwBlue:8,sliderGradeTexture:5,sliderGradeVignette:14
+    sliderGradeExposure:-0.05,sliderGradeContrast:21,sliderGradeHighlights:-18,sliderGradeBlacks:-8,sliderGradeBwRed:30,sliderGradeBwGreen:62,sliderGradeBwBlue:8,sliderGradeTexture:5,sliderGradeVignette:-14
   },{},true),
   makeBuiltinGradePreset('bw-warm-matte','Warm Matte Mono','Black & White',{
-    sliderGradeContrast:-7,sliderGradeHighlights:-12,sliderGradeShadows:13,sliderGradeBlacks:12,sliderGradeBwRed:34,sliderGradeBwGreen:61,sliderGradeBwBlue:5,sliderGradeVignette:5
+    sliderGradeContrast:-7,sliderGradeHighlights:-12,sliderGradeShadows:13,sliderGradeBlacks:12,sliderGradeBwRed:34,sliderGradeBwGreen:61,sliderGradeBwBlue:5,sliderGradeVignette:-5
   },{highlights:{x:0.85,y:0.36,amount:5}},true),
   makeBuiltinGradePreset('bw-cool-platinum','Cool Platinum','Black & White',{
-    sliderGradeExposure:0.08,sliderGradeContrast:9,sliderGradeHighlights:-17,sliderGradeShadows:8,sliderGradeBwRed:18,sliderGradeBwGreen:67,sliderGradeBwBlue:15,sliderGradeVignette:6
+    sliderGradeExposure:0.08,sliderGradeContrast:9,sliderGradeHighlights:-17,sliderGradeShadows:8,sliderGradeBwRed:18,sliderGradeBwGreen:67,sliderGradeBwBlue:15,sliderGradeVignette:-6
   },{shadows:{x:-0.46,y:-0.56,amount:4}},true),
   makeBuiltinGradePreset('film-portra-400','Portra 400','Film',{
-    sliderGradeExposure:0.12,sliderGradeContrast:-5,sliderGradeHighlights:-18,sliderGradeShadows:10,sliderGradeTemperature:6,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeVibrance:6,sliderGradeTexture:3,sliderGradeVignette:4
+    sliderGradeExposure:0.12,sliderGradeContrast:-5,sliderGradeHighlights:-18,sliderGradeShadows:10,sliderGradeTemperature:6,sliderGradeTint:2,sliderGradeSaturation:-7,sliderGradeVibrance:6,sliderGradeTexture:3,sliderGradeVignette:-4
   },{highlights:{x:0.8,y:0.32,amount:5}}),
   makeBuiltinGradePreset('film-gold-200','Gold 200','Film',{
-    sliderGradeExposure:0.1,sliderGradeContrast:6,sliderGradeHighlights:-10,sliderGradeShadows:6,sliderGradeTemperature:12,sliderGradeSaturation:6,sliderGradeVibrance:7,sliderGradeTexture:5,sliderGradeVignette:6
+    sliderGradeExposure:0.1,sliderGradeContrast:6,sliderGradeHighlights:-10,sliderGradeShadows:6,sliderGradeTemperature:12,sliderGradeSaturation:6,sliderGradeVibrance:7,sliderGradeTexture:5,sliderGradeVignette:-6
   },{midtones:{x:0.88,y:0.28,amount:7}}),
   makeBuiltinGradePreset('film-ektar-pop','Ektar Pop','Film',{
-    sliderGradeExposure:0.02,sliderGradeContrast:17,sliderGradeHighlights:-12,sliderGradeShadows:5,sliderGradeSaturation:12,sliderGradeVibrance:17,sliderGradeClarity:7,sliderGradeTexture:5,sliderGradeVignette:5
+    sliderGradeExposure:0.02,sliderGradeContrast:17,sliderGradeHighlights:-12,sliderGradeShadows:5,sliderGradeSaturation:12,sliderGradeVibrance:17,sliderGradeClarity:7,sliderGradeTexture:5,sliderGradeVignette:-5
   },{shadows:{x:-0.38,y:0.52,amount:5}}),
   makeBuiltinGradePreset('film-soft-chrome','Soft Chrome','Film',{
-    sliderGradeExposure:0.06,sliderGradeContrast:-3,sliderGradeHighlights:-19,sliderGradeShadows:11,sliderGradeTemperature:-3,sliderGradeSaturation:-12,sliderGradeVibrance:-3,sliderGradeTexture:4,sliderGradeVignette:3
+    sliderGradeExposure:0.06,sliderGradeContrast:-3,sliderGradeHighlights:-19,sliderGradeShadows:11,sliderGradeTemperature:-3,sliderGradeSaturation:-12,sliderGradeVibrance:-3,sliderGradeTexture:4,sliderGradeVignette:-3
   },{shadows:{x:-0.25,y:0.36,amount:4}}),
   makeBuiltinGradePreset('moody-forest-night','Forest Night','Moody',{
-    sliderGradeExposure:-0.25,sliderGradeContrast:16,sliderGradeHighlights:-19,sliderGradeShadows:-8,sliderGradeTemperature:-6,sliderGradeSaturation:-12,sliderGradeDehaze:12,sliderGradeVignette:19
+    sliderGradeExposure:-0.25,sliderGradeContrast:16,sliderGradeHighlights:-19,sliderGradeShadows:-8,sliderGradeTemperature:-6,sliderGradeSaturation:-12,sliderGradeDehaze:12,sliderGradeVignette:-19
   },{shadows:{x:-0.48,y:0.48,amount:12},midtones:{x:-0.34,y:0.19,amount:7}}),
   makeBuiltinGradePreset('moody-slate-rain','Slate Rain','Moody',{
-    sliderGradeExposure:-0.15,sliderGradeContrast:14,sliderGradeHighlights:-22,sliderGradeShadows:4,sliderGradeTemperature:-13,sliderGradeSaturation:-17,sliderGradeClarity:7,sliderGradeVignette:15
+    sliderGradeExposure:-0.15,sliderGradeContrast:14,sliderGradeHighlights:-22,sliderGradeShadows:4,sliderGradeTemperature:-13,sliderGradeSaturation:-17,sliderGradeClarity:7,sliderGradeVignette:-15
   },{shadows:{x:-0.55,y:-0.47,amount:12},highlights:{x:-0.25,y:-0.44,amount:5}}),
   makeBuiltinGradePreset('moody-desert-dusk','Desert Dusk','Moody',{
-    sliderGradeExposure:-0.1,sliderGradeContrast:11,sliderGradeHighlights:-15,sliderGradeShadows:8,sliderGradeTemperature:14,sliderGradeTint:4,sliderGradeSaturation:-11,sliderGradeVignette:17
+    sliderGradeExposure:-0.1,sliderGradeContrast:11,sliderGradeHighlights:-15,sliderGradeShadows:8,sliderGradeTemperature:14,sliderGradeTint:4,sliderGradeSaturation:-11,sliderGradeVignette:-17
   },{shadows:{x:0.14,y:0.28,amount:8},highlights:{x:0.84,y:0.25,amount:12}}),
   makeBuiltinGradePreset('moody-deep-olive','Deep Olive','Moody',{
-    sliderGradeExposure:-0.22,sliderGradeContrast:20,sliderGradeHighlights:-16,sliderGradeShadows:-2,sliderGradeTemperature:3,sliderGradeTint:-5,sliderGradeSaturation:-15,sliderGradeDehaze:9,sliderGradeVignette:18
+    sliderGradeExposure:-0.22,sliderGradeContrast:20,sliderGradeHighlights:-16,sliderGradeShadows:-2,sliderGradeTemperature:3,sliderGradeTint:-5,sliderGradeSaturation:-15,sliderGradeDehaze:9,sliderGradeVignette:-18
   },{shadows:{x:0.18,y:0.35,amount:13},midtones:{x:0.29,y:0.22,amount:8}}),
   makeBuiltinGradePreset('airy-cloudlight','Cloudlight','Bright & Airy',{
-    sliderGradeExposure:0.38,sliderGradeContrast:-11,sliderGradeHighlights:-22,sliderGradeShadows:17,sliderGradeWhites:8,sliderGradeBlacks:8,sliderGradeTemperature:3,sliderGradeSaturation:-8,sliderGradeVignette:-5
+    sliderGradeExposure:0.38,sliderGradeContrast:-11,sliderGradeHighlights:-22,sliderGradeShadows:17,sliderGradeWhites:8,sliderGradeBlacks:8,sliderGradeTemperature:3,sliderGradeSaturation:-8,sliderGradeVignette:5
   }),
   makeBuiltinGradePreset('airy-creamy-daylight','Creamy Daylight','Bright & Airy',{
-    sliderGradeExposure:0.27,sliderGradeContrast:-6,sliderGradeHighlights:-18,sliderGradeShadows:14,sliderGradeTemperature:7,sliderGradeTexture:-10,sliderGradeClarity:-5,sliderGradeVibrance:7,sliderGradeVignette:-3
+    sliderGradeExposure:0.27,sliderGradeContrast:-6,sliderGradeHighlights:-18,sliderGradeShadows:14,sliderGradeTemperature:7,sliderGradeTexture:-10,sliderGradeClarity:-5,sliderGradeVibrance:7,sliderGradeVignette:3
   },{highlights:{x:0.87,y:0.29,amount:5}}),
   makeBuiltinGradePreset('airy-fresh-pastel','Fresh Pastel','Bright & Airy',{
-    sliderGradeExposure:0.31,sliderGradeContrast:-13,sliderGradeHighlights:-23,sliderGradeShadows:19,sliderGradeSaturation:-13,sliderGradeVibrance:8,sliderGradeTexture:-8,sliderGradeVignette:-4
+    sliderGradeExposure:0.31,sliderGradeContrast:-13,sliderGradeHighlights:-23,sliderGradeShadows:19,sliderGradeSaturation:-13,sliderGradeVibrance:8,sliderGradeTexture:-8,sliderGradeVignette:4
   },{midtones:{x:-0.14,y:0.26,amount:4}}),
   makeBuiltinGradePreset('airy-sunlit-room','Sunlit Room','Bright & Airy',{
-    sliderGradeExposure:0.24,sliderGradeContrast:-4,sliderGradeHighlights:-15,sliderGradeShadows:10,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-3,sliderGradeTexture:-5,sliderGradeVignette:-2
+    sliderGradeExposure:0.24,sliderGradeContrast:-4,sliderGradeHighlights:-15,sliderGradeShadows:10,sliderGradeTemperature:8,sliderGradeTint:2,sliderGradeSaturation:-3,sliderGradeTexture:-5,sliderGradeVignette:2
   },{highlights:{x:0.82,y:0.34,amount:7}})
 ];
 function getAllGradePresets(){return [...BUILTIN_GRADE_PRESETS,...gradeUserPresets];}
@@ -3217,7 +3228,7 @@ function gradePresetCssFilter(preset){
   const contrast=Math.max(0.68,Math.min(1.45,1+number('sliderGradeContrast')*0.003));
   const saturation=Math.max(0,Math.min(2,1+(number('sliderGradeSaturation')+number('sliderGradeVibrance')*0.45)*0.005));
   const temperature=number('sliderGradeTemperature');
-  return `${preset.snapshot?.bwEnabled?'grayscale(1) ':''}brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) ${Math.abs(temperature)>10?`sepia(${Math.abs(temperature)/400}) hue-rotate(${temperature<0?210:345}deg)`:''}`;
+  return `${preset.snapshot?.bwEnabled?'grayscale(1) ':''}brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) ${Math.abs(temperature)>10?`sepia(${Math.abs(temperature)/260}) hue-rotate(${temperature<0?210:345}deg)`:''}`;
 }
 function createGradePresetThumbnail(preset){
   const sourceKey=`${currentPhoto?.id||'empty'}:${photoTextureRevision}:${hasContent?'photo':'placeholder'}`;
@@ -3270,7 +3281,7 @@ function setGradePresetStatus(message,error=false){
 }
 function persistGradeUserPresets(){
   try{
-    const payload={format:'film-lab-color-presets',version:1,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
+    const payload={format:'film-lab-color-presets',version:GRADE_SNAPSHOT_VERSION,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
     localStorage.setItem(GRADE_PRESET_STORAGE_KEY,JSON.stringify(payload));return true;
   }catch(error){console.warn('Could not save grading presets to local storage.',error);setGradePresetStatus('Could not save: browser storage is full or unavailable.',true);return false;}
 }
@@ -3325,7 +3336,7 @@ function deleteGradeUserPreset(id){
 }
 function exportGradeUserPresets(){
   try{
-    const payload={format:'film-lab-color-presets',version:1,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
+    const payload={format:'film-lab-color-presets',version:GRADE_SNAPSHOT_VERSION,presets:gradeUserPresets.map(preset=>({name:preset.name,category:'My Looks',snapshot:serializeGradeSnapshot(preset.snapshot)}))};
     const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');
     link.href=url;link.download='film-lab-presets.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     setGradePresetStatus(`Exported ${gradeUserPresets.length} user preset${gradeUserPresets.length===1?'':'s'} as JSON.`);
@@ -3349,7 +3360,7 @@ function importGradePresetFile(file){
 }
 async function copyGradeSettings(){
   try{
-    const text=JSON.stringify({format:'film-lab-grade-settings',version:1,snapshot:serializeGradeSnapshot(makeGradeSnapshot())});
+    const text=JSON.stringify({format:'film-lab-grade-settings',version:GRADE_SNAPSHOT_VERSION,snapshot:serializeGradeSnapshot(makeGradeSnapshot())});
     let copied=false;
     try{localStorage.setItem(GRADE_COPY_STORAGE_KEY,text);copied=true;}catch(error){console.warn('Could not keep a local copy of grading settings.',error);}
     if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);copied=true;}
@@ -3365,7 +3376,7 @@ async function pasteGradeSettings(){
   if(!text){try{text=localStorage.getItem(GRADE_COPY_STORAGE_KEY)||'';}catch(_){}}
   if(!text){showToast('No copied grading settings found');return;}
   try{
-    const parsed=JSON.parse(text);if(parsed?.format!=='film-lab-grade-settings'||parsed.version!==1)throw new Error('Clipboard data is not a Film Lab grading copy.');
+    const parsed=JSON.parse(text);if(parsed?.format!=='film-lab-grade-settings'||![1,GRADE_SNAPSHOT_VERSION].includes(Number(parsed.version)))throw new Error('Clipboard data is not a Film Lab grading copy.');
     const snapshot=normalizeGradeSnapshot(parsed.snapshot,{portable:true});applyGradeSnapshot(snapshot);activeGradePresetId=null;syncGradePresetSelection();commitGradeSnapshot();
     if(snapshot.bwEnabled)$('gradeBlackWhiteSection').open=true;
     showToast('Grading settings pasted');
@@ -3752,26 +3763,44 @@ float hueBandWeight(float hue,float center){
   float distance=hueDistance(fract(hue),center);
   return 1.0-smoothstep(0.045,0.18,distance);
 }
+const vec3 LUMA_WEIGHTS=vec3(0.2126,0.7152,0.0722);
+// Temperature and tint become real channel gains in linear light. 0.38 in log2 space puts the
+// red/blue ratio at ~1.7x for temperature +100 (~1/1.7 when cool); tint swings green against
+// magenta, with a small magenta lift on red and blue so the hue stays magenta and not pink.
+vec3 whiteBalanceGain(float temperature,float tint){
+  float t=clamp(temperature,-100.0,100.0)/100.0;
+  float ti=clamp(tint,-100.0,100.0)/100.0;
+  return vec3(exp2(t*0.38+ti*0.12),exp2(-ti*0.40),exp2(-t*0.38+ti*0.12));
+}
 void main(){
   vec4 base=texture(u_image,v_texCoord);
   if(u_gradeActive==0){ outColor=base; return; }
   vec3 linearColor=srgbToLinear(clamp(base.rgb,0.0,1.0));
-  float temperature=clamp(u_gradeTemperature,-100.0,100.0)/100.0;
-  float tint=clamp(u_gradeTint,-100.0,100.0)/100.0;
-  linearColor.r*=exp2(temperature*0.20+tint*0.045);
-  linearColor.g*=exp2(-tint*0.14);
-  linearColor.b*=exp2(-temperature*0.20+tint*0.045);
+  // The pixel's own luminance is restored after the gains, so white balance changes colour
+  // without brightening or darkening the photo.
+  float balanceLuma=max(dot(linearColor,LUMA_WEIGHTS),0.0001);
+  linearColor*=whiteBalanceGain(u_gradeTemperature,u_gradeTint);
+  linearColor*=balanceLuma/max(dot(linearColor,LUMA_WEIGHTS),0.0001);
   linearColor*=exp2(clamp(u_gradeExposure,-5.0,5.0));
   float contrastFactor=exp2(clamp(u_gradeContrast,-100.0,100.0)/100.0*1.35);
   linearColor=(linearColor-vec3(0.18))*contrastFactor+vec3(0.18);
   float luminance=max(0.0,dot(linearColor,vec3(0.2126,0.7152,0.0722)));
   float shadowWeight=1.0-smoothstep(0.015,0.62,luminance);
-  float highlightWeight=smoothstep(0.28,1.0,luminance);
+  float highlightWeight=smoothstep(0.10,0.80,luminance);
   float blackWeight=1.0-smoothstep(0.02,0.30,luminance);
-  float whiteWeight=smoothstep(0.62,1.05,luminance);
-  linearColor+=vec3(u_gradeHighlights/100.0*0.24*highlightWeight);
+  float whiteWeight=smoothstep(0.34,0.96,luminance);
+  // Highlights and whites are roughly 1.5-2x stronger and reach further down the tone range. A
+  // lift scales with the room left below white and a pull scales with the light already there, so
+  // neither direction can cross the ends: +100 brightens without flattening into a clipped block
+  // and -100 recovers without crushing to black. The push carries the larger coefficient because
+  // the headroom factor shrinks it near white.
+  float highlightLift=u_gradeHighlights/100.0*(u_gradeHighlights>0.0?0.55:0.40)*highlightWeight;
+  if(highlightLift>0.0) linearColor+=vec3(highlightLift)*clamp(vec3(1.0)-linearColor,0.0,1.0);
+  else linearColor+=vec3(highlightLift)*clamp(linearColor,0.0,1.0);
   linearColor+=vec3(u_gradeShadows/100.0*0.22*shadowWeight);
-  linearColor+=vec3(u_gradeWhites/100.0*0.13*whiteWeight);
+  float whiteLift=u_gradeWhites/100.0*(u_gradeWhites>0.0?0.75:0.20)*whiteWeight;
+  if(whiteLift>0.0) linearColor+=vec3(whiteLift)*clamp(vec3(1.0)-linearColor,0.0,1.0);
+  else linearColor+=vec3(whiteLift)*clamp(linearColor,0.0,1.0);
   linearColor+=vec3(u_gradeBlacks/100.0*0.11*blackWeight);
   vec3 color=linearToSrgb(clamp(linearColor,0.0,1.0));
   color=vec3(
@@ -3794,10 +3823,18 @@ void main(){
   hsl.x=fract(hsl.x+hueShift+1.0);
   hsl.y=clamp(hsl.y+saturationShift,0.0,1.0);
   hsl.z=clamp(hsl.z+luminanceShift,0.0,1.0);
-  float vibrance=u_gradeVibrance/100.0;
-  float mutedBoost=vibrance>0.0?vibrance*(1.0-hsl.y)*0.62:vibrance*0.58;
-  hsl.y=clamp(hsl.y+mutedBoost,0.0,1.0);
-  hsl.y=clamp(hsl.y+u_gradeSaturation/100.0*0.62,0.0,1.0);
+  float vibrance=clamp(u_gradeVibrance,-100.0,100.0)/100.0;
+  if(abs(vibrance)>0.0001){
+    // Vibrance scales relative chroma: muted colours travel a long way, already-saturated ones
+    // move less, the orange/skin band is damped, and grey (zero saturation) never gains a cast
+    // because the weight itself falls to zero there.
+    float skinWeight=smoothstep(0.02,0.05,hsl.x)*(1.0-smoothstep(0.09,0.16,hsl.x));
+    float vibranceWeight=smoothstep(0.0,0.05,hsl.y)*(0.30+0.70*pow(1.0-hsl.y,1.5))*(1.0-skinWeight*0.62);
+    hsl.y=clamp(hsl.y*(1.0+vibrance*0.95*vibranceWeight),0.0,1.0);
+  }
+  // Saturation stays additive (saved looks depend on its strength) but fades out on nearly
+  // grey pixels, which is what kept a neutral wall from picking up a red cast at +100.
+  hsl.y=clamp(hsl.y+u_gradeSaturation/100.0*0.62*smoothstep(0.0,0.05,hsl.y),0.0,1.0);
   color=clamp(hslToRgb(hsl),0.0,1.0);
   outColor=vec4(color,base.a);
 }`;
@@ -3865,7 +3902,7 @@ void main(){
       color=mix(vec3(luma),color,1.0+dehaze*0.12);
     }else color=mix(color,vec3(0.5),-dehaze*0.28);
   }
-  float textureAmount=clamp(u_texture,-1.0,1.0)*0.65;
+  float textureAmount=clamp(u_texture,-1.0,1.0)*1.05;
   float fineClarity=clamp(u_clarity,-1.0,1.0)*0.9;
   float noiseReduction=clamp(u_noiseReduction,0.0,1.0);
   float sharpen=clamp(u_sharpness,0.0,1.0);
@@ -3883,7 +3920,18 @@ void main(){
       gradedBase(v_texCoord+vec2(1.0,1.0)*fineOffset)
     )/8.0;
   }
-  color+=(color-fineBlur)*textureAmount;
+  // Positive texture adds the fine-detail difference; negative texture blends toward the fine
+  // blur instead, which softens without the overshoot a negative unsharp mask would ring with.
+  if(textureAmount>0.0001){
+    // Halo guard: the added detail may only leave the local fine-detail band by a small margin,
+    // and that margin shrinks as the pixel approaches white, so a texture boost cannot turn a
+    // bright edge into a clipped outline.
+    vec3 textureBase=max(color,fineBlur);
+    vec3 textureHeadroom=clamp(vec3(1.0)-textureBase,0.0,1.0);
+    vec3 textureTarget=color+(color-fineBlur)*textureAmount;
+    color=clamp(textureTarget,min(color,fineBlur)-vec3(0.07),textureBase+min(vec3(0.07),textureHeadroom*0.35));
+  }
+  else if(textureAmount<-0.0001) color=mix(color,fineBlur,clamp(-textureAmount,0.0,0.8));
   if(abs(fineClarity)>0.0001){
     vec2 clarityOffset=u_texelSize*4.0;
     vec3 broadBlur=(
@@ -3899,13 +3947,31 @@ void main(){
     color+=(color-broadBlur)*fineClarity;
   }
   if(noiseReduction>0.0001){
+    // ~1.5x stronger than the old single 8-tap mix: the fine blur is combined with four wider
+    // diagonal taps, each weighted by how similar it is to the smoothed centre, so grain is
+    // averaged away while a hard edge cannot bleed a halo into the smoothed area.
+    vec2 noiseOffset=u_texelSize*(2.0+u_sharpRadius*3.0);
+    vec3 wideA=gradedBase(v_texCoord+vec2(-1.2,-1.2)*noiseOffset);
+    vec3 wideB=gradedBase(v_texCoord+vec2(1.2,-1.2)*noiseOffset);
+    vec3 wideC=gradedBase(v_texCoord+vec2(-1.2,1.2)*noiseOffset);
+    vec3 wideD=gradedBase(v_texCoord+vec2(1.2,1.2)*noiseOffset);
+    float weightA=1.0-smoothstep(0.18,0.46,length(wideA-fineBlur));
+    float weightB=1.0-smoothstep(0.18,0.46,length(wideB-fineBlur));
+    float weightC=1.0-smoothstep(0.18,0.46,length(wideC-fineBlur));
+    float weightD=1.0-smoothstep(0.18,0.46,length(wideD-fineBlur));
+    vec3 noiseBlur=(fineBlur*8.0+color+wideA*weightA+wideB*weightB+wideC*weightC+wideD*weightD)/(9.0+weightA+weightB+weightC+weightD);
     float edge=length(color-fineBlur);
-    float edgeProtection=smoothstep(0.025,0.19,edge)*clamp(u_noiseDetail,0.0,1.0)*0.82;
-    color=mix(color,fineBlur,noiseReduction*(1.0-edgeProtection));
+    float edgeProtection=smoothstep(0.02,0.16,edge)*clamp(u_noiseDetail,0.0,1.0)*0.9;
+    color=mix(color,noiseBlur,clamp(noiseReduction*1.25,0.0,1.0)*(1.0-edgeProtection));
   }
   if(sharpen>0.0001){
     float edgeMask=smoothstep(0.008,0.12,length(color-fineBlur));
-    color+=(color-fineBlur)*sharpen*1.45*edgeMask;
+    // Halo guard: the sharpened result may only leave the local band by a small margin, so edges
+    // get crisp without the bright/dark outline that a hard unsharp mask leaves behind.
+    vec3 sharpenBase=max(color,fineBlur);
+    vec3 sharpenHeadroom=clamp(vec3(1.0)-sharpenBase,0.0,1.0);
+    vec3 sharpenTarget=color+(color-fineBlur)*min(sharpen*2.35*edgeMask,2.2);
+    color=clamp(sharpenTarget,min(color,fineBlur)-vec3(0.06),sharpenBase+min(vec3(0.06),sharpenHeadroom*0.35));
   }
   float shadowLuma=dot(color,vec3(0.2126,0.7152,0.0722));
   float shadowWeight=1.0-smoothstep(0.04,0.52,shadowLuma);
@@ -3922,9 +3988,11 @@ void main(){
   float squareDistance=max(abs(vignettePosition.x),abs(vignettePosition.y));
   float distanceFromCenter=mix(circularDistance,squareDistance,roundness);
   float vignetteEdge=smoothstep(clamp(u_vignetteMidpoint,0.0,1.0),clamp(u_vignetteMidpoint+u_vignetteFeather,0.001,1.5),distanceFromCenter);
+  // Lightroom convention: negative darkens the corners, positive lightens them. Stored
+  // presets and snapshots are negated on load so their look does not change.
   float vignette=clamp(u_vignette,-1.0,1.0);
-  if(vignette>0.0)color*=1.0-vignetteEdge*vignette*0.72;
-  else if(vignette<0.0)color=mix(color,vec3(1.0),vignetteEdge*(-vignette)*0.28);
+  if(vignette<0.0)color*=1.0-vignetteEdge*(-vignette)*0.72;
+  else if(vignette>0.0)color=mix(color,vec3(1.0),vignetteEdge*vignette*0.28);
   outColor=vec4(clamp(color,0.0,1.0),base.a);
 }`;
 const fsSharpen=`#version 300 es
@@ -4096,6 +4164,25 @@ vec3 localAdjust(vec3 col,vec4 pa,vec4 pb,vec4 pc,vec2 uv){
   }
   return max(col,vec3(0.0));
 }
+const vec3 WB_WEIGHTS=vec3(0.2126,0.7152,0.0722);
+vec3 srgbToLinear(vec3 value){
+  vec3 low=value/12.92;
+  vec3 high=pow((value+0.055)/1.055,vec3(2.4));
+  return mix(low,high,step(vec3(0.04045),value));
+}
+vec3 linearToSrgb(vec3 value){
+  value=max(value,vec3(0.0));
+  vec3 low=value*12.92;
+  vec3 high=1.055*pow(value,vec3(1.0/2.4))-0.055;
+  return mix(low,high,step(vec3(0.0031308),value));
+}
+// The same white-balance model the Grade tab uses, so the legacy Adjust-path temperature has
+// exactly the same strength (red/blue ratio ~1.7x at +100) and keeps luminance constant.
+vec3 whiteBalanceGain(float temperature,float tint){
+  float t=clamp(temperature,-100.0,100.0)/100.0;
+  float ti=clamp(tint,-100.0,100.0)/100.0;
+  return vec3(exp2(t*0.38+ti*0.12),exp2(-ti*0.40),exp2(-t*0.38+ti*0.12));
+}
 void main(){
   vec4 base=texture(u_base, v_texCoord);
   vec4 bloom=texture(u_bloom, v_texCoord);
@@ -4132,21 +4219,29 @@ void main(){
   float lum=dot(col, vec3(0.2126,0.7152,0.0722));
   col = mix(vec3(lum), col, u_saturation);
   // temperature: -1 cool (blue), +1 warm (amber)
-  if(u_temperature>0.0){
-    col.r += u_temperature*0.12;
-    col.g += u_temperature*0.04;
-    col.b -= u_temperature*0.10;
-  } else {
-    col.r += u_temperature*0.08;
-    col.b -= u_temperature*0.12;
+  // temperature: -1 cool (blue), +1 warm (amber), luminance preserved
+  if(abs(u_temperature)>0.001){
+    vec3 linear=srgbToLinear(clamp(col,0.0,1.0));
+    float before=max(dot(linear,WB_WEIGHTS),0.0001);
+    linear*=whiteBalanceGain(u_temperature*100.0,0.0);
+    linear*=before/max(dot(linear,WB_WEIGHTS),0.0001);
+    col=linearToSrgb(clamp(linear,0.0,1.0));
   }
 
-  // Vibrance favors muted colors instead of over-saturating already colorful areas.
+  // Vibrance favors muted colors instead of over-saturating already colorful areas, and eases
+  // off on the orange/skin band so faces stay natural at +100.
   if(abs(u_vibrance)>0.001){
-    float chroma=clamp(max(col.r,max(col.g,col.b))-min(col.r,min(col.g,col.b)),0.0,1.0);
+    float high=max(col.r,max(col.g,col.b)), low=min(col.r,min(col.g,col.b));
+    float chroma=clamp(high-low,0.0,1.0);
     float emphasis=u_vibrance>0.0 ? (1.0-chroma)*0.65 : 0.65;
-    float baseLuma=dot(col,vec3(0.2126,0.7152,0.0722));
-    col=mix(vec3(baseLuma),col,1.0+u_vibrance*emphasis);
+    float skinWeight=0.0;
+    if(chroma>0.02){
+      float hue=high==col.r?mod((col.g-col.b)/chroma,6.0)/6.0:(high==col.g?((col.b-col.r)/chroma+2.0)/6.0:((col.r-col.g)/chroma+4.0)/6.0);
+      hue=fract(hue+1.0);
+      skinWeight=smoothstep(0.02,0.05,hue)*(1.0-smoothstep(0.09,0.16,hue));
+    }
+    float baseLuma=dot(col,WB_WEIGHTS);
+    col=mix(vec3(baseLuma),col,1.0+u_vibrance*emphasis*(1.0-skinWeight*0.55));
   }
   // Split tone by luminance, and lift or deepen only the darkest parts.
   // A zero setting skips grading entirely, preserving the original presets.
@@ -4216,10 +4311,11 @@ void main(){
     col+=grainNoise*intensity;
   }
 
-  // Zero is neutral; negative strength brightens the edges instead.
+  // Lightroom convention: negative strength darkens the corners, positive lightens them.
+  // Stored Adjust values are negated on load, so the same saved look keeps its corners.
   float vignSize = max(u_vignSize,0.3);
   vec2 uv2 = uv / vignSize;
-  float vign = 1.0 - dot(uv2,uv2)*u_vignStrength;
+  float vign = 1.0 + dot(uv2,uv2)*u_vignStrength;
   vign=clamp(vign,0.0,1.5);
   col*=vign;
 
@@ -8191,7 +8287,11 @@ function convertLegacyValues(values){
       // The new exposure range is twice as wide; preserve old preset stops.
       converted[name]=Math.round(old-50);
     }else{
-      converted[name]=Math.round(100*(old-legacyZero)/(old<legacyZero ? legacyZero : 100-legacyZero));
+      const span=old<legacyZero ? Math.max(legacyZero,1) : 100-legacyZero;
+      const magnitude=Math.round(100*(old-legacyZero)/span);
+      // Version 3 flipped the vignette slider to Lightroom's direction, so the legacy amounts
+      // (0..100 of corner darkening) translate to negative values.
+      converted[name]=name==='VignStrength'&&magnitude!==0 ? -magnitude : magnitude;
     }
   });
   return converted;
@@ -8208,45 +8308,45 @@ const presetFromNeutral=values=>withoutSharpening({
 const builtInPresets={
   ...Object.fromEntries(Object.entries(legacyBuiltInPresets).map(([name,values])=>[name,presetFromNeutral(convertLegacyValues(values))])),
   'Noir Crunch':presetFromNeutral({
-    Exposure:-18,Contrast:65,Saturation:-100,Temperature:-12,VignStrength:60,VignSize:-20,
+    Exposure:-18,Contrast:65,Saturation:-100,Temperature:-12,VignStrength:-60,VignSize:-20,
     Bloom:-25,BloomThresh:20,BloomSpread:-25,BloomSoft:-35,BloomTint:-40,BloomBlend:-10,BloomAnam:0,
     Hall:-10,HallThresh:-15,HallSpread:-25,HallTint:-55,HallDir:-12,HallFalloff:15,HallSat:-50,
     Grain:55,GrainSize:-35,GrainRough:45,GrainSpeed:-30,GrainColor:-100,GrainLuma:25,GrainSoft:-30
   }),
   // Bright, warm and softly glowing — works especially well for outdoor portraits.
   'Golden Hour':presetFromNeutral({
-    Exposure:10,Contrast:-7,Saturation:13,Temperature:39,VignStrength:-9,VignSize:8,
+    Exposure:10,Contrast:-7,Saturation:13,Temperature:39,VignStrength:9,VignSize:8,
     Bloom:28,BloomThresh:-30,BloomSpread:24,BloomSoft:25,BloomTint:60,BloomBlend:18,BloomAnam:10,
     Hall:14,HallThresh:-22,HallSpread:20,HallTint:58,HallFalloff:16,HallSat:25,
     Grain:7,GrainSize:-25,GrainSpeed:-100,GrainColor:-100,GrainSoft:24
   }),
   // Airy and flattering, with light diffusion and gently brightened edges.
   'Soft Portrait':presetFromNeutral({
-    Exposure:14,Contrast:-25,Saturation:-8,Temperature:16,VignStrength:-18,VignSize:18,
+    Exposure:14,Contrast:-25,Saturation:-8,Temperature:16,VignStrength:18,VignSize:18,
     Bloom:21,BloomThresh:-36,BloomSpread:37,BloomSoft:38,BloomTint:18,BloomBlend:34,
     Hall:4,HallThresh:-18,HallSpread:9
   }),
   // Direct-flash energy: crisp color, compact highlights and textured grain.
   'Retro 2000':presetFromNeutral({
-    Exposure:5,Contrast:24,Saturation:24,Temperature:-11,VignStrength:32,VignSize:-20,
+    Exposure:5,Contrast:24,Saturation:24,Temperature:-11,VignStrength:-32,VignSize:-20,
     Bloom:12,BloomThresh:22,BloomSpread:-20,BloomSoft:-25,BloomTint:-28,
     Hall:16,HallThresh:10,HallSpread:-24,HallTint:-15,
     Grain:27,GrainSize:24,GrainRough:34,GrainSpeed:-100,GrainColor:28,GrainLuma:16,GrainSoft:-22
   }),
   // Cool, faded tones and lifted exposure for an understated pastel feed.
   'Cloudy Pastel':presetFromNeutral({
-    Exposure:21,Contrast:-36,Saturation:-21,Temperature:-22,VignStrength:-14,VignSize:15,
+    Exposure:21,Contrast:-36,Saturation:-21,Temperature:-22,VignStrength:14,VignSize:15,
     Bloom:15,BloomThresh:-26,BloomSpread:28,BloomSoft:34,BloomTint:-18,BloomBlend:28
   }),
   // Deep cafe shadows, warm highlights and subtle static monochrome texture.
   'Moody Coffee':presetFromNeutral({
-    Exposure:-24,Contrast:23,Saturation:-29,Temperature:23,VignStrength:37,VignSize:-16,
+    Exposure:-24,Contrast:23,Saturation:-29,Temperature:23,VignStrength:-37,VignSize:-16,
     Bloom:-13,BloomThresh:5,BloomSpread:-15,Hall:10,HallThresh:15,HallTint:28,
     Grain:17,GrainSize:-5,GrainRough:27,GrainSpeed:-100,GrainColor:-100,GrainSoft:-11
   }),
   // Cool night color with horizontal bloom and saturated red-orange halation.
   'Neon Nights':presetFromNeutral({
-    Exposure:-19,Contrast:39,Saturation:19,Temperature:-34,VignStrength:39,VignSize:-20,
+    Exposure:-19,Contrast:39,Saturation:19,Temperature:-34,VignStrength:-39,VignSize:-20,
     Bloom:38,BloomThresh:10,BloomSpread:28,BloomSoft:12,BloomTint:-24,BloomBlend:25,BloomAnam:67,
     Hall:34,HallThresh:3,HallSpread:33,HallTint:-28,HallDir:11,HallFalloff:12,HallSat:32,
     Grain:12,GrainSize:-30,GrainRough:8,GrainSpeed:-100,GrainColor:13,GrainSoft:12
@@ -8254,31 +8354,31 @@ const builtInPresets={
   // Color stories — use separate shadow and highlight tones for a distinct grade.
   'Teal & Ember':presetFromNeutral({
     Exposure:-7,Contrast:21,Saturation:4,Temperature:-9,Vibrance:27,Fade:-10,ShadowTone:-72,HighlightTone:74,
-    VignStrength:20,Bloom:16,BloomThresh:10,BloomTint:20,Hall:14,HallTint:33,
+    VignStrength:-20,Bloom:16,BloomThresh:10,BloomTint:20,Hall:14,HallTint:33,
     Grain:6,GrainSize:-18,GrainSpeed:-100,GrainColor:-100
   }),
   'Rosé Haze':presetFromNeutral({
     Exposure:13,Contrast:-27,Saturation:-9,Temperature:19,Vibrance:-11,Fade:48,ShadowTone:55,HighlightTone:20,
-    VignStrength:-15,Bloom:25,BloomThresh:-35,BloomSpread:32,BloomSoft:22,Hall:3
+    VignStrength:15,Bloom:25,BloomThresh:-35,BloomSpread:32,BloomSoft:22,Hall:3
   }),
   'Chrome Flash':presetFromNeutral({
     Exposure:4,Contrast:31,Saturation:-6,Temperature:-28,Vibrance:24,Fade:-16,ShadowTone:-30,HighlightTone:-58,
-    VignStrength:18,Bloom:11,BloomThresh:23,Hall:10,HallThresh:13,
+    VignStrength:-18,Bloom:11,BloomThresh:23,Hall:10,HallThresh:13,
     Grain:22,GrainSize:12,GrainRough:22,GrainSpeed:-100,GrainColor:-40
   }),
   'Instant Film':presetFromNeutral({
     Exposure:6,Contrast:-19,Saturation:-25,Temperature:17,Vibrance:-14,Fade:62,ShadowTone:18,HighlightTone:39,
-    VignStrength:19,Bloom:12,BloomThresh:-5,
+    VignStrength:-19,Bloom:12,BloomThresh:-5,
     Grain:32,GrainSize:19,GrainRough:18,GrainSpeed:-100,GrainColor:-100,GrainSoft:12
   }),
   'Coastal Fade':presetFromNeutral({
     Exposure:17,Contrast:-20,Saturation:4,Temperature:-17,Vibrance:28,Fade:27,ShadowTone:-39,HighlightTone:-37,
-    VignStrength:-13,Bloom:12,BloomThresh:-18,BloomSpread:14,
+    VignStrength:13,Bloom:12,BloomThresh:-18,BloomSpread:14,
     Grain:12,GrainSize:-23,GrainSpeed:-100,GrainColor:-100,GrainSoft:20
   }),
   'After Hours':presetFromNeutral({
     Exposure:-24,Contrast:20,Saturation:7,Temperature:-18,Vibrance:30,Fade:6,ShadowTone:69,HighlightTone:47,
-    VignStrength:32,Bloom:22,BloomThresh:12,BloomAnam:34,Hall:26,HallThresh:8,HallTint:-14,
+    VignStrength:-32,Bloom:22,BloomThresh:12,BloomAnam:34,Hall:26,HallThresh:8,HallTint:-14,
     Grain:12,GrainSize:-26,GrainSpeed:-100,GrainColor:10
   })
 };
@@ -8287,7 +8387,7 @@ const builtInPresets={
 const igPresets={
   'Moody Dark':presetFromNeutral({
     Exposure:-15,Contrast:28,Saturation:-18,Vibrance:12,Fade:-62,ShadowTone:-74,HighlightTone:18,
-    VignStrength:24,Bloom:7,BloomThresh:20,Grain:8,GrainSize:-25,GrainSpeed:-100,GrainColor:-100
+    VignStrength:-24,Bloom:7,BloomThresh:20,Grain:8,GrainSize:-25,GrainSpeed:-100,GrainColor:-100
   }),
   'Golden Hour':presetFromNeutral({
     Exposure:12,Contrast:-12,Saturation:8,Temperature:34,Vibrance:18,Fade:28,ShadowTone:-8,HighlightTone:60,
@@ -8295,31 +8395,31 @@ const igPresets={
     Grain:6,GrainSize:-30,GrainSpeed:-100,GrainColor:-100
   }),
   'Clean Minimal':presetFromNeutral({
-    Exposure:22,Contrast:-28,Saturation:-32,Temperature:-3,Vibrance:-14,Fade:12,VignStrength:-8
+    Exposure:22,Contrast:-28,Saturation:-32,Temperature:-3,Vibrance:-14,Fade:12,VignStrength:8
   }),
   'Dreamy Pastel':presetFromNeutral({
     Exposure:18,Contrast:-32,Saturation:-24,Temperature:-15,Vibrance:-14,Fade:42,ShadowTone:12,HighlightTone:-18,
-    Bloom:24,BloomThresh:-25,BloomSpread:32,BloomSoft:40,BloomTint:-15,VignStrength:-7
+    Bloom:24,BloomThresh:-25,BloomSpread:32,BloomSoft:40,BloomTint:-15,VignStrength:7
   }),
   'Punchy Vibrant':presetFromNeutral({
-    Exposure:2,Contrast:34,Saturation:26,Vibrance:48,Fade:-45,HighlightTone:6,VignStrength:14
+    Exposure:2,Contrast:34,Saturation:26,Vibrance:48,Fade:-45,HighlightTone:6,VignStrength:-14
   }),
   'Film Fade':presetFromNeutral({
     Exposure:5,Contrast:-14,Saturation:-26,Temperature:12,Vibrance:-12,Fade:58,HighlightTone:22,
     Bloom:8,Grain:32,GrainSize:4,GrainRough:12,GrainSpeed:-100,GrainColor:-100,GrainSoft:18
   }),
   'B&W Editorial':presetFromNeutral({
-    Exposure:4,Contrast:58,Saturation:-100,Fade:-30,VignStrength:18,
+    Exposure:4,Contrast:58,Saturation:-100,Fade:-30,VignStrength:-18,
     Grain:12,GrainSize:-28,GrainSpeed:-100,GrainColor:-100,GrainSoft:10
   }),
   'Neon Night':presetFromNeutral({
     Exposure:-14,Contrast:24,Saturation:12,Temperature:-24,Vibrance:25,Fade:-22,ShadowTone:-58,HighlightTone:-14,HighlightTint:68,
     Bloom:32,BloomThresh:12,BloomSpread:20,BloomTint:-22,BloomAnam:48,Hall:12,HallTint:-35,
-    Grain:9,GrainSize:-22,GrainSpeed:-100,GrainColor:-80,VignStrength:18
+    Grain:9,GrainSize:-22,GrainSpeed:-100,GrainColor:-80,VignStrength:-18
   }),
   'Soft Skin':presetFromNeutral({
     Exposure:14,Contrast:-20,Saturation:-6,Temperature:10,Vibrance:10,Fade:20,HighlightTone:15,
-    Bloom:15,BloomThresh:-15,BloomSpread:25,BloomSoft:38,VignStrength:-6
+    Bloom:15,BloomThresh:-15,BloomSpread:25,BloomSoft:38,VignStrength:6
   }),
   'Café Cream':presetFromNeutral({
     Exposure:8,Contrast:-12,Saturation:-24,Temperature:22,Vibrance:-10,Fade:34,ShadowTone:8,HighlightTone:40,
@@ -8327,11 +8427,11 @@ const igPresets={
   }),
   'Coastal Blue':presetFromNeutral({
     Exposure:12,Contrast:-8,Saturation:-7,Temperature:-17,Vibrance:30,Fade:18,ShadowTone:-32,HighlightTone:-25,
-    Bloom:10,BloomThresh:-12,VignStrength:-5
+    Bloom:10,BloomThresh:-12,VignStrength:5
   }),
   'Direct Flash':presetFromNeutral({
     Exposure:10,Contrast:38,Saturation:8,Temperature:-8,Vibrance:20,Fade:-26,HighlightTone:-12,
-    Bloom:9,BloomThresh:28,Grain:19,GrainSize:-8,GrainSpeed:-100,GrainColor:-100,VignStrength:16
+    Bloom:9,BloomThresh:28,Grain:19,GrainSize:-8,GrainSpeed:-100,GrainColor:-100,VignStrength:-16
   }),
   'Terracotta':presetFromNeutral({
     Exposure:3,Contrast:12,Saturation:-16,Temperature:28,Vibrance:14,Fade:15,ShadowTone:14,HighlightTone:50,
@@ -8371,13 +8471,18 @@ const featuredPresetNames=[...Object.keys(legacyBuiltInPresets),'Noir Crunch'];
 let activePresetName=null, availablePresets=new Map();
 let customPresets=[], customPresetDither=new Map();
 function upgradeV4Preset(p){
-  if(p.version===2) return p;
-  // Earlier v4 presets used half the exposure and direction ranges.
+  if(p.version===3) return p;
   const values={...p.values};
-  ['Exposure','HallDir'].forEach(name=>{
-    if(values[name]!=null) values[name]=Math.round(Number(values[name])/2);
-  });
-  return {...p,values,version:2};
+  // Version 1 presets used half the exposure and direction ranges.
+  if(Number(p.version||0)<2){
+    ['Exposure','HallDir'].forEach(name=>{
+      if(values[name]!=null) values[name]=Math.round(Number(values[name])/2);
+    });
+  }
+  // Version 3 flips the vignette slider to Lightroom's direction (left darkens, right
+  // lightens), so stored values are negated: every saved look keeps the corners it had.
+  if(Number(p.version||0)<3 && values.VignStrength!=null) values.VignStrength=Math.round(-Number(values.VignStrength));
+  return {...p,values,version:3};
 }
 function saveCustom(){
   try{ localStorage.setItem('film_lab_presets_v4',JSON.stringify(customPresets)); }
@@ -8393,7 +8498,7 @@ try{
     }
   }else{
     const old=JSON.parse(localStorage.getItem('film_lab_presets_v3')||'[]');
-    if(Array.isArray(old)) customPresets=old.filter(p=>p && typeof p.name==='string' && p.values && typeof p.values==='object').map(p=>({...p,values:convertLegacyValues(p.values),version:2}));
+    if(Array.isArray(old)) customPresets=old.filter(p=>p && typeof p.name==='string' && p.values && typeof p.values==='object').map(p=>upgradeV4Preset({...p,values:convertLegacyValues(p.values),version:3}));
     if(customPresets.length) saveCustom();
   }
 }catch(e){ customPresets=[]; }
@@ -8484,7 +8589,7 @@ function lookPreviewCssFilter(values={}){
   const brightness=Math.max(.5,Math.min(1.8,Math.pow(2,exposure*1.2)+bloom+Math.max(0,fade)*.0016));
   const contrast=Math.max(.55,Math.min(1.7,(1+number('Contrast')*.0035)*(1-Math.max(0,fade)*.0016)));
   const saturation=Math.max(0,Math.min(2,1+(number('Saturation')+number('Vibrance')*.45)*.004));
-  const sepia=Math.max(0,Math.min(.5,Math.abs(temperature)/240+Math.abs(fade)/900));
+  const sepia=Math.max(0,Math.min(.6,Math.abs(temperature)/150+Math.abs(fade)/900));
   const parts=[`brightness(${brightness.toFixed(3)})`,`contrast(${contrast.toFixed(3)})`,`saturate(${saturation.toFixed(3)})`];
   if(Math.abs(temperature)>6||sepia>.01){ parts.push(`sepia(${sepia.toFixed(3)})`); parts.push(`hue-rotate(${temperature<0?205:345}deg)`); }
   return parts.join(' ');
@@ -8869,7 +8974,7 @@ $('savePresetBtn').addEventListener('click',()=>{
   const values={...(activePresetBase||getCurrentValues()),DitherScope:ditherScope,Effects:{...effectEnabled}};
   values.MaskBackground=getMaskBackgroundPresetSettings(true);
   customPresets=customPresets.filter(c=>c.name!==name);
-  customPresets.push({name,values,version:2,dither:getDitherSettings()}); saveCustom();
+  customPresets.push({name,values,version:3,dither:getDitherSettings()}); saveCustom();
   activePresetName=name; renderChips();
   selectedPresetName=name; syncPresetSelection();
   showToast(maskBgBackgroundImage&&!values.MaskBackground.imageDataUrl?'Preset saved without its background image because it was too large to embed':`Saved "${name}"`,5000);
@@ -9448,7 +9553,7 @@ $('cancelExportBtn').addEventListener('click',()=>{
   }
 });
 function settingsSnapshot(){
-  return social.sanitizeSettings({version:1,values:getCurrentValues(),effects:{...effectEnabled},scope:ditherScope,preset:activePresetName,export:{...exportOptions},dither:getDitherSettings()},ids,Object.keys(effectEnabled));
+  return social.sanitizeSettings({version:social.SETTINGS_VERSION,values:getCurrentValues(),effects:{...effectEnabled},scope:ditherScope,preset:activePresetName,export:{...exportOptions},dither:getDitherSettings()},ids,Object.keys(effectEnabled));
 }
 function restoreSettings(snapshot){
   const data=social.sanitizeSettings(snapshot,ids,Object.keys(effectEnabled));
@@ -9468,8 +9573,8 @@ async function copySettings(){
 }
 function parsePastedSettings(text){
   if(typeof text!=='string' || text.length>20000) throw new Error('Invalid copied settings');
-  const hashIndex=text.indexOf('#look=v1.');
-  return hashIndex>=0?social.decodeSettings(text.slice(hashIndex).trim(),ids,Object.keys(effectEnabled)):social.sanitizeSettings(JSON.parse(text),ids,Object.keys(effectEnabled));
+  const hashMatch=text.match(/#look=v[12]\./);
+  return hashMatch?social.decodeSettings(text.slice(text.indexOf(hashMatch[0])).trim(),ids,Object.keys(effectEnabled)):social.sanitizeSettings(JSON.parse(text),ids,Object.keys(effectEnabled));
 }
 async function pasteSettings(){
   let data=null, source='clipboard';
