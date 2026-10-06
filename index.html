@@ -11322,12 +11322,23 @@ for(const id of ['sliderChromaTolerance','sliderChromaSoftness','sliderChromaSpi
 }
 function fxPickChromaColor(event){
   const rect=canvas.getBoundingClientRect();
-  const x=Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width)));
-  const y=Math.max(0,Math.min(1,(event.clientY-rect.top)/Math.max(1,rect.height)));
+  // Clicks on the letterboxing around the frame have no pixel to sample.
+  if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom) return;
+  const x=(event.clientX-rect.left)/Math.max(1,rect.width);
+  const y=(event.clientY-rect.top)/Math.max(1,rect.height);
   const scratch=document.createElement('canvas'); scratch.width=canvas.width; scratch.height=canvas.height;
   const context=scratch.getContext('2d',{willReadFrequently:true});
-  context.drawImage(canvas,0,0);
+  // Sample exactly what the user sees: the graded frame plus every overlay surface stacked above
+  // it. The base canvas is hidden once the scene canvas takes over a keyframed or effect clip, so
+  // reading one surface used to leave the eyedropper with nothing to sample.
+  const surfaces=[...canvasWrap.querySelectorAll('canvas')]
+    .filter(node=>node.width>1&&node.height>1)
+    .filter(node=>Math.abs(node.width-canvas.width)<2&&Math.abs(node.height-canvas.height)<2)
+    .filter(node=>{ const style=getComputedStyle(node); return style.visibility!=='hidden'&&style.display!=='none'; });
+  if(!surfaces.length) return;
+  for(const node of surfaces) context.drawImage(node,0,0,scratch.width,scratch.height);
   const pixel=context.getImageData(Math.round(x*(canvas.width-1)),Math.round(y*(canvas.height-1)),1,1).data;
+  if(!pixel[3]){ setFxStatus('Nothing to pick there — click on the clip.'); return; }
   const hex=fxRuntime.rgbToHex(pixel[0],pixel[1],pixel[2]);
   $('chromaColor').value=hex;
   setFxChromaPicking(false);
@@ -11340,7 +11351,9 @@ function setFxChromaPicking(on){
   canvasWrap.classList.toggle('videoFxPicking',fxColorPicking);
 }
 $('videoFxEyebrowBtn')?.addEventListener('click',()=>setFxChromaPicking(!fxColorPicking));
-canvas.addEventListener('pointerdown',event=>{
+// The listener sits on the preview wrapper (capture phase) so the pick still lands when an overlay
+// canvas, the scene canvas or a layer handle is the surface under the pointer.
+canvasWrap.addEventListener('pointerdown',event=>{
   if(!fxColorPicking) return;
   event.preventDefault(); event.stopPropagation();
   fxPickChromaColor(event);

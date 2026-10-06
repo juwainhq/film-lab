@@ -33,16 +33,12 @@ const BROWSER_CANDIDATES = [
   '/tmp/chromium',
 ].filter(Boolean);
 const CHROME_LIBS = process.env.FILM_LAB_CHROME_LIBS || '/tmp/al2023/lib:/tmp/al2023';
-/* Film Lab refuses to boot without a WebGL2 context, so the browser is launched with the first
-   argument set that can actually create one. SwiftShader moved from --use-gl=swiftshader to
-   --use-gl=angle --use-angle=swiftshader, and a machine with a real GPU needs neither, so all
-   three are tried before the test skips itself. */
-const CHROMIUM_ARG_SETS = [
-  ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-  ['--no-sandbox', '--disable-dev-shm-usage', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-];
-const CHROMIUM_ARGS = CHROMIUM_ARG_SETS[0];
+/* Film Lab will not boot without a WebGL2 context, so the editor needs software GL. SwiftShader
+   only initialises when its whole bundle (libEGL.so, libGLESv2.so, libvk_swiftshader.so,
+   libvulkan.so.1 and vk_swiftshader_icd.json) sits in the same directory as the Chromium binary,
+   with al2023/lib on LD_LIBRARY_PATH. The probe below proves a context exists before the test runs
+   and skips with a real reason instead of timing out on a machine without one. */
+const CHROMIUM_ARGS = ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
 
 function resolvePlaywright() {
   for (const candidate of PW_CANDIDATES) {
@@ -56,22 +52,20 @@ function resolveChromium() {
   }
   return null;
 }
-/* Launch the browser and prove the page can get a WebGL2 context, which the Film Lab editor needs
-   before it will start. Returns null (so the caller can skip) when no argument set works. */
+/* Launch Chromium and prove the page can get a WebGL2 context, which the Film Lab editor needs
+   before it will start. Returns null (so the caller can skip) when software GL is unavailable. */
 async function launchWithWebgl2() {
-  for (const args of CHROMIUM_ARG_SETS) {
-    let browser = null;
-    try {
-      browser = await playwright.chromium.launch({executablePath: chromiumPath, args, env: {...process.env, LD_LIBRARY_PATH: CHROME_LIBS}});
-      const probe = await browser.newPage();
-      const ok = await probe.evaluate(() => {
-        try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; }
-      });
-      await probe.close();
-      if (ok) return browser;
-    } catch (_) { /* try the next argument set */ }
-    if (browser) { try { await browser.close(); } catch (_) { /* already gone */ } }
-  }
+  let browser = null;
+  try {
+    browser = await playwright.chromium.launch({executablePath: chromiumPath, args: CHROMIUM_ARGS, env: {...process.env, LD_LIBRARY_PATH: CHROME_LIBS}});
+    const probe = await browser.newPage();
+    const ok = await probe.evaluate(() => {
+      try { return !!document.createElement('canvas').getContext('webgl2'); } catch (_) { return false; }
+    });
+    await probe.close();
+    if (ok) return browser;
+  } catch (_) { /* fall through to the skip below */ }
+  if (browser) { try { await browser.close(); } catch (_) { /* already gone */ } }
   return null;
 }
 /* The clip is recorded with the browser's own MediaRecorder, so the test needs neither ffmpeg nor
@@ -438,7 +432,7 @@ test('the timeline and the editor wire every round-8 control without removing ex
   // The service worker ships the new module.
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   assert.match(sw, /'video-tools\.js'/);
-  assert.match(sw, /const CACHE = 'filmlab-v14';/);
+  assert.match(sw, /const CACHE = 'filmlab-v15';/);
   // Nothing was renamed away.
   for (const id of ['mtl-play-pause', 'mtl-zoom-slider', 'mtl-main-track', 'mtl-text-track', 'mtl-audio-track', 'videoExportPanel', 'videoCaptionPanel']) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -1135,7 +1129,44 @@ test('keyframes, speed, text, stickers, blends and the chroma key survive previe
     assert.ok(mainParity.exportWith - mainParity.exportWithout > 10,
       `the exported frame carries the keyframed move (${mainParity.exportWithout} → ${mainParity.exportWith})`);
 
-    // --- 11. A phone keeps the panel usable ------------------------------------------------
+    // --- 11. The eyedropper reads the preview even when the scene canvas owns the frame -------
+    // The base canvas is hidden the moment a clip carries keyframes, so an eyedropper wired to that
+    // one surface used to do nothing at all. This clicks the real control on the real preview.
+    await page.evaluate(async () => {
+      document.querySelectorAll('#videoFxPanel details').forEach(section => { section.open = true; });
+      const clip = window.multiTimeline.clips.find(entry => entry.track === 'main');
+      const span = window.multiTimeline.clipOutputDuration(clip);
+      window.multiTimeline.updateClip(clip.id, {keyframes: {position: [
+        {time: 0, value: {x: 0, y: 0}, easing: 'linear'},
+        {time: span, value: {x: 0.35, y: 0}, easing: 'linear'},
+      ]}});
+      window.multiTimeline.refreshLayers();
+      document.getElementById('chromaColor').value = '#123456';
+      await window.__freezeAt(clip.start + span * 0.5);
+      await new Promise(resolve => setTimeout(resolve, 700));
+    });
+    const ownedFrame = await page.evaluate(() => ({
+      sceneBase: document.getElementById('canvasWrap').classList.contains('mtl-scene-base'),
+      glHidden: getComputedStyle(document.getElementById('glCanvas')).visibility === 'hidden',
+    }));
+    assert.ok(ownedFrame.sceneBase && ownedFrame.glHidden, 'the scene canvas owns the base frame before the eyedropper runs');
+    await page.click('#videoFxEyebrowBtn');
+    const armed = await page.getAttribute('#videoFxEyebrowBtn', 'aria-pressed');
+    assert.equal(armed, 'true', 'the eyedropper arms when its button is pressed');
+    const frame = await (await page.$('#glCanvas')).boundingBox();
+    // The clip is keyframed to the right, so the right half of the frame still shows picture.
+    await page.mouse.click(frame.x + frame.width * 0.72, frame.y + frame.height * 0.5);
+    await page.waitForTimeout(400);
+    const picked = await page.evaluate(() => ({
+      color: document.getElementById('chromaColor').value.toLowerCase(),
+      picking: document.getElementById('videoFxEyebrowBtn').getAttribute('aria-pressed'),
+      status: document.getElementById('videoFxStatus').textContent,
+    }));
+    assert.notEqual(picked.color, '#123456', `the eyedropper picked a colour off the preview (${picked.color})`);
+    assert.equal(picked.picking, 'false', 'picking a colour leaves the eyedropper disarmed');
+    assert.match(picked.status, /^Key colour picked: #/, `the pick is reported: ${picked.status}`);
+
+    // --- 12. A phone keeps the panel usable ------------------------------------------------
     const phone = await context.newPage();
     await phone.setViewportSize({width: 390, height: 844});
     await phone.goto(`http://127.0.0.1:${PORT}/index.html`, {waitUntil: 'domcontentloaded'});

@@ -133,7 +133,7 @@ test('local masks keep round one background behaviour: only the panel in use cut
 
 test('the service worker ships the new build and no removed assets', () => {
   const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.match(sw, /const CACHE = 'filmlab-v14';/);
+  assert.match(sw, /const CACHE = 'filmlab-v15';/);
   assert.match(sw, /mask-stack\.js/);
   assert.ok(!sw.includes('vendor/transformers'), 'the transformers bundle is not committed');
 });
