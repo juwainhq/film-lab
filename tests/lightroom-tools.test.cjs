@@ -191,7 +191,9 @@ test('the new controls are wired into the existing editor without removing anyth
   // Straighten is baked into the source the renderer and the export share.
   assert.match(html, /id="sliderStraighten" min="-45" max="45" step="0\.5"/);
   assert.match(script, /function applyStraightenToSource\(source,width,height,angle\)/);
-  assert.match(script, /const source=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\);/);
+  assert.match(script, /const straightened=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\);/);
+  // Spot heal is baked on top of the straightened pixels, and both feed the same source.
+  assert.match(script, /const source=applyHealToSource\(straightened,w,h,item\.healStrokes\);/);
   assert.match(script, /scheduleHistoryCommit\(`Straighten/);
   // Crop presets drive the existing data-format handler.
   for (const id of ['cropRatio1x1', 'cropRatio4x5', 'cropRatio16x9', 'cropRatio3x2', 'cropRatio9x16', 'cropRatioOriginal']) {

@@ -30,10 +30,11 @@ test('the existing upload landing routes image and video files without a reload'
 
 test('workspace state shows subtle top-bar mode and only exposes video controls in video mode', () => {
   const fn = script.match(/function updateWorkspaceUI\(\)\{[\s\S]*?\n\}/)[0];
+  const formatHelper = script.match(/function exportTypeQualityLabel\(\)\{[\s\S]*?\n\}/)[0];
   const ids=['app','workspacePill','videoPlaybackControls','editorTimeline','grainSpeedRow','backToDropBtn','exportPanelTitle','frameFormatLabel','frameQualityLabel'];
   const elements = Object.fromEntries(ids.map(id => [id, {dataset:{},hidden:false,disabled:false,textContent:''}]));
   const state = vm.createContext({appState:{mode:'empty'},document:{body:{dataset:{}}},hasContent:true,isVideo:false,mediaBusy:false,exportBusy:false,$:id=>elements[id],updateCaptionOverlay(){}});
-  vm.runInContext(`${fn}\nthis.update=updateWorkspaceUI;`,state);
+  vm.runInContext(`${formatHelper}\n${fn}\nthis.update=updateWorkspaceUI;`,state);
   state.update();
   assert.equal(elements.app.dataset.workspace,'photo');
   assert.equal(state.appState.mode,'photo');

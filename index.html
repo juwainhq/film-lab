@@ -1537,6 +1537,7 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
   body[data-mode="photo"] #app #carouselStrip { padding-top: 12px; }
   /* The Lightroom-style tools keep the same invisible 44px targets on touch screens. */
   .cropRatioBtn,.straightenResetBtn,.historyItem,#addSnapshotBtn,#deleteSnapshotBtn,#copyToPhotoBtn,#copyPhotoSettingsBtn,#wbEyedropperBtn,#wbAutoBtn,#selectPhotosBtn,#syncSelectedBtn,#splitToggleBtn { position: relative; min-height: 44px; }
+  .geometryGrid .toolBtn,.exportPresetBtn,#healBrushBtn,#healUndoBtn,#healClearBtn,.healTools .toolBtn { position: relative; min-height: 44px; }
   #addSnapshotBtn::before,#deleteSnapshotBtn::before,#copyToPhotoBtn::before,#copyPhotoSettingsBtn::before,#wbEyedropperBtn::before,#wbAutoBtn::before,#selectPhotosBtn::before,#syncSelectedBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translate(-50%,-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1601,6 +1602,26 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
   #selectPhotosBtn,#syncSelectedBtn { min-height: 34px; }
 }
 
+
+/* === Spot heal, geometry, lens blur, film-look fine-tuning and export presets ============== */
+#healOverlayCanvas { position: absolute; z-index: 4; inset: 0; display: none; background: transparent; pointer-events: none; }
+#healOverlayCanvas.visible { display: block; }
+#healBrushCursor { position: absolute; z-index: 6; display: none; width: 44px; height: 44px; margin: -22px 0 0 -22px; border: 1px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.6); pointer-events: none; }
+#healBrushCursor.visible { display: block; }
+.filmLookPanel { margin-top: 4px; border-top: 1px solid var(--panel-border); padding-top: 8px; }
+.filmLookGrid { display: flex; flex-direction: column; gap: 2px; }
+.healTools .toolBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.geometryGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 8px 0 2px; }
+.geometryGrid .toolBtn { min-height: 34px; font-size: 10px; letter-spacing: .08em; }
+.geometryGrid .toolBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.geometryNote { margin: 6px 0 2px; }
+.exportPresets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 0 10px; }
+.exportPresetBtn { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; min-height: 46px; padding: 7px 9px; border: 1px solid var(--panel-border); background: transparent; color: var(--text); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; text-align: left; }
+.exportPresetBtn small { color: var(--text-dim2); font: 400 8px 'JetBrains Mono',monospace; letter-spacing: .04em; text-transform: none; }
+.exportPresetBtn:hover { border-color: var(--border-hover); background: var(--soft-bg); }
+.exportPresetBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--soft-bg); }
+.exportPresetBtn[aria-pressed="true"] small { color: var(--accent); }
+.lensBlurStatus { margin-top: 8px; }
 </style>
 </head>
 <body data-mode="empty">
@@ -1647,6 +1668,8 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
       <div id="canvasWrap" style="display:none">
         <canvas id="glCanvas" title="Scroll to zoom in or out. Drag to pan when zoomed."></canvas>
         <canvas id="maskOverlayCanvas" aria-hidden="true"></canvas>
+        <canvas id="healOverlayCanvas" aria-hidden="true"></canvas>
+        <div id="healBrushCursor" aria-hidden="true"></div>
         <div id="maskBrushCursor" aria-hidden="true"></div>
         <div id="cropOverlay" hidden><div id="cropFrame" role="group" tabindex="0" aria-label="Crop frame. Drag to reposition, or use arrow keys."><span id="cropFrameLabel"></span></div></div>
         <div id="splitDivider" role="separator" aria-orientation="vertical" aria-label="Before and after split. Drag, or use the arrow keys." aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0" hidden><span class="splitBadge before">BEFORE</span><span class="splitBadge after">AFTER</span></div>
@@ -1733,7 +1756,16 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
         <label class="presetSelectLabel" for="presetSelect">More presets <span id="presetCount">26 looks</span></label>
         <div class="presetSelectWrap"><span id="presetSelectSwatch" aria-hidden="true"></span><select id="presetSelect"><option value="">Choose a look</option></select><div id="presetHoverMenu" class="presetHoverMenu" role="listbox" aria-label="More preset previews" hidden></div></div>
         <div class="presetActions"><button type="button" class="toolBtn" id="presetCompareBtn" disabled>Compare</button><button type="button" class="toolBtn" id="presetApplyBtn" disabled>Apply preset</button><button type="button" class="toolBtn" id="presetUndoBtn" hidden>Undo</button></div>
-      </div><section id="settingsTools" class="socialPanel" aria-label="Copy and share settings">
+      </div>
+      <section class="filmLookPanel photo-only" aria-label="Film look fine tuning">
+        <div class="savedHeading"><span class="sectionLabel">Film look</span><button type="button" class="textAction" id="filmLookResetBtn">Reset</button></div>
+        <p class="socialHint" id="filmLookHint">Fine-tune the grain, bloom and halation any look applies. These are the same controls as Adjust › Film Grain and Bloom &amp; halation.</p>
+        <div class="filmLookGrid">
+          <div class="subRow"><div class="subHead"><div class="subLabel">Grain <span>amount</span></div><div class="subVal" id="valFilmGrain">0</div></div><input class="subSlider toolSlider" type="range" id="sliderFilmGrain" min="-100" max="100" value="0" aria-label="Film look grain amount"></div>
+          <div class="subRow"><div class="subHead"><div class="subLabel">Bloom <span>glow</span></div><div class="subVal" id="valFilmBloom">0</div></div><input class="subSlider toolSlider" type="range" id="sliderFilmBloom" min="-100" max="100" value="0" aria-label="Film look bloom intensity"></div>
+          <div class="subRow"><div class="subHead"><div class="subLabel">Halation <span>red glow</span></div><div class="subVal" id="valFilmHalation">0</div></div><input class="subSlider toolSlider" type="range" id="sliderFilmHalation" min="-100" max="100" value="0" aria-label="Film look halation intensity"></div>
+        </div>
+      </section><section id="settingsTools" class="socialPanel" aria-label="Copy and share settings">
         <button type="button" id="settingsToolsToggle" class="panelHeading" aria-expanded="false" aria-controls="settingsToolsBody"><span class="sectionLabel">Copy / paste & share</span><span class="panelChevron" aria-hidden="true"></span></button>
         <div id="settingsToolsBody" hidden>
           <div class="inlineActions"><button type="button" class="toolBtn" id="copySettingsBtn">Copy settings</button><button type="button" class="toolBtn" id="pasteSettingsBtn">Paste settings</button></div>
@@ -1815,6 +1847,54 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
           </div>
         </div>
 </div>
+              </details>
+              <details class="adjustCluster" data-cluster="retouch">
+                <summary><span>Retouch</span><span class="clusterSummary" data-summary="retouch">Spot heal · Lens blur</span></summary>
+                <div class="clusterContents"><div class="adjustSectionHeading">Spot heal</div><div class="effectGroup photo-only" data-group="heal">
+          <div class="effectHeader">
+            <button type="button" class="effectTitle" aria-expanded="true" aria-controls="healControls"><i style="background:var(--accent)"></i> Spot heal <span class="expand" aria-hidden="true"></span></button>
+            <div class="effectHeadRight"><button type="button" class="toolBtn" id="healBrushBtn" aria-pressed="false" title="Brush over a blemish to fill it from the pixels around it">⦿ Heal brush</button></div>
+          </div>
+          <div class="subControls" id="healControls">
+            <div class="subRow"><div class="subHead"><div class="subLabel">Brush size <span>dab radius</span></div><div class="subVal" id="valHealSize">3</div></div><input class="subSlider toolSlider" type="range" id="sliderHealSize" min="1" max="20" value="3" aria-label="Spot heal brush size"></div>
+            <div class="maskBgButtonRow healTools"><button type="button" class="toolBtn" id="healUndoBtn" disabled>↶ Undo last heal</button><button type="button" class="toolBtn" id="healClearBtn" disabled>Clear heals</button></div>
+            <p class="maskBgHint" id="healStatus" role="status" aria-live="polite">Arm the heal brush, then paint over a blemish. The patch is filled from the surrounding pixels on this device.</p>
+          </div>
+        </div>
+<div class="adjustSectionHeading">Lens blur</div><div class="effectGroup photo-only" data-group="lensblur">
+          <div class="effectHeader">
+            <button type="button" class="effectTitle" aria-expanded="true" aria-controls="lensBlurControls"><i style="background:var(--text-dim)"></i> Depth of field <span class="expand" aria-hidden="true"></span></button>
+            <div class="effectHeadRight"><button type="button" class="groupReset" data-reset="lensblur" hidden aria-label="Reset Lens blur section" title="Reset Lens blur">↺</button></div>
+          </div>
+          <div class="subControls" id="lensBlurControls">
+            <div class="subRow"><div class="subHead"><div class="subLabel">Strength <span>background blur</span></div><div class="subVal" id="valLensBlur">0</div></div><input class="subSlider toolSlider" type="range" id="sliderLensBlur" min="0" max="100" value="0" aria-label="Lens blur strength"></div>
+            <div class="subRow"><div class="subHead"><div class="subLabel">Edge feather <span>subject falloff</span></div><div class="subVal" id="valLensFeather">30</div></div><input class="subSlider toolSlider" type="range" id="sliderLensFeather" min="0" max="100" value="30" aria-label="Lens blur edge feather"></div>
+            <p class="maskBgHint lensBlurStatus" id="lensBlurStatus" role="status" aria-live="polite">Make a Subject mask to blur everything behind it.</p>
+          </div>
+        </div>
+        </div>
+              </details>
+              <details class="adjustCluster" data-cluster="geometry">
+                <summary><span>Geometry</span><span class="clusterSummary" data-summary="geometry">Keystone · Flip · Rotate</span></summary>
+                <div class="clusterContents"><div class="adjustSectionHeading">Perspective &amp; orientation</div><div class="effectGroup photo-only" data-group="geometry">
+          <div class="effectHeader">
+            <button type="button" class="effectTitle" aria-expanded="true" aria-controls="geometryControls"><i style="background:var(--text-dim)"></i> Geometry <span class="expand" aria-hidden="true"></span></button>
+            <div class="effectHeadRight"><button type="button" class="groupReset" data-reset="geometry" hidden aria-label="Reset Geometry section" title="Reset Geometry">↺</button></div>
+          </div>
+          <div class="subControls" id="geometryControls">
+            <div class="geometryGrid" role="group" aria-label="Rotate and flip the photo">
+              <button type="button" class="toolBtn" id="geometryRotateLeftBtn" title="Rotate 90° counter-clockwise">⟲ Rotate left</button>
+              <button type="button" class="toolBtn" id="geometryRotateRightBtn" title="Rotate 90° clockwise">⟳ Rotate right</button>
+              <button type="button" class="toolBtn" id="geometryFlipHBtn" aria-pressed="false" title="Mirror the photo horizontally">⇋ Flip horizontal</button>
+              <button type="button" class="toolBtn" id="geometryFlipVBtn" aria-pressed="false" title="Mirror the photo vertically">⇅ Flip vertical</button>
+            </div>
+            <div class="subRow"><div class="subHead"><div class="subLabel">Vertical keystone <span>node → wide top</span></div><div class="subVal" id="valKeystoneV">0</div></div><input class="subSlider toolSlider" type="range" id="sliderKeystoneV" min="-100" max="100" value="0" aria-label="Vertical keystone"></div>
+            <div class="subRow"><div class="subHead"><div class="subLabel">Horizontal keystone <span>node → wide side</span></div><div class="subVal" id="valKeystoneH">0</div></div><input class="subSlider toolSlider" type="range" id="sliderKeystoneH" min="-100" max="100" value="0" aria-label="Horizontal keystone"></div>
+            <div class="geometryGrid"><button type="button" class="toolBtn" id="geometryResetBtn">↺ Reset geometry</button><button type="button" class="toolBtn" id="geometryStraightenResetBtn" hidden>Reset angle</button></div>
+            <p class="maskBgHint geometryNote" id="geometryStatus" role="status" aria-live="polite">Keystone straightens converging lines and crops in just enough to keep the frame full.</p>
+          </div>
+        </div>
+        </div>
               </details>
               <details class="adjustCluster" data-cluster="creative">
                 <summary><span>Creative</span><span class="clusterSummary" data-summary="creative">Film Grain · Vignette · Dither · Sharpening</span></summary>
@@ -2329,13 +2409,20 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
             <button type="button" class="cropRatioBtn" id="cropRatioOriginal" data-format="original" aria-pressed="true" aria-label="Keep the original aspect ratio">Orig</button>
           </div>
           <div class="subRow cropStraightenRow" id="straightenRow"><div class="subHead"><div class="subLabel">Straighten <span>−45° → +45°</span></div><div class="subVal" id="valStraighten">0°</div></div><input class="subSlider" type="range" id="sliderStraighten" min="-45" max="45" step="0.5" value="0" aria-label="Straighten angle in degrees"><button type="button" class="toolBtn straightenResetBtn" id="straightenResetBtn">Reset angle</button></div>
+          <div class="savedHeading exportPresetHeading"><span class="sectionLabel">Export presets</span></div>
+          <div class="exportPresets" role="group" aria-label="Export presets">
+            <button type="button" class="exportPresetBtn" id="exportPresetInstagram" data-export-preset="instagram" aria-pressed="false"><span>Instagram 4:5</span><small>1080 wide · JPG 92%</small></button>
+            <button type="button" class="exportPresetBtn" id="exportPresetStory" data-export-preset="story" aria-pressed="false"><span>Story 9:16</span><small>1080 × 1920 · JPG 92%</small></button>
+            <button type="button" class="exportPresetBtn" id="exportPresetFull" data-export-preset="full" aria-pressed="false"><span>Full quality</span><small>No crop · 100%</small></button>
+          </div>
           <div class="outputRow"><span>Output dimensions</span><output id="outputDimensions" aria-live="polite">Upload to see size</output></div>
           <p class="socialHint" id="cropHint">Pick a format. Drag the crop frame to keep your subject in view.</p>
           <div class="cropTools"><button type="button" class="toolBtn" id="cropPreviewBtn" aria-pressed="false">Reposition crop</button><button type="button" class="toolBtn" id="centerCropBtn">Center</button></div>
           <label class="fieldLabel" for="exportFileType" id="frameFormatLabel">Photo format</label>
-          <select id="exportFileType" class="socialSelect sourceControl" aria-hidden="true" tabindex="-1"><option value="jpeg">JPG / smaller, ready for Instagram</option><option value="png">PNG / lossless</option></select>
-          <div class="formatPills" role="group" aria-label="Photo export format"><button type="button" class="choicePill active" data-photo-type="jpeg" aria-pressed="true">JPG</button><button type="button" class="choicePill" data-photo-type="png" aria-pressed="false">PNG</button></div>
+          <select id="exportFileType" class="socialSelect sourceControl" aria-hidden="true" tabindex="-1"><option value="jpeg">JPG / smaller, ready for Instagram</option><option value="webp">WebP / smallest file, sharp detail</option><option value="png">PNG / lossless</option></select>
+          <div class="formatPills" role="group" aria-label="Photo export format"><button type="button" class="choicePill active" data-photo-type="jpeg" aria-pressed="true">JPG</button><button type="button" class="choicePill" data-photo-type="webp" aria-pressed="false">WebP</button><button type="button" class="choicePill" data-photo-type="png" aria-pressed="false">PNG</button></div>
           <div id="qualityField"><div class="qualityHeading"><label class="fieldLabel" for="exportQuality" id="frameQualityLabel">JPG quality</label><output id="exportQualityValue">92%</output></div><input type="range" id="exportQuality" min="80" max="100" value="92" aria-label="JPG export quality"></div>
+          <p class="socialHint" id="exportTypeHint">PNG is lossless and ignores the quality slider.</p>
           <details class="exportExtras"><summary>More photo options</summary>
           <label class="checkLabel" id="photoComparisonField"><input type="checkbox" id="exportComparison">Export a before / after pair</label>
           <div id="comparisonOptions" hidden><label class="fieldLabel" for="comparisonFormat">Side-by-side layout</label><select id="comparisonFormat" class="socialSelect"><option value="square">Square / 1:1 · 1080 × 1080</option><option value="landscape" selected>Landscape / 2:1 · 2160 × 1080</option><option value="story">Story / 9:16 · 1080 × 1920</option></select><label class="checkLabel"><input type="checkbox" id="comparisonLabels" checked>Before / After labels</label></div>
@@ -2618,6 +2705,7 @@ const ditherColorModeSelect=$('ditherColorMode'), ditherPaletteSizeSelect=$('dit
 const ditherPaletteShadow=$('ditherPaletteShadow'), ditherPaletteHighlight=$('ditherPaletteHighlight');
 
 let sourceTexture=null, fboComposite=null, fboSharpened=null, fboGraded=null, fboDithered=null, fboBloomExtract=null, fboBloomBlurH=null, fboBloomBlurV=null, fboBloomBlurH2=null, fboBloomBlurV2=null, fboHallExtract=null, fboHallBlurH=null, fboHallBlurV=null;
+let fboLensBlurA=null, fboLensBlurB=null;
 let maskBgTexture=null, maskBgBackgroundTexture=null, localMaskTextureA=null, localMaskTextureB=null;
 let floydTexture=null, floydLastKey=null, subjectMaskRevision=0;
 const appState={mode:'empty'};
@@ -2650,6 +2738,19 @@ function randomGrainSeed(){
   return 1+(values[0]%65535);
 }
 function rotateCropPosition(position){ return {x:1-position.y,y:position.x}; }
+// A quarter turn in either direction: 90 is clockwise, 270 counter-clockwise.
+function rotateNormalizedPoint(point,degrees){
+  const x=Math.max(0,Math.min(1,Number(point?.x)||0)), y=Math.max(0,Math.min(1,Number(point?.y)||0));
+  const rotation=((Number(degrees)||0)%360+360)%360;
+  if(rotation===90) return {x:1-y,y:x};
+  if(rotation===270) return {x:y,y:1-x};
+  return {x,y};
+}
+function rotateCropPositionFor(position,degrees){
+  const source=position&&typeof position==='object'?position:{x:0.5,y:0.5};
+  const point=rotateNormalizedPoint({x:Number(source.x)||0.5,y:Number(source.y)||0.5},degrees);
+  return {x:point.x,y:point.y};
+}
 
 // Every slider runs from -100 to +100. Intensity sliders are signed [-1,1],
 // while the detail sliders map zero to a useful neutral shader setting.
@@ -3730,6 +3831,47 @@ function updateSliderUI(){
     s.style.setProperty('--slider-glow',value<0?'var(--negative-glow)':'var(--accent-glow)');
   });
   updateSectionIndicators();
+  syncToolSliderUI();
+}
+
+// The round-7 photo tools (perspective, spot heal, lens blur, film-look fine tuning) work on their
+// own scales — keystone is signed, focus strength and brush size are one-sided — so they keep the
+// same track, fill and readout look without joining the centered ±100 effect-slider bookkeeping.
+const TOOL_SLIDER_NAMES=['KeystoneV','KeystoneH','HealSize','LensBlur','LensFeather','FilmGrain','FilmBloom','FilmHalation'];
+const toolSliderReadoutNames={HealSize:'valHealSize'};
+function toolSliderFill(slider,value){
+  const min=Number(slider.min), max=Number(slider.max), oneSided=min>=0;
+  const pct=oneSided?Math.max(0,Math.min(100,((value-min)/Math.max(1e-6,max-min))*100)):50+value/2;
+  const from=Math.min(pct,50), to=Math.max(pct,50);
+  const fill=oneSided?'var(--accent)':value<0?'var(--negative)':'var(--accent)';
+  slider.style.background=`linear-gradient(90deg, transparent 49.75%, var(--slider-center) 49.75%, var(--slider-center) 50.25%, transparent 50.25%), linear-gradient(90deg, transparent ${from}%, ${fill} ${from}%, ${fill} ${to}%, transparent ${to}%), linear-gradient(var(--slider-track),var(--slider-track))`;
+  slider.style.backgroundSize='100% 2px'; slider.style.backgroundPosition='center'; slider.style.backgroundRepeat='no-repeat';
+  slider.style.setProperty('--slider-thumb',value<0?'var(--negative)':value>0?'var(--accent)':'var(--slider-neutral)');
+  slider.style.setProperty('--slider-glow',value<0?'var(--negative-glow)':'var(--accent-glow)');
+}
+function toolSliderReadout(name,value){
+  const min=Number($('slider'+name)?.min??-100);
+  return min<0&&value>0?`+${value}`:String(value);
+}
+// One-time pass that replaces the generic -100 / 0 / +100 scale under the sliders whose real range
+// is different, so the labels never lie about the units.
+function relabelToolSliderScale(name,slider){
+  const scale=slider.parentNode?.querySelector('.subScale');
+  if(!scale) return;
+  const min=Number(slider.min), max=Number(slider.max);
+  const labels=min<0?[String(min),'0',max>0?`+${max}`:String(max)]:[String(min),String(Math.round((min+max)/2)),String(max)];
+  scale.innerHTML=`<span>${labels[0]}</span><span>${labels[1]}</span><span>${labels[2]}</span>`;
+}
+function syncToolSliderUI(){
+  for(const name of TOOL_SLIDER_NAMES){
+    const slider=$('slider'+name);
+    if(!slider) continue;
+    const value=Number(slider.value)||0;
+    toolSliderFill(slider,value);
+    if(!slider.dataset.toolScale){ slider.dataset.toolScale='1'; relabelToolSliderScale(name,slider); }
+    const readout=$(toolSliderReadoutNames[name]||('val'+name));
+    if(readout) readout.textContent=toolSliderReadout(name,value);
+  }
 }
 
 // Label every signed scale and its range input for keyboard and screen-reader use.
@@ -3773,8 +3915,26 @@ precision highp float;
 in vec2 a_position; in vec2 a_texCoord; out vec2 v_texCoord;
 void main(){ gl_Position=vec4(a_position,0.,1.); v_texCoord=a_texCoord; }`;
 const fsPassthrough=`#version 300 es
-precision highp float; in vec2 v_texCoord; uniform sampler2D u_image; out vec4 outColor;
-void main(){ outColor=texture(u_image, v_texCoord); }`;
+precision highp float; in vec2 v_texCoord; uniform sampler2D u_image; uniform vec2 u_geometryFlip; uniform vec2 u_keystone; uniform float u_keystoneScale; out vec4 outColor;
+// Geometry: mirroring and the keystone homography. Output coordinate -> source coordinate, so every
+// texture (photo, masks, background, split "before") is sampled in the same warped space and stays
+// aligned with the photo. u_keystone = (horizontalAmount, verticalAmount) in -0.22 .. 0.22.
+vec2 geometryUv(vec2 uv){
+  // Texture coordinates arrive bottom-up (v=0 is the bottom row). Work in screen space, top-down,
+  // so the keystone direction matches the sliders and the JS helpers behind the overlays and the
+  // heal brush, then convert back.
+  vec2 p=vec2(uv.x,1.0-uv.y);
+  if(u_geometryFlip.x>0.5)p.x=1.0-p.x;
+  if(u_geometryFlip.y>0.5)p.y=1.0-p.y;
+  if(abs(u_keystone.x)>0.0001 || abs(u_keystone.y)>0.0001){
+    vec2 c=(p-0.5)*2.0;
+    float denominator=max(1.0-u_keystone.x*c.x-u_keystone.y*c.y,0.2);
+    c=c*u_keystoneScale/denominator;
+    p=c*0.5+0.5;
+  }
+  return vec2(p.x,1.0-p.y);
+}
+void main(){ outColor=texture(u_image, geometryUv(v_texCoord)); }`;
 const fsColorGrade=`#version 300 es
 precision highp float;
 in vec2 v_texCoord;
@@ -4154,6 +4314,8 @@ const fsComposite=`#version 300 es
 precision highp float;
 in vec2 v_texCoord;
 uniform sampler2D u_base; uniform sampler2D u_bloom; uniform sampler2D u_hallation;
+uniform sampler2D u_lensBlur; uniform sampler2D u_lensMask; uniform float u_lensEnabled; uniform float u_lensStrength; uniform float u_lensFeather; uniform float u_lensMaskInvert; uniform vec2 u_lensMaskTexel;
+uniform vec2 u_geometryFlip; uniform vec2 u_keystone; uniform float u_keystoneScale;
 uniform float u_bloomStrength; uniform float u_hallationStrength; uniform float u_bloomTint; uniform float u_bloomBlend; uniform float u_bloomAnam; uniform float u_hallFalloff;
 uniform float u_grainStrength; uniform float u_grainSize; uniform float u_grainSpeed; uniform float u_grainColor; uniform float u_grainRough; uniform float u_grainLuma; uniform float u_grainSoft; uniform float u_grainSeed;
 uniform float u_time; uniform vec2 u_resolution;
@@ -4169,6 +4331,37 @@ uniform sampler2D u_localMasksA; uniform sampler2D u_localMasksB;
 uniform float u_localMaskOn; uniform float u_localMaskCount;
 uniform vec4 u_localAdjustA[8]; uniform vec4 u_localAdjustB[8]; uniform vec4 u_localAdjustC[8];
 out vec4 outColor;
+// Geometry: mirroring and the keystone homography. Output coordinate -> source coordinate, so every
+// texture (photo, masks, background, split "before") is sampled in the same warped space and stays
+// aligned with the photo. u_keystone = (horizontalAmount, verticalAmount) in -0.22 .. 0.22.
+vec2 geometryUv(vec2 uv){
+  // Texture coordinates arrive bottom-up (v=0 is the bottom row). Work in screen space, top-down,
+  // so the keystone direction matches the sliders and the JS helpers behind the overlays and the
+  // heal brush, then convert back.
+  vec2 p=vec2(uv.x,1.0-uv.y);
+  if(u_geometryFlip.x>0.5)p.x=1.0-p.x;
+  if(u_geometryFlip.y>0.5)p.y=1.0-p.y;
+  if(abs(u_keystone.x)>0.0001 || abs(u_keystone.y)>0.0001){
+    vec2 c=(p-0.5)*2.0;
+    float denominator=max(1.0-u_keystone.x*c.x-u_keystone.y*c.y,0.2);
+    c=c*u_keystoneScale/denominator;
+    p=c*0.5+0.5;
+  }
+  return vec2(p.x,1.0-p.y);
+}
+
+// Lens blur reads the subject mask: white (1) is the subject that stays sharp, black (0) is the
+// background that gets the blur, and the feather widens the transition between them.
+float sampleLensMask(vec2 uv){
+  vec2 f=u_lensMaskTexel*(0.5+u_lensFeather*14.0);
+  vec2 clamped=clamp(uv,vec2(0.0),vec2(1.0));
+  float blurred=texture(u_lensMask,clamped).r*0.34;
+  blurred+=(texture(u_lensMask,clamp(clamped+vec2(-f.x,0.0),vec2(0.0),vec2(1.0))).r+texture(u_lensMask,clamp(clamped+vec2(f.x,0.0),vec2(0.0),vec2(1.0))).r
+    +texture(u_lensMask,clamp(clamped+vec2(0.0,-f.y),vec2(0.0),vec2(1.0))).r+texture(u_lensMask,clamp(clamped+vec2(0.0,f.y),vec2(0.0),vec2(1.0))).r)*0.12;
+  blurred+=(texture(u_lensMask,clamp(clamped+vec2(-f.x,-f.y),vec2(0.0),vec2(1.0))).r+texture(u_lensMask,clamp(clamped+vec2(f.x,-f.y),vec2(0.0),vec2(1.0))).r
+    +texture(u_lensMask,clamp(clamped+vec2(-f.x,f.y),vec2(0.0),vec2(1.0))).r+texture(u_lensMask,clamp(clamped+vec2(f.x,f.y),vec2(0.0),vec2(1.0))).r)*0.075;
+  return blurred;
+}
 float grainHash(vec2 p,float seed){
   p=fract(p*vec2(123.34,345.45)+vec2(seed*0.013,seed*0.071));
   p+=dot(p,p+34.345);
@@ -4266,9 +4459,12 @@ vec3 whiteBalanceGain(float temperature,float tint){
   return vec3(exp2(t*0.38+ti*0.12),exp2(-ti*0.40),exp2(-t*0.38+ti*0.12));
 }
 void main(){
-  vec4 base=texture(u_base, v_texCoord);
-  vec4 bloom=texture(u_bloom, v_texCoord);
-  vec4 hall=texture(u_hallation, v_texCoord);
+  // Every sample uses the warped coordinate, so the photo, its masks and any replaced background
+  // move together; grain and the vignette stay on the frame (v_texCoord) the way film does.
+  vec2 gUv=geometryUv(v_texCoord);
+  vec4 base=texture(u_base, gUv);
+  vec4 bloom=texture(u_bloom, gUv);
+  vec4 hall=texture(u_hallation, gUv);
   vec3 col=base.rgb;
 
   // Signed tint: cooler on the left, amber on the right.
@@ -4348,7 +4544,7 @@ void main(){
       if(float(index)>=u_localMaskCount) break;
       vec4 pa=u_localAdjustA[index]; vec4 pb=u_localAdjustB[index]; vec4 pc=u_localAdjustC[index];
       if(pc.z<0.5) continue;
-      float alpha=localMaskAlpha(index,v_texCoord);
+      float alpha=localMaskAlpha(index,gUv);
       if(alpha<=0.0005) continue;
       vec3 adjusted=localAdjust(col,pa,pb,pc,v_texCoord);
       col=mix(col,adjusted,clamp(alpha,0.0,1.0));
@@ -4401,8 +4597,16 @@ void main(){
   vign=clamp(vign,0.0,1.5);
   col*=vign;
 
+  // Lens blur: the background (where the subject mask is dark) is swapped for the blurred copy.
+  if(u_lensEnabled>0.5 && u_lensStrength>0.001){
+    float subject=clamp(sampleLensMask(gUv),0.0,1.0);
+    if(u_lensMaskInvert>0.5) subject=1.0-subject;
+    float amount=(1.0-subject)*clamp(u_lensStrength,0.0,1.0);
+    col=mix(col,texture(u_lensBlur,gUv).rgb,amount);
+  }
+
   if(u_maskEnabled==1){
-    vec2 maskUv=clamp(v_texCoord,vec2(0.0),vec2(1.0));
+    vec2 maskUv=clamp(gUv,vec2(0.0),vec2(1.0));
     float keep=sampleKeepMask(maskUv);
     if(abs(u_maskExpandPixels)>0.5){
       vec2 o=u_maskTexelSize*abs(u_maskExpandPixels);
@@ -4463,9 +4667,29 @@ uniform sampler2D u_image; uniform sampler2D u_original; uniform sampler2D u_sub
 uniform vec2 u_resolution;
 uniform int u_algorithm; uniform int u_colorMode; uniform int u_paletteSize; uniform int u_downscale;
 uniform int u_backgroundOnly; uniform int u_splitPreview; uniform int u_floydReady; uniform float u_splitPosition;
+uniform vec2 u_geometryFlip; uniform vec2 u_keystone; uniform float u_keystoneScale;
 uniform float u_strength; uniform float u_steps; uniform float u_threshold; uniform float u_dotSize; uniform float u_angle;
 uniform vec3 u_duotoneShadow; uniform vec3 u_duotoneHighlight; uniform vec3 u_customShadow; uniform vec3 u_customHighlight;
 out vec4 outColor;
+
+// Geometry: mirroring and the keystone homography. Output coordinate -> source coordinate, so every
+// texture (photo, masks, background, split "before") is sampled in the same warped space and stays
+// aligned with the photo. u_keystone = (horizontalAmount, verticalAmount) in -0.22 .. 0.22.
+vec2 geometryUv(vec2 uv){
+  // Texture coordinates arrive bottom-up (v=0 is the bottom row). Work in screen space, top-down,
+  // so the keystone direction matches the sliders and the JS helpers behind the overlays and the
+  // heal brush, then convert back.
+  vec2 p=vec2(uv.x,1.0-uv.y);
+  if(u_geometryFlip.x>0.5)p.x=1.0-p.x;
+  if(u_geometryFlip.y>0.5)p.y=1.0-p.y;
+  if(abs(u_keystone.x)>0.0001 || abs(u_keystone.y)>0.0001){
+    vec2 c=(p-0.5)*2.0;
+    float denominator=max(1.0-u_keystone.x*c.x-u_keystone.y*c.y,0.2);
+    c=c*u_keystoneScale/denominator;
+    p=c*0.5+0.5;
+  }
+  return vec2(p.x,1.0-p.y);
+}
 float bayerRank(ivec2 pixel,int side){
   int bits=side==4?2:3, rank=0;
   ivec2 cell=ivec2(mod(vec2(pixel),float(side)));
@@ -4498,7 +4722,7 @@ vec3 mapPalette(vec3 color,int mode,float levels,float thresholdShift){
 }
 void main(){
   vec4 fullSource=texture(u_image,v_texCoord);
-  if(u_splitPreview==1 && v_texCoord.x<u_splitPosition){ outColor=texture(u_original,v_texCoord); return; }
+  if(u_splitPreview==1 && v_texCoord.x<u_splitPosition){ outColor=texture(u_original,geometryUv(v_texCoord)); return; }
   float amount=clamp(abs(u_strength),0.0,1.0);
   if(amount<0.001){ outColor=fullSource; return; }
   float factor=float(max(u_downscale,1));
@@ -4615,12 +4839,14 @@ function getRenderDimensions(w,h){
 }
 function recreateFBOs(w,h){
   const renderSize=getRenderDimensions(w,h), renderWidth=renderSize.width, renderHeight=renderSize.height;
-  [fboComposite,fboSharpened,fboGraded,fboDithered,fboBloomExtract,fboBloomBlurH,fboBloomBlurV,fboBloomBlurH2,fboBloomBlurV2,fboHallExtract,fboHallBlurH,fboHallBlurV].forEach(deleteFBO);
+  [fboComposite,fboSharpened,fboGraded,fboDithered,fboBloomExtract,fboBloomBlurH,fboBloomBlurV,fboBloomBlurH2,fboBloomBlurV2,fboHallExtract,fboHallBlurH,fboHallBlurV,fboLensBlurA,fboLensBlurB].forEach(deleteFBO);
   fboComposite=createFBO(renderWidth,renderHeight); fboSharpened=createFBO(renderWidth,renderHeight); fboGraded=createFBO(renderWidth,renderHeight);
   fboDithered=renderWidth!==w || renderHeight!==h ? createFBO(renderWidth,renderHeight) : null; floydLastKey=null;
   const hw=Math.max(1,Math.floor(renderWidth/2)), hh=Math.max(1,Math.floor(renderHeight/2));
   fboBloomExtract=createFBO(hw,hh); fboBloomBlurH=createFBO(hw,hh); fboBloomBlurV=createFBO(hw,hh); fboBloomBlurH2=createFBO(hw,hh); fboBloomBlurV2=createFBO(hw,hh);
   fboHallExtract=createFBO(hw,hh); fboHallBlurH=createFBO(hw,hh); fboHallBlurV=createFBO(hw,hh);
+  // Lens blur runs at half resolution: the wider kernel costs less and upsamples smoothly.
+  fboLensBlurA=createFBO(hw,hh); fboLensBlurB=createFBO(hw,hh);
   lastPreviewRenderKey=null;
 }
 function setFullResolutionRendering(enabled){
@@ -4685,6 +4911,7 @@ function previewFrameKey(){
   return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,sourceFrame,gradeStateKey(),
     ids.map(id=>sliders[id]?.value??'').join(','),Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),
     ditherScope,JSON.stringify(getDitherSettings()),subjectMaskRevision,showOriginal,splitPreview,
+    JSON.stringify(currentGeometry()),JSON.stringify(currentLensBlur()),lensBlurMaskKey(),
     appState.mode==='photo'&&maskBgActive,maskBgReplaceActive(),maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
     localMaskRenderKey(),
     isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,renderAtFullResolution].join('|');
@@ -4699,6 +4926,7 @@ function render(timeMs){
     gl.useProgram(progPassthrough); bindQuad(progPassthrough);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sourceTexture);
     gl.uniform1i(gl.getUniformLocation(progPassthrough,'u_image'),0);
+    applyGeometryUniforms(progPassthrough);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     if(cacheable) lastPreviewRenderKey=frameKey;
     scheduleGradeHistogram();
@@ -4893,6 +5121,33 @@ function render(timeMs){
   gl.uniform1f(gl.getUniformLocation(progBlur,'u_radius'),0.6+Math.abs(params.hallation)*0.6);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
 
+  // Lens blur: a half-resolution blur of the graded photo, mixed by the subject mask in the
+  // composite pass. Two blur pairs widen the kernel for strong settings.
+  const lens=lensBlurPlan();
+  let lensTexture=fboLensBlurB?fboLensBlurB.tex:null;
+
+  if(lens&&fboLensBlurA&&fboLensBlurB){
+    const blurRadius=lens.radius;
+    const runBlurPass=(target,source,radius,direction)=>{
+      gl.bindFramebuffer(gl.FRAMEBUFFER,target.fbo); gl.viewport(0,0,target.width,target.height);
+      gl.useProgram(progBlur); bindQuad(progBlur);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,source);
+      gl.uniform1i(gl.getUniformLocation(progBlur,'u_image'),0);
+      gl.uniform2f(gl.getUniformLocation(progBlur,'u_texelSize'),1/target.width,1/target.height);
+      gl.uniform2f(gl.getUniformLocation(progBlur,'u_direction'),direction[0],direction[1]);
+      gl.uniform1f(gl.getUniformLocation(progBlur,'u_radius'),radius);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+    };
+    runBlurPass(fboLensBlurA,gradeSourceTexture,blurRadius,[1,0]);
+    runBlurPass(fboLensBlurB,fboLensBlurA.tex,blurRadius,[0,1]);
+    if(blurRadius>3){
+      const wide=blurRadius*1.8;
+      runBlurPass(fboLensBlurA,fboLensBlurB.tex,wide,[1,0]);
+      runBlurPass(fboLensBlurB,fboLensBlurA.tex,wide,[0,1]);
+    }
+    lensTexture=fboLensBlurB.tex;
+  }
+
   // Color / light and optical effects compose into an offscreen texture; dithering follows in its own pass.
   gl.bindFramebuffer(gl.FRAMEBUFFER,fboComposite.fbo); gl.viewport(0,0,fboComposite.width,fboComposite.height);
   gl.useProgram(progComposite); bindQuad(progComposite);
@@ -4916,6 +5171,20 @@ function render(timeMs){
   gl.uniform3f(gl.getUniformLocation(progComposite,'u_backgroundColor'),...hexRgb(maskBgSettings.color));
   gl.uniform3f(gl.getUniformLocation(progComposite,'u_gradientStart'),...hexRgb(maskBgSettings.gradientStart));
   gl.uniform3f(gl.getUniformLocation(progComposite,'u_gradientEnd'),...hexRgb(maskBgSettings.gradientEnd));
+  applyGeometryUniforms(progComposite);
+  const lensUniforms=lens||null;
+  const lensMask=lensUniforms?lensUniforms.mask:null;
+  gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D,lensTexture||sourceTexture);
+  gl.uniform1i(gl.getUniformLocation(progComposite,'u_lensBlur'),8);
+  gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D,lensMask?lensMask.texture:subjectMaskTexture);
+  gl.uniform1i(gl.getUniformLocation(progComposite,'u_lensMask'),9);
+  // u_lensEnabled is a float in the shader, so it must go through uniform1f (uniform1i on a
+  // float uniform is an INVALID_OPERATION and silently leaves the default of 0).
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_lensEnabled'),lensUniforms?1:0);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_lensStrength'),lensUniforms?lensUniforms.strength:0);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_lensFeather'),lensUniforms?lensUniforms.feather:0);
+  gl.uniform1f(gl.getUniformLocation(progComposite,'u_lensMaskInvert'),(lensUniforms&&lensUniforms.invert)?1:0);
+  gl.uniform2f(gl.getUniformLocation(progComposite,'u_lensMaskTexel'),...(lensMask?lensMask.texel:[1,1]));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_bloomStrength'),effectValue('bloom',params.bloom));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_hallationStrength'),effectValue('hallation',params.hallation));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_bloomTint'),params.bloomTint);
@@ -4956,6 +5225,7 @@ function render(timeMs){
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_vignStrength'),effectValue('color',params.vignStrength));
   gl.uniform1f(gl.getUniformLocation(progComposite,'u_vignSize'),params.vignSize);
   gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+
   const backgroundOnly=ditherScope==='background' && !isVideo;
   const subjectProtected=!!autoSubjectMask || maskStrokes.some(s=>s.mode==='protect');
   const ditherStrength=backgroundOnly && !subjectProtected?0:effectValue('dither',params.dither);
@@ -5047,7 +5317,7 @@ function errorDiffusionPixels(source,width,height,options={}){
 function floydStateKey(timeMs,dither,backgroundOnly,strength){
   const frame=isVideo?Math.floor(((timeMs??videoEl.currentTime*1000)*0.001)*240):0;
   return [canvas.width,canvas.height,fboComposite?.width||0,fboComposite?.height||0,isVideo?videoSourceFile?.name:'photo',currentPhoto?.id||'',frame,gradeStateKey(),
-    isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,ids.map(id=>sliders[id].value).join(','),
+    isVideo?videoGrainSeed:currentPhoto?.grainSeed||0,ids.map(id=>sliders[id].value).join(','),JSON.stringify(currentGeometry()),
     Object.keys(effectEnabled).map(name=>effectEnabled[name]?1:0).join(''),ditherScope,subjectMaskRevision,
     appState.mode==='photo'&&maskBgActive,maskBgReplaceActive(),maskBgRevision,maskBgImageRevision,maskBgRenderSettingsKey(),
     localMaskRenderKey(),
@@ -5097,6 +5367,7 @@ function renderDitherPass(timeMs,strength,backgroundOnly){
   gl.uniform1i(gl.getUniformLocation(progDither,'u_colorMode'),colors[dither.colorMode]??2);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_paletteSize'),dither.paletteSize);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_downscale'),dither.downscale);
+  applyGeometryUniforms(progDither);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_backgroundOnly'),backgroundOnly?1:0);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_splitPreview'),splitPreview?1:0);
   gl.uniform1f(gl.getUniformLocation(progDither,'u_splitPosition'),splitPosition);
@@ -5571,7 +5842,7 @@ function rotateMaskBgState(saved,degrees){
   const rotate=source=>source?rotateCanvas(source,source.width,source.height,degrees):null;
   saved.canvas=rotate(saved.canvas);saved.auto=rotate(saved.auto);
   saved.strokes=(saved.strokes||[]).map(stroke=>{
-    const next={...stroke,points:(stroke.points||[]).map(point=>({x:1-point.y,y:point.x}))};
+    const next={...stroke,points:(stroke.points||[]).map(point=>rotateNormalizedPoint(point,degrees))};
     if(stroke.selection)next.selection=rotate(stroke.selection);
     return next;
   });
@@ -6927,6 +7198,9 @@ function maskLayerOverlayTick(){
   const nextLeft=`${box[0]}px`,nextTop=`${box[1]}px`,nextWidth=`${box[2]}px`,nextHeight=`${box[3]}px`;
   const geometryChanged=style.left!==nextLeft||style.top!==nextTop||style.width!==nextWidth||style.height!==nextHeight;
   if(geometryChanged){style.left=nextLeft;style.top=nextTop;style.width=nextWidth;style.height=nextHeight;}
+  // Keep the red overlay lined up with a keystoned or mirrored preview.
+  const warpKey=JSON.stringify(currentGeometry());
+  if(maskLayerOverlayCanvas.dataset.warpKey!==warpKey){maskLayerOverlayCanvas.dataset.warpKey=warpKey;applyGeometryOverlayTransform(maskLayerOverlayCanvas);}
   maskLayerOverlayCanvas.classList.add('visible');
   if(geometryChanged||maskLayerOverlayDirty) maskLayerRenderOverlay();
   maskLayerOverlayFrame=requestAnimationFrame(maskLayerOverlayTick);
@@ -7761,7 +8035,7 @@ function rotatePhotoMask(saved,degrees){
   if(!saved) return;
   saved.canvas=rotateCanvas(saved.canvas,saved.canvas.width,saved.canvas.height,degrees);
   if(saved.auto) saved.auto=rotateCanvas(saved.auto,saved.auto.width,saved.auto.height,degrees);
-  saved.strokes=saved.strokes.map(stroke=>({...stroke,points:stroke.points.map(point=>({x:1-point.y,y:point.x}))}));
+  saved.strokes=saved.strokes.map(stroke=>({...stroke,points:stroke.points.map(point=>rotateNormalizedPoint(point,degrees))}));
 }
 // === Lightroom-style straighten and white balance sampling ==================================
 // A downscaled copy of the straightened source feeds the white balance tools. Reading it instead
@@ -7874,6 +8148,12 @@ function runWbEyedropperAt(clientX,clientY){
   if(!sample){ showToast('Could not read that pixel',4500); return; }
   reportWhiteBalance(colorGrading.whiteBalanceFromSample(sample,{legacyTemperature:gradeLegacyTemperatureValue()}),'Eyedropper','White balance set from a neutral point');
 }
+function uploadPhotoSourceTexture(source){
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,sourceTexture); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
+  photoTextureRevision++; lastPreviewRenderKey=null;
+}
+function clearPhotoRenderCache(){ lastPreviewRenderKey=null; floydLastKey=null; }
 function uploadPhoto(item,img,resetView=true){
   const maximum=Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE),gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
   const scale=Math.min(1,maximum/Math.max(img.naturalWidth,img.naturalHeight));
@@ -7889,7 +8169,11 @@ function uploadPhoto(item,img,resetView=true){
   const w=swapped?baseH:baseW, h=swapped?baseW:baseH;
   // Straighten is baked in here: the crop frame, the masks, the histogram, the preview and the
   // exported file all read the same straightened pixels, so what you frame is what you download.
-  const source=applyStraightenToSource(rotateCanvas(baseSource,baseW,baseH,rotation),w,h,item.straighten);
+  const straightened=applyStraightenToSource(rotateCanvas(baseSource,baseW,baseH,rotation),w,h,item.straighten);
+  // Spot heal edits are baked on top of the straightened pixels, so the preview, the masks, the
+  // histogram and the exported file all read the same healed image.
+  const source=applyHealToSource(straightened,w,h,item.healStrokes);
+  photoHealCanvas=ensureHealCanvas(source,w,h);
   buildPhotoSampleCanvas(source,w,h,item.id);
   createLookPreviewSource(item,source);
   item.width=w; item.height=h; item.grainSeed=item.grainSeed||randomGrainSeed();
@@ -7913,6 +8197,10 @@ function uploadPhoto(item,img,resetView=true){
   $('processVideoBtn').style.display='none';
   $('downloadBtn').innerHTML='⤓ Original-size PNG';
   syncStraightenControl();
+  syncGeometryControls();
+  syncLensBlurControls();
+  syncHealControls();
+  syncFilmLookMirrors();
   beginPhotoHistory(item);
   updateSocialUI();
   if(!exportBusy&&!mediaBusy){if(typeof render==='function')render(performance.now());if(typeof renderGradePresetCards==='function')renderGradePresetCards();}
@@ -7928,6 +8216,7 @@ async function createThumbnail(img,rotation=0){
 function clearPhotos(){
   photos.forEach(photo=>{ if(photo.thumbUrl) URL.revokeObjectURL(photo.thumbUrl); });
   photos=[]; activePhotoIndex=-1; currentPhoto=null;
+  photoHealCanvas=null; photoHealContext=null; healStroke=null; healMode=false;
   selectedPhotoIds.clear(); photoSelectMode=false; photoSettingsClipboard=null;
   resetHistoryTimeline();
   renderPhotoStrip(); renderPhotoSelectionBar();
@@ -8166,6 +8455,7 @@ function updatePreviewZoom(){
   zoomOutBtn.disabled=previewZoom<=MIN_PREVIEW_ZOOM;
   zoomInBtn.disabled=previewZoom>=MAX_PREVIEW_ZOOM;
   updateCropOverlay(); updateSplitDivider(); if(typeof updateCaptionOverlay==='function') updateCaptionOverlay();
+  refreshGeometryOverlays();
 }
 function zoomPreviewTo(next,clientX,clientY){
   next=Math.max(MIN_PREVIEW_ZOOM,Math.min(MAX_PREVIEW_ZOOM,next));
@@ -8191,6 +8481,16 @@ function updatePinchZoom(){
   previewPanY=centerY-(wrap.top+wrap.height/2)-(pinchZoom.focalY-.5)*height*next;
   if(previewZoom<=1) previewPanX=previewPanY=0;
   updatePreviewZoom();
+}
+// Keeps the heal marks and the mask overlay glued to the warped preview after a zoom or refit.
+// Kept defensive on purpose: the zoom path calls this on every gesture, including before the
+// first photo is loaded, and a failure here must never break zooming or panning.
+function refreshGeometryOverlays(){
+  try{
+    if(isVideo||!currentPhoto||!hasContent) return;
+    if(healMode||photoHealStrokes(currentPhoto).length) updateHealOverlay();
+    if(!social.geometryIsNeutral(currentGeometry())) applyGeometryOverlayTransform($('maskOverlayCanvas'));
+  }catch(error){ console.warn('The geometry overlay could not be refreshed.',error); }
 }
 function resetPreviewZoom(){
   pinchZoom=null; touchZoomPointers.clear();
@@ -8338,6 +8638,11 @@ function finishPreviewDrag(e){
   if(maskStroke && maskStroke.id===e.pointerId){
     maskStroke=null;
     if(maskUploadFrame) uploadSubjectMask(); // export must see the final brush stroke immediately
+    // A finished protect / erase stroke is a real mask change: the mask badge, the clear button and
+    // the Lens blur status all read the stroke list, so they are refreshed right away instead of
+    // waiting for the next unrelated control to move.
+    updateMaskTools();
+    if(typeof updateLensBlurStatus==='function') updateLensBlurStatus();
     if(canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId);
     return;
   }
@@ -9233,6 +9538,13 @@ function bringPreviewIntoView(){
     canvas.scrollIntoView({block:'center',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   }
 }
+// Export-type label for the panel headings, e.g. "JPG quality" / "WebP quality". The social
+// helpers can still be loading while the workspace is restored, so JPG is the fallback.
+function exportTypeQualityLabel(){
+  const type=typeof exportOptions!=='undefined'&&exportOptions?exportOptions.type:'jpeg';
+  const labels=typeof social!=='undefined'&&social?social.EXPORT_TYPE_LABELS:null;
+  return (labels&&labels[type])||'JPG';
+}
 function updateWorkspaceUI(){
   const workspace=hasContent?(isVideo?'video':'photo'):'empty';
   appState.mode=workspace;
@@ -9246,7 +9558,7 @@ function updateWorkspaceUI(){
   $('backToDropBtn').hidden=!hasContent; $('backToDropBtn').disabled=!hasContent || mediaBusy || exportBusy;
   $('exportPanelTitle').textContent=isVideo?'Reel Framing':'Instagram Export';
   $('frameFormatLabel').textContent=isVideo?'Frame capture format':'Photo format';
-  $('frameQualityLabel').textContent=isVideo?'Frame capture quality':'JPG quality';
+  $('frameQualityLabel').textContent=isVideo?'Frame capture quality':`${exportTypeQualityLabel()} quality`;
   updateCaptionOverlay();
   if(typeof updateMaskBgControls==='function')updateMaskBgControls();
 }
@@ -9306,12 +9618,24 @@ function updateSocialUI(){
   $('exportFileType').value=exportOptions.type; $('exportQuality').value=exportOptions.quality;
   $('videoFrameFormat').value=exportOptions.format;
   $('exportQualityValue').textContent=`${exportOptions.quality}%`; $('exportQuality').setAttribute('aria-valuetext',`${exportOptions.quality} percent`);
+  const qualityLabel=$('frameQualityLabel');
+  if(qualityLabel) qualityLabel.textContent=isVideo?'Frame capture quality':`${exportTypeQualityLabel()} quality`;
   syncExportChoicePills();
-  $('qualityField').hidden=exportOptions.type==='png';
+  $('qualityField').hidden=!social.exportQualityApplies(exportOptions.type);
+  const typeHint=$('exportTypeHint');
+  if(typeHint){
+    typeHint.textContent=exportOptions.type==='webp'
+      ? 'WebP is about 30% smaller than JPG and keeps transparency.'
+      : exportOptions.type==='png'
+        ? 'PNG is lossless and keeps transparency, but the file is larger.'
+        : 'JPG is the smallest and opens everywhere.';
+  }
+  syncExportPresetButtons();
   $('exportComparison').checked=exportOptions.comparison; $('exportComparison').disabled=isVideo||exportBusy;
   $('comparisonOptions').hidden=!exportOptions.comparison;
   $('comparisonFormat').value=exportOptions.comparisonFormat; $('comparisonLabels').checked=exportOptions.labels;
-  $('exportPhotoLabel').textContent=isVideo?`⤓ Export current frame ${exportOptions.type==='png'?'PNG':'JPG'}`:`⤓ Export ${exportOptions.comparison?'before / after':''} ${exportOptions.type==='png'?'PNG':'JPG'}`.replace(/  /g,' ');
+  const exportTypeLabel=exportTypeQualityLabel();
+  $('exportPhotoLabel').textContent=isVideo?`⤓ Export current frame ${exportTypeLabel}`:`⤓ Export ${exportOptions.comparison?'before / after':''} ${exportTypeLabel}`.replace(/  /g,' ');
   $('exportPhotoBtn').disabled=!hasContent||locked;
   $('exportZipBtn').disabled=!photos.length||isVideo||locked;
   $('zipCount').textContent=`${photos.length} photo${photos.length===1?'':'s'}`;
@@ -9348,16 +9672,18 @@ $('randomizeGrainBtn').addEventListener('click',()=>{
   render(performance.now()); showToast('Grain pattern randomized · photo grain stays still');
 });
 $('rotateMediaBtn').addEventListener('click',rotateActiveMedia);
-async function rotateActiveMedia(){
+async function rotateActiveMedia(direction=90){
   if(!hasContent||mediaBusy||exportBusy) return;
+  const quarter=((Number(direction)||90)%360+360)%360===270?270:90;
+  const directionLabel=quarter===270?'counter-clockwise':'clockwise';
   if(isVideo){
-    videoRotation=(videoRotation+90)%360; videoCrop=rotateCropPosition(videoCrop);
+    videoRotation=(videoRotation+quarter)%360; videoCrop=rotateCropPositionFor(videoCrop,quarter);
     const swapped=videoRotation===90||videoRotation===270;
     canvas.width=swapped?videoEl.videoHeight:videoEl.videoWidth;
     canvas.height=swapped?videoEl.videoWidth:videoEl.videoHeight;
     recreateFBOs(canvas.width,canvas.height); uploadVideoTexture();
     resetPreviewZoom(); render(videoEl.currentTime*1000); updateSocialUI();
-    showToast(`Video rotated ${videoRotation}° clockwise`); return;
+    showToast(`Video rotated ${videoRotation}° ${directionLabel}`); return;
   }
   if(!currentPhoto) return;
   const item=currentPhoto;
@@ -9366,17 +9692,18 @@ async function rotateActiveMedia(){
     const img=await decodePhoto(item);
     if(currentPhoto!==item) return;
     saveActivePhotoMask();
-    item.mask && rotatePhotoMask(item.mask,90);
-    item.maskBackground && rotateMaskBgState(item.maskBackground,90);
-    item.rotation=((item.rotation||0)+90)%360;
-    item.crop=rotateCropPosition(item.crop);
+    item.mask && rotatePhotoMask(item.mask,quarter);
+    item.maskBackground && rotateMaskBgState(item.maskBackground,quarter);
+    item.healStrokes=photoHealStrokes(item).map(point=>({...point,...rotateNormalizedPoint(point,quarter)}));
+    item.rotation=((item.rotation||0)+quarter)%360;
+    item.crop=rotateCropPositionFor(item.crop,quarter);
     uploadPhoto(item,img,false);
     resetPreviewZoom(); render(performance.now());
     const oldThumb=item.thumbUrl;
     item.thumbUrl=await createThumbnail(img,item.rotation);
     if(oldThumb) URL.revokeObjectURL(oldThumb);
     renderPhotoStrip(); updateSocialUI();
-    showToast(`Photo rotated ${item.rotation}° clockwise`);
+    showToast(`Photo rotated ${item.rotation}° ${directionLabel}`);
   }catch(error){ console.error(error); showToast(`Could not rotate this photo: ${error.message}`,5000); }
   finally{ mediaBusy=false; updateSocialUI();if(typeof renderGradePresetCards==='function')renderGradePresetCards(); }
 }
@@ -9574,7 +9901,24 @@ function setEffectStates(states){
   updateSectionIndicators();
 }
 function canvasBlob(source,type='image/png',quality=1){
-  return new Promise((resolve,reject)=>source.toBlob(blob=>blob?resolve(blob):reject(new Error('Image encoding failed — try a smaller output')),type,quality));
+  const encode=(mime)=>new Promise(resolve=>source.toBlob(resolve,mime,quality));
+  return (async()=>{
+    let blob=await encode(type);
+    // Safari and some mobile browsers cannot encode WebP; re-encode as JPG so a ".webp" file is
+    // never a mislabelled PNG.
+    if(blob&&type==='image/webp'&&blob.type!=='image/webp'){
+      const jpeg=await encode('image/jpeg');
+      if(jpeg&&jpeg.type==='image/jpeg') blob=jpeg;
+    }
+    if(blob) return blob;
+    if(type!=='image/jpeg'){ const jpeg=await encode('image/jpeg'); if(jpeg) return jpeg; }
+    throw new Error('Image encoding failed — try a smaller output');
+  })();
+}
+// What actually came back from the encoder decides the extension and the label; the helper lives
+// in social-tools.js so a Node test can prove the fallback rules.
+function exportFormatFor(requestedType,blob){
+  return social.exportFormatFor(requestedType,blob&&blob.type);
 }
 function downloadBlob(blob,name){
   const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=name; a.click();
@@ -9761,11 +10105,12 @@ async function exportPhoto(){
     await prepareMaskBgBlurForExport();
     if(ditherScope==='background' && maskDetectionPending){ progressText.textContent='Finishing the subject mask…'; await maskQueue; }
     checkExportCancelled(); progressText.textContent='Rendering your Instagram-ready image…';
-    const output=makeExportCanvas(options), type=options.type==='png'?'image/png':'image/jpeg';
+    const output=makeExportCanvas(options), type=social.exportMimeType(options.type);
     const blob=await canvasBlob(output,type,options.quality/100); checkExportCancelled();
     const name=social.safeFilename(currentPhoto?.file.name||videoSourceFile?.name||'frame');
-    const format=options.type==='png'?'PNG':`JPG · ${options.quality}%`;
-    requestDownload(blob,`${name}-${options.comparison?'before-after':options.format}.${options.type==='png'?'png':'jpg'}`,{format,resolution:`${output.width} × ${output.height}`});
+    const target=exportFormatFor(options.type,blob);
+    const format=`${target.label}${target.qualityApplies?` · ${options.quality}%`:''}`;
+    requestDownload(blob,`${name}-${options.comparison?'before-after':options.format}.${target.extension}`,{format,resolution:`${output.width} × ${output.height}`});
     $('exportStatus').textContent=`${format} · ${output.width} × ${output.height} ready to download.`;
     showReadyConfirmation();
   }catch(error){
@@ -9789,9 +10134,10 @@ async function exportCarousel(){
       if(ditherScope==='background' && maskDetectionPending) await maskQueue;
       checkExportCancelled(); saveActivePhotoMask();
       if(ditherScope==='background' && effectEnabled.dither && params.dither && !autoSubjectMask && !maskStrokes.some(s=>s.mode==='protect')) missingMasks++;
-      const output=makeExportCanvas(options,item.crop), blob=await canvasBlob(output,options.type==='png'?'image/png':'image/jpeg',options.quality/100);
+      const output=makeExportCanvas(options,item.crop), blob=await canvasBlob(output,social.exportMimeType(options.type),options.quality/100);
+      const target=exportFormatFor(options.type,blob);
       outputSizes.add(`${output.width} × ${output.height}`);
-      entries.push({name:`${String(i+1).padStart(2,'0')}-${social.safeFilename(item.file.name)}-${options.comparison?'before-after':options.format}.${options.type==='png'?'png':'jpg'}`,blob});
+      entries.push({name:`${String(i+1).padStart(2,'0')}-${social.safeFilename(item.file.name)}-${options.comparison?'before-after':options.format}.${target.extension}`,blob});
       const pct=Math.round((i+1)/photos.length*90); progressFill.style.width=pct+'%'; progressPct.textContent=pct+'%';
       progressText.textContent=`Photo ${i+1}/${photos.length} · same settings, individual framing`;
       await new Promise(resolve=>setTimeout(resolve,0));
@@ -9799,7 +10145,8 @@ async function exportCarousel(){
     checkExportCancelled(); progressText.textContent='Packing the ZIP on this device…';
     const zip=await social.createZip(entries); checkExportCancelled();
     const resolution=outputSizes.size===1?`${[...outputSizes][0]} per photo`:`Multiple sizes across ${outputSizes.size} dimensions`;
-    requestDownload(zip,`film-lab-carousel-${Date.now()}.zip`,{format:`ZIP · ${entries.length} ${options.type==='png'?'PNG':'JPG'} photos`,resolution});
+    const carouselLabel=exportFormatFor(options.type,entries[0]?.blob).label;
+    requestDownload(zip,`film-lab-carousel-${Date.now()}.zip`,{format:`ZIP · ${entries.length} ${carouselLabel} photos`,resolution});
     $('exportStatus').textContent=`${entries.length} matching images ready as ZIP.${missingMasks?` Background dither skipped on ${missingMasks} photo(s) without a protected subject.`:''}`;
     showReadyConfirmation();
   }catch(error){
@@ -10391,6 +10738,7 @@ Object.values(sliders).forEach(slider=>slider&&slider.addEventListener('input',u
 $('resetOriginalBtn').addEventListener('click',()=>{
   if(exportBusy||mediaBusy)return;
   ids.forEach(id=>sliders[id].value=0);setDitherScope('full');setDitherSettings(social.DEFAULT_DITHER);
+  resetPhotoToolSliders();
   for(const [name,on] of Object.entries(effectEnabled))if(!on){effectEnabled[name]=true;const toggle=document.querySelector(`[data-toggle="${name}"]`);if(toggle){toggle.setAttribute('aria-checked','true');toggle.querySelector('.toggleText').textContent='ON';toggle.closest('.effectGroup').classList.remove('effectOff');}}
   presetIntensityInput.value='100';updatePresetIntensityReadout();
   resetAllColorGrade(true);
@@ -10503,6 +10851,13 @@ function fullSettingsSnapshot(originName){
     app:'film-lab', version:1, settings, grade,
     straighten:social.clampStraighten(currentPhoto?currentPhoto.straighten:0),
     crop:{x:Number(position?.x)||0.5,y:Number(position?.y)||0.5},
+    // Perspective and lens blur travel with a copied look or a history step; the spot heal dabs
+    // stay on the photo they were painted on.
+    geometry:social.normalizeGeometry(currentPhoto?.geometry),
+    lens:social.normalizeLensBlur(currentPhoto?.lensBlur),
+    // The heal dabs are pixels, not a look: they restore from the edit history and named
+    // snapshots, but the settings clipboard never copies them onto another photo.
+    heal:social.normalizeHealStrokes(currentPhoto?.healStrokes),
     origin:originName||currentPhoto?.file?.name||null,
   };
 }
@@ -10520,10 +10875,17 @@ function restoreFullSettings(payload,{crop=false}={}){
       currentPhoto.crop={x:Math.max(0,Math.min(1,Number(data.crop.x))),y:Math.max(0,Math.min(1,Number(data.crop.y)))};
       updateCropOverlay();
     }
+    if(currentPhoto&&!isVideo){
+      currentPhoto.geometry=data.geometry;
+      currentPhoto.lensBlur=data.lens;
+      syncGeometryControls(); syncLensBlurControls();
+      lastPreviewRenderKey=null;
+      if(hasContent) render(performance.now());
+    }
   }finally{ historyApplying=false; }
   return data;
 }
-async function applySettingsPayload(payload,{crop=false,straighten=false,reason=''}={}){
+async function applySettingsPayload(payload,{crop=false,straighten=false,heal=false,reason=''}={}){
   const data=restoreFullSettings(payload,{crop});
   if(!data) return null;
   if(straighten&&currentPhoto&&!isVideo){
@@ -10532,6 +10894,14 @@ async function applySettingsPayload(payload,{crop=false,straighten=false,reason=
       currentPhoto.straighten=angle;
       syncStraightenControl();
       await refreshStraightenPixels(currentPhoto);
+    }
+  }
+  if(heal&&currentPhoto&&!isVideo){
+    const dabs=data.heal;
+    if(JSON.stringify(social.normalizeHealStrokes(currentPhoto.healStrokes))!==JSON.stringify(dabs)){
+      currentPhoto.healStrokes=dabs;
+      currentPhoto.healStrokeGroups=dabs.length?[dabs]:[];
+      await refreshHealPixels(currentPhoto);
     }
   }
   if(reason) $('settingsStatus').textContent=reason;
@@ -10597,7 +10967,7 @@ function pushHistory(label){
   if(!payload) return;
   const entry={label:String(label||'Edit').slice(0,64),payload,photo:currentPhoto?.id??null,at:Date.now()};
   const current=historyEntries[historyIndex];
-  if(current&&current.photo===entry.photo&&JSON.stringify(current.payload.settings)===JSON.stringify(entry.payload.settings)&&JSON.stringify(current.payload.grade)===JSON.stringify(entry.payload.grade)&&current.payload.straighten===entry.payload.straighten) return;
+  if(current&&current.photo===entry.photo&&JSON.stringify(current.payload.settings)===JSON.stringify(entry.payload.settings)&&JSON.stringify(current.payload.grade)===JSON.stringify(entry.payload.grade)&&current.payload.straighten===entry.payload.straighten&&JSON.stringify(current.payload.geometry)===JSON.stringify(entry.payload.geometry)&&JSON.stringify(current.payload.lens)===JSON.stringify(entry.payload.lens)&&JSON.stringify(current.payload.heal)===JSON.stringify(entry.payload.heal)) return;
   historyEntries=historyEntries.slice(0,historyIndex+1);
   historyEntries.push(entry);
   if(historyEntries.length>HISTORY_LIMIT) historyEntries.splice(0,historyEntries.length-HISTORY_LIMIT);
@@ -10618,7 +10988,7 @@ async function applyHistoryEntry(index){
   const entry=historyEntries[index];
   if(!entry) return;
   historyIndex=index; renderHistoryList();
-  await applySettingsPayload(entry.payload,{crop:true,straighten:true});
+  await applySettingsPayload(entry.payload,{crop:true,straighten:true,heal:true});
   showToast(`Back to “${entry.label}”`,3500);
 }
 function renderHistoryList(){
@@ -10686,7 +11056,7 @@ async function applySnapshot(name){
   const entry=snapshots.find(candidate=>candidate.name===name);
   if(!entry) return;
   snapshotSelection=name; renderSnapshotChips();
-  await applySettingsPayload(entry.payload,{crop:true,straighten:true});
+  await applySettingsPayload(entry.payload,{crop:true,straighten:true,heal:true});
   pushHistory(`Snapshot “${name}”`);
   showToast(`Snapshot “${name}” applied`,3500);
 }
@@ -10812,6 +11182,586 @@ $('photoThumbnails').addEventListener('click',event=>{
 new MutationObserver(()=>renderPhotoSelectionBar()).observe($('photoThumbnails'),{childList:true});
 loadSnapshots(); renderSnapshotChips(); renderHistoryList(); renderPhotoSelectionBar();
 
+
+// === Geometry, spot heal, lens blur, film-look fine tuning and export presets ================
+// --- state ---------------------------------------------------------------------------------
+let healMode=false, healSize=3, healStroke=null, healBrushCursorPoint=null, healOverlayFrame=0;
+// The straightened, un-healed canvas of the open photo; every heal dab is stamped into a copy of it.
+let photoHealCanvas=null, photoHealContext=null;
+let healRebuildToken=0;
+function photoGeometry(item){ return social.normalizeGeometry(item&&typeof item==='object'?item.geometry:item); }
+function currentGeometry(){ return (!isVideo&&currentPhoto)?photoGeometry(currentPhoto):social.normalizeGeometry(null); }
+function photoLensBlur(item){ return social.normalizeLensBlur(item&&typeof item==='object'?item.lensBlur:item); }
+function currentLensBlur(){ return photoLensBlur(currentPhoto); }
+function photoHealStrokes(item){ return Array.isArray(item?.healStrokes)?item.healStrokes:[]; }
+// Each brush stroke is kept as its own group, so Undo removes a whole stroke and Clear wipes the
+// photo. Legacy dabs (a flat list) still count as one spot each.
+function photoHealStrokeGroups(item){ return Array.isArray(item?.healStrokeGroups)?item.healStrokeGroups:[]; }
+function photoHealSpotCount(item){ return photoHealStrokeGroups(item).length||photoHealStrokes(item).length; }
+
+// --- shader plumbing: one place that feeds the geometry uniforms to any program -------------
+function geometryUniformValues(){
+  const geometry=currentGeometry();
+  return {
+    flip:[geometry.flipH?1:0,geometry.flipV?1:0],
+    keystone:[social.keystoneAmount(geometry.keystoneH),social.keystoneAmount(geometry.keystoneV)],
+    scale:social.keystoneFillScale(geometry.keystoneV,geometry.keystoneH),
+  };
+}
+function applyGeometryUniforms(program){
+  if(!program) return;
+  const values=geometryUniformValues();
+  gl.uniform2f(gl.getUniformLocation(program,'u_geometryFlip'),values.flip[0],values.flip[1]);
+  gl.uniform2f(gl.getUniformLocation(program,'u_keystone'),values.keystone[0],values.keystone[1]);
+  gl.uniform1f(gl.getUniformLocation(program,'u_keystoneScale'),values.scale);
+}
+// Pointer -> source photo coordinate: the inverse of the shader warp, so brushes, the eyedropper
+// and the heal tool all read the pixel the user is pointing at.
+function previewPointToSource(clientX,clientY){
+  const box=canvas.getBoundingClientRect();
+  if(!box.width||!box.height) return {x:0.5,y:0.5};
+  const nx=Math.max(0,Math.min(1,(clientX-box.left)/box.width)), ny=Math.max(0,Math.min(1,(clientY-box.top)/box.height));
+  return sourcePointFromPreview(nx,ny);
+}
+function sourcePointFromPreview(nx,ny){
+  const geometry=currentGeometry();
+  const unflipped=social.flipPoint(nx,ny,geometry.flipH,geometry.flipV);
+  return social.keystoneInversePoint(geometry.keystoneV,geometry.keystoneH,unflipped.x,unflipped.y);
+}
+function displayedPointFromSource(nx,ny){
+  const geometry=currentGeometry();
+  const warped=social.keystoneMapPoint(geometry.keystoneV,geometry.keystoneH,nx,ny);
+  return social.flipPoint(warped.x,warped.y,geometry.flipH,geometry.flipV);
+}
+
+// --- geometry controls --------------------------------------------------------------------
+function setPhotoGeometry(patch,{commit=false,label='' }={}){
+  if(!currentPhoto||isVideo) return;
+  const next=social.normalizeGeometry({...photoGeometry(currentPhoto),...patch});
+  const before=photoGeometry(currentPhoto);
+  if(JSON.stringify(next)===JSON.stringify(before)){ if(commit) scheduleHistoryCommit(label||'Perspective'); return; }
+  currentPhoto.geometry=next;
+  syncGeometryControls();
+  lastPreviewRenderKey=null;
+  render(performance.now());
+  if(commit) scheduleHistoryCommit(label||'Geometry');
+}
+function syncGeometryControls(){
+  const available=!isVideo&&!!currentPhoto;
+  const geometry=currentGeometry();
+  for(const [id,value] of [['sliderKeystoneV',geometry.keystoneV],['sliderKeystoneH',geometry.keystoneH]]){
+    const slider=$(id); if(!slider) continue;
+    slider.value=String(value); slider.disabled=!available;
+  }
+  const readouts={valKeystoneV:geometry.keystoneV,valKeystoneH:geometry.keystoneH};
+  for(const [id,value] of Object.entries(readouts)){
+    const node=$(id); if(node) node.textContent=value>0?`+${value}`:String(value);
+  }
+  const flipH=$('geometryFlipHBtn'), flipV=$('geometryFlipVBtn');
+  if(flipH){ flipH.setAttribute('aria-pressed',String(geometry.flipH)); flipH.disabled=!available; }
+  if(flipV){ flipV.setAttribute('aria-pressed',String(geometry.flipV)); flipV.disabled=!available; }
+  for(const id of ['geometryRotateLeftBtn','geometryRotateRightBtn','geometryResetBtn']){
+    const button=$(id); if(button) button.disabled=!available;
+  }
+  updateGeometryOverlayTransform();
+}
+function geometryIsNeutralNow(){ return social.geometryIsNeutral(currentGeometry()); }
+// The overlay canvases sit on top of the preview, so they get the same mirror / keystone warp the
+// shader applies. The matrix comes from social.geometryOverlayMatrix, which a Node test checks
+// against the shader maths.
+function geometryOverlayTransform(width,height){
+  const matrix=social.geometryOverlayMatrix(currentGeometry(),width,height);
+  const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+  if(matrix.every((value,index)=>Math.abs(value-identity[index])<1e-9)) return 'none';
+  return `matrix3d(${matrix.map(value=>Number.isFinite(value)?value.toFixed(8):0).join(',')})`;
+}
+function applyGeometryOverlayTransform(element){
+  if(!element) return;
+  const rect=canvas.getBoundingClientRect();
+  element.style.transformOrigin='0 0';
+  element.style.transform=rect.width&&rect.height?geometryOverlayTransform(rect.width,rect.height):'none';
+}
+function updateGeometryOverlayTransform(){
+  applyGeometryOverlayTransform($('maskOverlayCanvas'));
+  applyGeometryOverlayTransform($('healOverlayCanvas'));
+  updateHealOverlay();
+}
+
+// --- spot heal ----------------------------------------------------------------------------
+// Patch based: for every dab the ring of pixels just outside the patch is matched against nearby
+// candidates (12 directions × up to 5 distances) and the best match is copied in, then blended
+// through a feathered edge and smoothed so the seam disappears. Everything runs on this device.
+function healDabRadius(stroke,width,height){ return Math.max(1,stroke.r*Math.min(width,height)); }
+// The heal brush stamps into a canvas copy of the source, so painting stays instant; the stroke
+// list is the source of truth and is re-applied on every reload of the photo.
+function ensureHealCanvas(source,width,height){
+  if(source&&source.getContext&&source.width===width&&source.height===height) return source;
+  const canvasCopy=document.createElement('canvas');
+  canvasCopy.width=width; canvasCopy.height=height;
+  canvasCopy.getContext('2d').drawImage(source,0,0,width,height);
+  return canvasCopy;
+}
+function healSourceCanvas(){
+  if(photoHealCanvas&&photoHealCanvas.width===canvas.width&&photoHealCanvas.height===canvas.height) return photoHealCanvas;
+  return null;
+}
+function healPlanOffset(pixels,width,height,cx,cy,radius,offsets){
+  const ring=social.healRingSamples(16);
+  const sample=(x,y)=>{ const px=Math.round(Math.max(0,Math.min(width-1,x))), py=Math.round(Math.max(0,Math.min(height-1,y))); return (py*width+px)*4; };
+  const ringDistance=(offset)=>{
+    let total=0, count=0;
+    for(const point of ring){
+      const sx=Math.round(cx+point.x*radius), sy=Math.round(cy+point.y*radius);
+      const dx=Math.round(sx+offset.x), dy=Math.round(sy+offset.y);
+      if(dx<0||dy<0||dx>=width||dy>=height) continue;
+      const a=sample(sx,sy), b=sample(dx,dy);
+      total+=Math.abs(pixels[a]-pixels[b])+Math.abs(pixels[a+1]-pixels[b+1])+Math.abs(pixels[a+2]-pixels[b+2]);
+      count++;
+    }
+    return count?total/count:Infinity;
+  };
+  let best=null, bestScore=Infinity;
+  for(const offset of offsets){
+    if(cx+offset.x-radius*0.5<0||cy+offset.y-radius*0.5<0||cx+offset.x+radius*0.5>=width||cy+offset.y+radius*0.5>=height) continue;
+    const score=ringDistance(offset);
+    if(score<bestScore){ bestScore=score; best=offset; }
+  }
+  return best;
+}
+function applyHealDab(pixels,width,height,stroke){
+  const radius=healDabRadius(stroke,width,height);
+  const cx=stroke.x*width, cy=stroke.y*height;
+  const offsets=social.healPatchOffsets(radius,5);
+  const offset=healPlanOffset(pixels,width,height,cx,cy,radius,offsets)||{x:radius*1.6,y:0};
+  const inner=Math.max(1,Math.round(radius*0.62)), outer=Math.max(inner+1,Math.round(radius*1.05));
+  const x0=Math.max(0,Math.floor(cx-outer)), x1=Math.min(width-1,Math.ceil(cx+outer));
+  const y0=Math.max(0,Math.floor(cy-outer)), y1=Math.min(height-1,Math.ceil(cy+outer));
+  const copy=new Uint8ClampedArray(pixels.length);
+  copy.set(pixels);
+  for(let y=y0;y<=y1;y++){
+    for(let x=x0;x<=x1;x++){
+      const distance=Math.hypot(x-cx,y-cy);
+      if(distance>outer) continue;
+      const sx=Math.round(x+offset.x), sy=Math.round(y+offset.y);
+      if(sx<0||sy<0||sx>=width||sy>=height) continue;
+      const target=(y*width+x)*4, source=(sy*width+sx)*4;
+      // Feathered edge: solid in the middle, then a smooth ramp out to the ring.
+      const weight=distance<=inner?1:1-((distance-inner)/Math.max(1,outer-inner));
+      const alpha=weight*weight*(3-2*weight);
+      for(let channel=0;channel<3;channel++){
+        pixels[target+channel]=copy[target+channel]*(1-alpha)+copy[source+channel]*alpha;
+      }
+    }
+  }
+  // Two smoothing passes blend the filled patch into its ring so no hard seam is left.
+  const blurred=new Uint8ClampedArray(pixels.length);
+  blurred.set(pixels);
+  for(let pass=0;pass<2;pass++){
+    for(let y=Math.max(1,y0);y<=Math.min(height-2,y1);y++){
+      for(let x=Math.max(1,x0);x<=Math.min(width-2,x1);x++){
+        if(Math.hypot(x-cx,y-cy)>outer) continue;
+        const at=(y*width+x)*4;
+        for(let channel=0;channel<3;channel++){
+          const average=(blurred[at+channel]*4+blurred[at-4+channel]+blurred[at+4+channel]+blurred[at-width*4+channel]+blurred[at+width*4+channel])/8;
+          pixels[at+channel]=average;
+        }
+      }
+    }
+    blurred.set(pixels);
+  }
+}
+function applyHealToSource(source,width,height,strokes){
+  const list=social.normalizeHealStrokes(strokes);
+  if(!list.length) return source;
+  const target=document.createElement('canvas');
+  target.width=width; target.height=height;
+  const context=target.getContext('2d',{willReadFrequently:true});
+  context.drawImage(source,0,0,width,height);
+  let image=context.getImageData(0,0,width,height);
+  for(const stroke of list) applyHealDab(image.data,width,height,stroke);
+  context.putImageData(image,0,0);
+  return target;
+}
+function stampHealStroke(stroke){
+  const item=currentPhoto;
+  if(!item||isVideo) return;
+  const base=healSourceCanvas();
+  if(!base) return;
+  const context=base.getContext('2d',{willReadFrequently:true});
+  const image=context.getImageData(0,0,base.width,base.height);
+  for(const dab of stroke.points) applyHealDab(image.data,base.width,base.height,dab);
+  context.putImageData(image,0,0);
+}
+function commitHealStroke(stroke){
+  if(!currentPhoto||isVideo||!stroke||!stroke.points.length) return;
+  const item=currentPhoto;
+  stampHealStroke(stroke);
+  item.healStrokes=photoHealStrokes(item).concat(stroke.points);
+  item.healStrokeGroups=photoHealStrokeGroups(item).concat([stroke.points]);
+  const base=healSourceCanvas();
+  if(base) uploadPhotoSourceTexture(base);
+  photoSampleKey=null;
+  if(base) buildPhotoSampleCanvas(base,canvas.width,canvas.height,item.id);
+  clearPhotoRenderCache();
+  syncHealControls();
+  pushHistory(`Spot heal · ${stroke.points.length} dab${stroke.points.length===1?'':'s'}`);
+  render(performance.now());
+  showToast('Blemish filled from the surrounding pixels');
+}
+function clearHealEdits(){
+  if(!currentPhoto||isVideo) return;
+  if(!photoHealStrokes(currentPhoto).length){ showToast('No spot heal edits on this photo'); return; }
+  currentPhoto.healStrokes=[];
+  currentPhoto.healStrokeGroups=[];
+  syncHealControls();
+  refreshHealPixels(currentPhoto,'Spot heal edits cleared');
+  pushHistory('Spot heal cleared');
+}
+function undoHealStroke(){
+  if(!currentPhoto||isVideo) return;
+  const dabs=photoHealStrokes(currentPhoto);
+  if(!dabs.length){ showToast('Nothing to undo'); return; }
+  const groups=photoHealStrokeGroups(currentPhoto);
+  const removed=groups.at(-1)||[dabs.at(-1)];
+  currentPhoto.healStrokes=dabs.slice(0,Math.max(0,dabs.length-removed.length));
+  currentPhoto.healStrokeGroups=groups.slice(0,-1);
+  syncHealControls();
+  refreshHealPixels(currentPhoto,`Undid the last heal stroke (${removed.length} dab${removed.length===1?'':'s'})`);
+}
+async function refreshHealPixels(item,message){
+  if(!item||isVideo||currentPhoto!==item) return;
+  const token=++healRebuildToken;
+  try{
+    const img=await decodePhoto(item);
+    if(currentPhoto!==item||token!==healRebuildToken) return;
+    suppressPhotoOverride=true;
+    try{ uploadPhoto(item,img,false); }finally{ suppressPhotoOverride=false; }
+    syncHealControls();
+    if(message) showToast(message);
+  }catch(error){ console.warn('The spot heal edits could not be re-applied.',error); showToast('Spot heal could not be re-applied'); }
+}
+function syncHealControls(){
+  const available=!isVideo&&!!currentPhoto;
+  const count=available?photoHealSpotCount(currentPhoto):0;
+  const brush=$('healBrushBtn');
+  if(brush){
+    brush.setAttribute('aria-pressed',String(healMode&&available));
+    brush.disabled=!available;
+    brush.textContent=healMode?'⦿ Heal brush on':'⦿ Heal brush';
+  }
+  const size=$('sliderHealSize');
+  if(size) size.disabled=!available;
+  const undo=$('healUndoBtn'), clear=$('healClearBtn');
+  if(undo) undo.disabled=!available||!count;
+  if(clear) clear.disabled=!available||!count;
+  const status=$('healStatus');
+  if(status&&!status.dataset.busy){
+    status.textContent=!available?'Open a photo to heal blemishes.'
+      :healMode?`Heal brush armed · brush ${Math.round(healSize)} · paint over a blemish.`
+      :count?`${count} healed spot${count===1?'':'s'} on this photo. Switch the brush on to heal more.`
+      :'Arm the heal brush, then paint over a blemish. The patch is filled from the surrounding pixels on this device.';
+  }
+  if(!healMode) hideHealBrushCursor();
+  updateHealOverlay();
+}
+function setHealMode(on){
+  healMode=!!on&&!isVideo&&!!currentPhoto;
+  if(healMode){ cropEditing=false; setWbPicking(false); if(typeof setMaskPaintMode==='function') setMaskPaintMode(null); }
+  syncHealControls();
+  if(healMode) showToast('Heal brush on — paint over a blemish');
+}
+function healStrokePoint(event){ return previewPointToSource(event.clientX,event.clientY); }
+function healPointerDown(event){
+  if(!healMode||!currentPhoto||isVideo||exportBusy||mediaBusy) return;
+  if(event.pointerType==='mouse'&&event.button!==0) return;
+  event.preventDefault();
+  // Capture phase plus stopImmediatePropagation keeps the crop, pan and mask handlers out of the way.
+  if(event.stopImmediatePropagation) event.stopImmediatePropagation(); else event.stopPropagation();
+  canvas.setPointerCapture(event.pointerId);
+  healStroke={id:event.pointerId,points:[{...healStrokePoint(event),r:healSize/100}]};
+  updateHealOverlay();
+}
+function healPointerMove(event){
+  if(healMode){
+    healBrushCursorPoint={x:event.clientX,y:event.clientY};
+    updateHealBrushCursor(event);
+  }
+  if(!healStroke||healStroke.id!==event.pointerId) return;
+  if(event.stopImmediatePropagation) event.stopImmediatePropagation();
+  const point=healStrokePoint(event);
+  const previous=healStroke.points.at(-1);
+  const travel=Math.hypot((point.x-previous.x)*canvas.width,(point.y-previous.y)*canvas.height);
+  const steps=Math.max(1,Math.min(48,Math.ceil(travel/Math.max(1.5,healSize*0.6))));
+  // A drag lays down a row of dabs, the same way a soft brush paints.
+  for(let step=1;step<=steps;step++){
+    const t=step/steps;
+    healStroke.points.push({x:previous.x+(point.x-previous.x)*t,y:previous.y+(point.y-previous.y)*t,r:healSize/100});
+  }
+  updateHealOverlay();
+}
+function healPointerUp(event){
+  if(!healStroke||healStroke.id!==event.pointerId) return;
+  if(event.stopImmediatePropagation) event.stopImmediatePropagation();
+  const stroke=healStroke; healStroke=null;
+  try{ canvas.releasePointerCapture(event.pointerId); }catch(error){}
+  commitHealStroke(stroke);
+  updateHealOverlay();
+}
+function updateHealOverlay(){
+  const overlay=$('healOverlayCanvas');
+  if(!overlay) return;
+  const active=appState.mode==='photo'&&!isVideo&&hasContent&&(healMode||photoHealStrokes(currentPhoto).length>0);
+  if(!active){ overlay.classList.remove('visible'); return; }
+  overlay.classList.add('visible');
+  const rect=canvas.getBoundingClientRect(), wrap=canvasWrap.getBoundingClientRect();
+  if(!rect.width||!rect.height) return;
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const width=Math.max(1,Math.round(rect.width*dpr)), height=Math.max(1,Math.round(rect.height*dpr));
+  if(overlay.width!==width||overlay.height!==height){ overlay.width=width; overlay.height=height; }
+  overlay.style.left=`${rect.left-wrap.left}px`; overlay.style.top=`${rect.top-wrap.top}px`;
+  overlay.style.width=`${rect.width}px`; overlay.style.height=`${rect.height}px`;
+  applyGeometryOverlayTransform(overlay);
+  const context=overlay.getContext('2d');
+  context.clearRect(0,0,width,height);
+  const scaled=window.devicePixelRatio?Math.min(2,window.devicePixelRatio||1):1;
+  const drawDab=(point)=>{
+    const display=displayedPointFromSource(point.x,point.y);
+    const radius=point.r*Math.min(rect.width,rect.height)*scaled;
+    context.beginPath();
+    context.arc(display.x*width,display.y*height,Math.max(2,radius),0,Math.PI*2);
+    context.fillStyle='rgba(214,40,40,.28)';
+    context.fill();
+    context.strokeStyle='rgba(255,255,255,.75)';
+    context.lineWidth=1;
+    context.stroke();
+  };
+  for(const point of photoHealStrokes(currentPhoto).slice(-300)) drawDab(point);
+  if(healStroke) for(const point of healStroke.points) drawDab(point);
+}
+function updateHealBrushCursor(event){
+  const cursor=$('healBrushCursor');
+  if(!cursor) return;
+  if(!healMode||!healBrushCursorPoint){ hideHealBrushCursor(); return; }
+  const rect=canvas.getBoundingClientRect(), wrap=canvasWrap.getBoundingClientRect(), point=healBrushCursorPoint;
+  if(point.x<rect.left||point.x>rect.right||point.y<rect.top||point.y>rect.bottom){ hideHealBrushCursor(); return; }
+  const diameter=Math.max(8,healSize*2*rect.width/Math.max(1,canvas.width));
+  cursor.classList.add('visible');
+  cursor.style.left=`${point.x-wrap.left}px`; cursor.style.top=`${point.y-wrap.top}px`;
+  cursor.style.width=`${diameter}px`; cursor.style.height=`${diameter}px`;
+  cursor.style.marginLeft=`${-diameter/2}px`; cursor.style.marginTop=`${-diameter/2}px`;
+}
+function hideHealBrushCursor(){ const cursor=$('healBrushCursor'); if(cursor) cursor.classList.remove('visible'); }
+
+// --- lens blur ------------------------------------------------------------------------------
+function lensBlurMask(){
+  if(isVideo||!currentPhoto||!hasContent) return null;
+  // 1. The mask layers composite — a Subject / Background / Pick layer gives the cleanest edge.
+  if(maskBgTexture&&maskBgActive&&maskBgCanvas&&appState.mode==='photo')
+    return {texture:maskBgTexture,texel:[1/maskBgCanvas.width,1/maskBgCanvas.height],source:'layers',invert:!!maskBgSettings.invert};
+  // 2. Fall back to the protect-subject mask, but only when a subject was actually selected —
+  //    an untouched mask is all background and would blur the whole photo.
+  const selected=!!autoSubjectMask||maskStrokes.some(stroke=>stroke.mode==='protect');
+  if(subjectMaskTexture&&maskCanvas&&selected)
+    return {texture:subjectMaskTexture,texel:[1/maskCanvas.width,1/maskCanvas.height],source:'subject',invert:false};
+  return null;
+}
+function lensBlurMaskKey(){
+  const mask=lensBlurMask();
+  return mask?`${mask.source}:${mask.texture===maskBgTexture?'layers':'subject'}:${maskBgRevision}:${maskBgImageRevision}`:'none';
+}
+function lensBlurPlan(){
+  if(isVideo||!currentPhoto||!hasContent) return null;
+  const settings=currentLensBlur();
+  if(settings.strength<=0) return null;
+  const mask=lensBlurMask();
+  if(!mask) return null;
+  return {strength:settings.strength/100,feather:settings.feather/100,mask,radius:social.lensBlurRadius(settings.strength,canvas.width,canvas.height)};
+}
+function updateLensBlurStatus(){
+  const status=$('lensBlurStatus');
+  if(!status) return;
+  const settings=currentLensBlur();
+  const mask=(!isVideo&&currentPhoto)?lensBlurMask():null;
+  if(isVideo||!currentPhoto){ status.textContent='Open a photo to blur its background.'; return; }
+  if(!mask){ status.textContent='Open the Mask tab and select the subject, then the background can be blurred.'; return; }
+  const where=mask.source==='layers'?'the Mask tab selection':'the Protect subject mask';
+  status.textContent=settings.strength>0?`Blurring behind ${where}. Feather ${settings.feather}%.`:`Ready — using ${where}. Raise the strength to blur the background.`;
+}
+function syncLensBlurControls(){
+  const available=!isVideo&&!!currentPhoto;
+  const settings=currentLensBlur();
+  const slider=$('sliderLensBlur'), feather=$('sliderLensFeather');
+  if(slider){ slider.value=String(settings.strength); slider.disabled=!available; }
+  if(feather){ feather.value=String(settings.feather); feather.disabled=!available; }
+  const readout=$('valLensBlur'); if(readout) readout.textContent=String(settings.strength);
+  const featherReadout=$('valLensFeather'); if(featherReadout) featherReadout.textContent=String(settings.feather);
+  updateLensBlurStatus();
+}
+function setLensBlurSettings(patch,{commit=false}={}){
+  if(!currentPhoto||isVideo) return;
+  const next=social.normalizeLensBlur({...photoLensBlur(currentPhoto),...patch});
+  const before=photoLensBlur(currentPhoto);
+  if(JSON.stringify(next)===JSON.stringify(before)){ if(commit) scheduleHistoryCommit(`Lens blur ${next.strength}%`); return; }
+  currentPhoto.lensBlur=next;
+  syncLensBlurControls();
+  lastPreviewRenderKey=null;
+  render(performance.now());
+  if(commit) scheduleHistoryCommit(`Lens blur ${next.strength}%`);
+}
+
+// --- film look fine tuning ------------------------------------------------------------------
+// The mirror sliders drive the existing Grain / Bloom / Hallation values, so every preset, saved
+// look and settings payload keeps working exactly as before.
+const FILM_LOOK_MIRRORS=[['Grain','FilmGrain'],['Bloom','FilmBloom'],['Hall','FilmHalation']];
+function syncFilmLookMirrors(){
+  for(const [primary,mirror] of FILM_LOOK_MIRRORS){
+    const source=sliders[primary], target=$('slider'+mirror), readout=$('val'+mirror);
+    if(!source||!target) continue;
+    const value=Number(source.value)||0;
+    if(Number(target.value)!==value) target.value=String(value);
+    target.disabled=source.disabled;
+    if(readout) readout.textContent=value>0?`+${value}`:String(value);
+  }
+}
+// Reset to original covers the round-7 tools too: perspective straight, focus neutral, film-look
+// fine tuning back to zero. Spot heal edits are pixels, not sliders, so they keep their own
+// Undo / Clear buttons.
+function resetPhotoToolSliders(){
+  for(const name of ['KeystoneV','KeystoneH']){ const slider=$('slider'+name); if(slider) slider.value='0'; }
+  const blur=$('sliderLensBlur'); if(blur) blur.value='0';
+  const feather=$('sliderLensFeather'); if(feather) feather.value=String(social.normalizeLensBlur({}).feather);
+  for(const [,mirror] of FILM_LOOK_MIRRORS){ const slider=$('slider'+mirror); if(slider) slider.value='0'; }
+  if(currentPhoto&&!isVideo&&!social.geometryIsNeutral(photoGeometry(currentPhoto))) setPhotoGeometry({flipH:false,flipV:false,keystoneV:0,keystoneH:0});
+  else { syncGeometryControls(); }
+  syncLensBlurControls(); syncFilmLookMirrors(); syncToolSliderUI();
+}
+function resetFilmLook(){
+  for(const [primary] of FILM_LOOK_MIRRORS){
+    const slider=sliders[primary];
+    if(!slider||Number(slider.value)===0) continue;
+    slider.value='0';
+    slider.dispatchEvent(new Event('input',{bubbles:true}));
+    slider.dispatchEvent(new Event('change',{bubbles:true}));
+  }
+  syncFilmLookMirrors();
+  showToast('Grain, bloom and halation reset');
+}
+
+// --- export presets on top of the quality / format controls ---------------------------------
+function applyExportPreset(id){
+  const preset=social.exportPreset(id);
+  if(!preset){ return false; }
+  exportOptions.format=preset.format;
+  exportOptions.type=preset.type;
+  exportOptions.quality=preset.quality;
+  exportOptions.comparison=false;
+  $('exportFileType').value=preset.type;
+  $('exportQuality').value=String(preset.quality);
+  syncExportPresetButtons();
+  updateSocialUI();
+  showToast(`${preset.label} — ${preset.detail}`,3600);
+  return true;
+}
+function syncExportPresetButtons(){
+  const buttons=[...document.querySelectorAll('[data-export-preset]')];
+  for(const button of buttons){
+    const preset=social.exportPreset(button.dataset.exportPreset);
+    const active=!!preset&&preset.format===exportOptions.format&&preset.type===exportOptions.type&&preset.quality===exportOptions.quality;
+    button.setAttribute('aria-pressed',String(active));
+  }
+}
+
+// --- wiring ---------------------------------------------------------------------------------
+// Perspective: the sliders and flips warp the GPU preview instantly and only bake a history step
+// when the drag ends, exactly like the existing slider pattern.
+for(const [sliderId,key] of [['sliderKeystoneV','keystoneV'],['sliderKeystoneH','keystoneH']]){
+  const slider=$(sliderId);
+  if(!slider) continue;
+  const label=key==='keystoneV'?'Vertical perspective':'Horizontal perspective';
+  slider.addEventListener('input',()=>setPhotoGeometry({[key]:Number(slider.value)}));
+  slider.addEventListener('change',()=>setPhotoGeometry({[key]:Number(slider.value)},{commit:true,label}));
+}
+const geometryFlipHButton=$('geometryFlipHBtn'), geometryFlipVButton=$('geometryFlipVBtn');
+if(geometryFlipHButton) geometryFlipHButton.addEventListener('click',()=>{
+  const flipH=!currentGeometry().flipH;
+  setPhotoGeometry({flipH},{commit:true,label:flipH?'Mirrored horizontally':'Mirror removed'});
+});
+if(geometryFlipVButton) geometryFlipVButton.addEventListener('click',()=>{
+  const flipV=!currentGeometry().flipV;
+  setPhotoGeometry({flipV},{commit:true,label:flipV?'Flipped vertically':'Flip removed'});
+});
+const geometryRotateRightButton=$('geometryRotateRightBtn'), geometryRotateLeftButton=$('geometryRotateLeftBtn');
+if(geometryRotateRightButton) geometryRotateRightButton.addEventListener('click',()=>rotateActiveMedia(90));
+if(geometryRotateLeftButton) geometryRotateLeftButton.addEventListener('click',()=>rotateActiveMedia(270));
+const geometryResetButton=$('geometryResetBtn');
+if(geometryResetButton) geometryResetButton.addEventListener('click',()=>{
+  if(!currentPhoto||isVideo) return;
+  if(social.geometryIsNeutral(photoGeometry(currentPhoto))){ showToast('Perspective is already straight'); return; }
+  setPhotoGeometry({flipH:false,flipV:false,keystoneV:0,keystoneH:0},{commit:true,label:'Perspective reset'});
+  showToast('Perspective reset');
+});
+const geometryStraightenResetButton=$('geometryStraightenResetBtn');
+if(geometryStraightenResetButton) geometryStraightenResetButton.addEventListener('click',()=>{
+  if(!currentPhoto||isVideo) return;
+  if(!social.clampStraighten(currentPhoto.straighten)){ showToast('This photo is not straightened'); return; }
+  setStraightenAngle(0,{commit:true});
+});
+
+// Spot heal.
+const healBrushButton=$('healBrushBtn'), healSizeSlider=$('sliderHealSize');
+if(healBrushButton) healBrushButton.addEventListener('click',()=>setHealMode(!healMode));
+if(healSizeSlider){
+  const readSize=()=>Math.max(1,Math.min(20,Number(healSizeSlider.value)||3));
+  healSizeSlider.addEventListener('input',()=>{ healSize=readSize(); syncHealControls(); });
+  healSizeSlider.addEventListener('change',()=>{ healSize=readSize(); syncHealControls(); });
+}
+const healUndoButton=$('healUndoBtn'), healClearButton=$('healClearBtn');
+if(healUndoButton) healUndoButton.addEventListener('click',undoHealStroke);
+if(healClearButton) healClearButton.addEventListener('click',clearHealEdits);
+canvas.addEventListener('pointerdown',healPointerDown,{capture:true});
+canvas.addEventListener('pointermove',healPointerMove,{capture:true});
+canvas.addEventListener('pointerup',healPointerUp,{capture:true});
+canvas.addEventListener('pointercancel',healPointerUp,{capture:true});
+
+// Lens blur.
+for(const [sliderId,key] of [['sliderLensBlur','strength'],['sliderLensFeather','feather']]){
+  const slider=$(sliderId);
+  if(!slider) continue;
+  slider.addEventListener('input',()=>setLensBlurSettings({[key]:Number(slider.value)}));
+  slider.addEventListener('change',()=>setLensBlurSettings({[key]:Number(slider.value)},{commit:true}));
+}
+
+// Film look fine tuning: the mirror sliders drive the existing grain, bloom and halation values,
+// so presets, saved looks and settings payloads keep working untouched.
+for(const [primary,mirror] of FILM_LOOK_MIRRORS){
+  const slider=$('slider'+mirror);
+  if(!slider) continue;
+  slider.addEventListener('input',()=>{
+    const source=sliders[primary];
+    if(!source) return;
+    source.value=slider.value;
+    source.dispatchEvent(new Event('input',{bubbles:true}));
+    const readout=$('val'+mirror), value=Number(slider.value)||0;
+    if(readout) readout.textContent=value>0?`+${value}`:String(value);
+  });
+  slider.addEventListener('change',()=>sliders[primary]?.dispatchEvent(new Event('change',{bubbles:true})));
+}
+const filmLookResetButton=$('filmLookResetBtn');
+if(filmLookResetButton) filmLookResetButton.addEventListener('click',resetFilmLook);
+
+for(const name of TOOL_SLIDER_NAMES){
+  const slider=$('slider'+name);
+  if(slider) slider.addEventListener('input',syncToolSliderUI);
+}
+
+// Export presets.
+document.querySelectorAll('[data-export-preset]').forEach(button=>button.addEventListener('click',()=>applyExportPreset(button.dataset.exportPreset)));
+
+syncGeometryControls();
+syncLensBlurControls();
+syncHealControls();
+syncFilmLookMirrors();
+syncExportPresetButtons();
 // FFmpeg is initialized only after a video upload succeeds; exports await the shared loader promise.
 console.log('Film Lab — Instagram tools · 44 signed controls — WebGL2', gl.getParameter(gl.VERSION));
 })();

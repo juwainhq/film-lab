@@ -6,8 +6,10 @@ const vm = require('node:vm');
 const social = require('../social-tools.js');
 const html = readFileSync(resolve(__dirname,'../index.html'),'utf8');
 const script = html.split('<script>')[1].split('</script>')[0];
-// `ids` mirrors the app's own legacy slider list: the Color Grade sliders and the standalone
-// Straighten control ride along in the fuller snapshot payload, not in this 44-slider list.
+// `ids` mirrors every slider the app exposes outside the Color Grade tab: the 44 legacy effect
+// sliders plus the round-7 photo tools (perspective, heal, lens blur, film-look fine tuning). The
+// Color Grade sliders and the standalone Straighten control ride in the fuller snapshot payload
+// instead.
 const ids = [...html.matchAll(/id="slider(\w+)"/g)].map(m=>m[1]).filter(id=>!/^(?:Grade|Hsl|Straighten)/.test(id));
 const effects = ['color','bloom','hallation','grain','dither','sharpen'];
 const snapshot = () => ({version:1,values:Object.fromEntries(ids.map(id=>[id,0])),effects:Object.fromEntries(effects.map(id=>[id,true])),scope:'full',preset:'Café / রঙ',export:{format:'portrait',type:'jpeg',quality:94},dither:{algorithm:'halftone',downscale:4,colorMode:'custom',paletteSize:8,threshold:0.62,spread:1.4,angle:27,paletteShadow:'#221122',paletteHighlight:'#f0e0c0'}});
@@ -143,7 +145,7 @@ test('settings and look links round-trip all effect sliders, switches, scope, ex
   const clean=social.sanitizeSettings(input,ids,effects), hash=social.encodeSettings(clean);
   assert.match(hash,/^#look=v2\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
   assert.equal(clean.values.HighlightTint,68); assert.equal(clean.effects.grain,false); assert.equal(clean.preset,'Café / রঙ');
-  assert.ok(!hash.includes(' ')); assert.equal(ids.length,44);
+  assert.ok(!hash.includes(' ')); assert.equal(ids.length,52); // 44 effect sliders + the 8 round-7 perspective / heal / lens / film-look controls
 });
 test('settings imports clamp signed values, ignore unknown keys, and reject malformed or oversized links', () => {
   const input=snapshot(); input.values.Exposure=400; input.values.Grain=-400; input.values.Hall=NaN;

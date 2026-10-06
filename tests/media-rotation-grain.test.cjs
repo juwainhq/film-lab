@@ -37,11 +37,17 @@ test('rotation controls change photo pixels and video frame pixels, not just pre
   assert.match(html, /id="rotateMediaBtn" aria-label="Rotate media 90 degrees clockwise"/);
   assert.match(script, /function rotateCanvas\(source,width,height,degrees\)/);
   assert.match(script, /ctx\.drawImage\(source,-width\/2,-height\/2,width,height\)/);
-  assert.match(script, /const source=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\)/);
+  assert.match(script, /const straightened=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\)/);
+  assert.match(script, /const source=applyHealToSource\(straightened,w,h,item\.healStrokes\)/);
   assert.match(script, /function applyStraightenToSource\(source,width,height,angle\)/);
   assert.match(script, /videoFrameContext\.drawImage\(videoEl,-sourceW\/2,-sourceH\/2,sourceW,sourceH\)/);
-  assert.match(script, /videoRotation=\(videoRotation\+90\)%360/);
-  assert.match(script, /item\.rotation=\(\(item\.rotation\|\|0\)\+90\)%360/);
+  // Round 7 shares one rotate helper for the preview controls and the new geometry row, so both
+  // directions go through the same quarter-turn value while the pixels are rebuilt the same way.
+  assert.match(script, /function rotateActiveMedia\(direction=90\)/);
+  assert.match(script, /videoRotation=\(videoRotation\+quarter\)%360/);
+  assert.match(script, /item\.rotation=\(\(item\.rotation\|\|0\)\+quarter\)%360/);
+  assert.match(script, /item\.mask && rotatePhotoMask\(item\.mask,quarter\)/);
+  assert.match(script, /item\.healStrokes=photoHealStrokes\(item\)\.map\(point=>\(\{\.\.\.point,\.\.\.rotateNormalizedPoint\(point,quarter\)\}\)\)/);
   assert.match(script, /useWebCodecs=videoRotation===0/);
   assert.match(script, /else uploadVideoTexture\(\)/);
   assert.match(script, /function makeExportCanvas\([\s\S]*?social\.cropRect\(canvas\.width,canvas\.height/);

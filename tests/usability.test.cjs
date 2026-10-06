@@ -38,7 +38,7 @@ test('look cards preview the loaded photo, render one per frame, and cache on th
   assert.match(script, /lookPreviewSource=source;[\s\S]*?lookPreviewKey=`\$\{item\?\.id\|\|'photo'\}:\$\{\+\+lookPreviewGeneration\}`/);
   // The thumbnail is built once per loaded photo, inside uploadPhoto, and never from a slider move.
   assert.equal((script.match(/createLookPreviewSource\(/g) || []).length, 2);
-  assert.match(script, /const source=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\);\n  buildPhotoSampleCanvas\(source,w,h,item\.id\);\n  createLookPreviewSource\(item,source\);/);
+  assert.match(script, /const source=applyHealToSource\(straightened,w,h,item\.healStrokes\);\n  photoHealCanvas=ensureHealCanvas\(source,w,h\);\n  buildPhotoSampleCanvas\(source,w,h,item\.id\);\n  createLookPreviewSource\(item,source\);/);
   const sliderPath = script.slice(script.indexOf('function userChangedSliders(){'), script.indexOf('function updateDitherControlVisibility(){'));
   assert.doesNotMatch(sliderPath, /LookPreview|createLookPreviewSource/);
   assert.doesNotMatch(sliderPath, /toDataURL/);

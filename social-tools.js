@@ -32,6 +32,15 @@
   });
   const DEFAULT_EXPORT = Object.freeze({format: 'original', type: 'jpeg', quality: 92, comparison: false, comparisonFormat: 'landscape', labels: true});
   const DEFAULT_DITHER = Object.freeze({algorithm:'bayer4',downscale:1,colorMode:'color',paletteSize:16,threshold:0.5,spread:1,angle:0,paletteShadow:'#111111',paletteHighlight:'#f5f5f5'});
+  // Export presets: the three Instagram workflows the panel offers. `jpeg` keeps the files small
+  // enough for a phone upload, `webp` is the smaller modern option and PNG stays lossless.
+  const EXPORT_TYPES = Object.freeze(['jpeg', 'png', 'webp']);
+  const EXPORT_TYPE_LABELS = Object.freeze({jpeg: 'JPG', png: 'PNG', webp: 'WebP'});
+  const EXPORT_PRESETS = Object.freeze([
+    Object.freeze({id: 'instagram', label: 'Instagram 4:5', detail: '1080 wide · 1080 × 1350', format: 'portrait', type: 'jpeg', quality: 92}),
+    Object.freeze({id: 'story', label: 'Story / Reel 9:16', detail: '1080 × 1920 · full screen', format: 'story', type: 'jpeg', quality: 92}),
+    Object.freeze({id: 'full', label: 'Full quality', detail: 'No crop · 100% quality', format: 'original', type: 'jpeg', quality: 100}),
+  ]);
   const DITHER_ALGORITHMS = new Set(['floyd-steinberg','floyd-steinberg-serpentine','stucki','burkes','atkinson','jarvis-judice-ninke','sierra','two-row-sierra','bayer4','bayer8','halftone4','halftone8','halftone','none']);
   const DITHER_COLORS = new Set(['monochrome','duotone','color','custom']);
   const DITHER_PALETTE_SIZES = new Set([2,4,8,16,32]);
@@ -44,7 +53,7 @@
     if (!input || typeof input !== 'object') input = {};
     return {
       format: own(FORMATS, input.format) ? input.format : DEFAULT_EXPORT.format,
-      type: input.type === 'png' ? 'png' : 'jpeg',
+      type: EXPORT_TYPES.includes(input.type) ? input.type : DEFAULT_EXPORT.type,
       quality: Math.round(clamp(finite(input.quality, 92), 80, 100)),
       comparison: input.comparison === true,
       comparisonFormat: own(COMPARISONS, input.comparisonFormat) ? input.comparisonFormat : 'landscape',
@@ -185,6 +194,170 @@
   function cropRatioPreset(id) {
     return CROP_RATIO_PRESETS.find(preset => preset.id === id || preset.format === id) || null;
   }
+  function exportPreset(id) {
+    const preset = EXPORT_PRESETS.find(entry => entry.id === id);
+    return preset ? {...preset} : null;
+  }
+  function exportMimeType(type) {
+    return ({png: 'image/png', webp: 'image/webp'})[type] || 'image/jpeg';
+  }
+  function exportExtension(type) {
+    return ({png: 'png', webp: 'webp'})[type] || 'jpg';
+  }
+  // PNG is lossless, so the quality slider does not apply to it.
+  function exportQualityApplies(type) {
+    return type !== 'png';
+  }
+  // What the encoder actually produced decides the extension and the label: a browser that
+  // silently falls back to JPEG must not hand the user a file called .webp.
+  function exportFormatFor(requestedType, blobType) {
+    const labels = {jpeg: 'JPG', png: 'PNG', webp: 'WebP'};
+    const mime = typeof blobType === 'string' ? blobType : blobType && blobType.type;
+    const fromMime = mime === 'image/webp' ? 'webp' : mime === 'image/png' ? 'png' : mime ? 'jpeg' : null;
+    const type = fromMime || (EXPORT_TYPES.includes(requestedType) ? requestedType : 'jpeg');
+    return {type, extension: exportExtension(type), label: labels[type] || 'JPG', qualityApplies: exportQualityApplies(type)};
+  }
+  // === Perspective / keystone ================================================================
+  // The preview shader maps an output coordinate to a source coordinate with the inverse of a
+  // projective (homography) warp:
+  //   p = (uv - 0.5) * 2      p' = p * scale / (1 - kH*p.x - kV*p.y)      uv' = p' * 0.5 + 0.5
+  // Both helpers below mirror that maths on the CPU so the fill scale, the eyedropper sample and
+  // the brush coordinates agree with what the GPU draws.
+  const KEYSTONE_LIMIT = 0.22;
+  function keystoneAmount(value) {
+    return clamp(finite(Number(value), 0), -100, 100) / 100 * KEYSTONE_LIMIT;
+  }
+  // The warp divides by (1 - kH*x - kV*y), which magnifies the side that moves towards the camera.
+  // Sampling therefore has to shrink by the smallest corner denominator, otherwise the magnified
+  // corners would read outside the photo and smear; shrinking is what an auto-crop does — the
+  // frame stays full, at the cost of a little of the original edges.
+  function keystoneFillScale(vertical, horizontal) {
+    const kV = keystoneAmount(vertical), kH = keystoneAmount(horizontal);
+    if (!kV && !kH) return 1;
+    return clamp(1 - Math.abs(kH) - Math.abs(kV), 0.3, 1);
+  }
+  // Output (normalized) point -> source (normalized) point, the same direction the shader uses.
+  function keystoneMapPoint(vertical, horizontal, x, y) {
+    const kV = keystoneAmount(vertical), kH = keystoneAmount(horizontal);
+    const px = (finite(Number(x), 0.5) - 0.5) * 2, py = (finite(Number(y), 0.5) - 0.5) * 2;
+    if (!kV && !kH) return {x: clamp(px * 0.5 + 0.5, 0, 1), y: clamp(py * 0.5 + 0.5, 0, 1)};
+    const scale = keystoneFillScale(vertical, horizontal);
+    const denominator = Math.max(0.2, 1 - kH * px - kV * py);
+    return {x: clamp(px * scale / denominator * 0.5 + 0.5, 0, 1), y: clamp(py * scale / denominator * 0.5 + 0.5, 0, 1)};
+  }
+  // Source point -> output point: what the brush, the heal tool and the eyedropper need to read
+  // the pixel under the pointer. The warp is linear in the source point once the denominator is
+  // substituted, so it inverts exactly instead of by iteration.
+  //   q = p * s / d(p)   with d(p) = 1 - kH*px - kV*py
+  //   (s + qx*kH) px + (qx*kV) py = qx
+  //          (qy*kH) px + (s + qy*kV) py = qy
+  function keystoneInversePoint(vertical, horizontal, x, y) {
+    const kV = keystoneAmount(vertical), kH = keystoneAmount(horizontal);
+    const scale = keystoneFillScale(vertical, horizontal);
+    const qx = (clamp(finite(Number(x), 0.5), 0, 1) - 0.5) * 2, qy = (clamp(finite(Number(y), 0.5), 0, 1) - 0.5) * 2;
+    if (!kV && !kH) {
+      const px = qx * scale, py = qy * scale;
+      return {x: clamp(px * 0.5 + 0.5, 0, 1), y: clamp(py * 0.5 + 0.5, 0, 1)};
+    }
+    const a = scale + qx * kH, b = qx * kV, c = qy * kH, d = scale + qy * kV;
+    const determinant = a * d - b * c;
+    const px = Math.abs(determinant) < 1e-9 ? qx * scale : (qx * d - b * qy) / determinant;
+    const py = Math.abs(determinant) < 1e-9 ? qy * scale : (a * qy - qx * c) / determinant;
+    return {x: clamp(px * 0.5 + 0.5, 0, 1), y: clamp(py * 0.5 + 0.5, 0, 1)};
+  }
+  // Flip / mirror, shared by the shader uniforms and the pointer mapping.
+  function flipPoint(x, y, horizontalFlip, verticalFlip) {
+    const nx = clamp(finite(Number(x), 0.5), 0, 1), ny = clamp(finite(Number(y), 0.5), 0, 1);
+    return {x: horizontalFlip ? 1 - nx : nx, y: verticalFlip ? 1 - ny : ny};
+  }
+  // === Lens blur ============================================================================
+  // Strength is the blur radius behind the subject, feather is how far the transition between the
+  // sharp subject and the blurred background spreads.
+  function normalizeLensBlur(input) {
+    const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    return {
+      strength: Math.round(clamp(finite(Number(source.strength), 0), 0, 100)),
+      feather: Math.round(clamp(finite(Number(source.feather), 30), 0, 100)),
+    };
+  }
+  // Pixel radius for the half-resolution blur passes; scaled by the frame so the look is the same
+  // on a phone preview and a full-size export.
+  function lensBlurRadius(strength, width, height) {
+    const amount = clamp(finite(Number(strength), 0), 0, 100) / 100;
+    if (!amount) return 0;
+    const reference = Math.max(1, Math.min(finite(Number(width), 1), finite(Number(height), 1)));
+    return Math.max(1, amount * (4 + reference * 0.02));
+  }
+  // CSS matrix3d (column-major argument order) for the same warp, so an overlay canvas laid over
+  // the preview lines up with the photo. Returns 16 numbers; identity when the geometry is neutral.
+  function geometryOverlayMatrix(geometry, width, height) {
+    const g = normalizeGeometry(geometry);
+    const w = Math.max(1, finite(Number(width), 1)), h = Math.max(1, finite(Number(height), 1));
+    const kH = g.keystoneH / 100 * KEYSTONE_LIMIT, kV = g.keystoneV / 100 * KEYSTONE_LIMIT;
+    const scale = keystoneFillScale(g.keystoneV, g.keystoneH);
+    const flipX = g.flipH ? -1 : 1, flipY = g.flipV ? -1 : 1;
+    const sum = 1 + kH * flipX + kV * flipY;
+    const a = 2 * flipX * (scale - kH);
+    const b = -2 * kH * flipX * h / w;
+    const c = -2 * kV * flipY * w / h;
+    const f = 2 * flipY * (scale - kV);
+    // The denominator is 2*d, so the w row carries twice the d coefficients.
+    return [
+      a, b, 0, -4 * kH * flipX / w,
+      c, f, 0, -4 * kV * flipY / h,
+      0, 0, 1, 0,
+      w * (sum - scale * flipX), h * (sum - scale * flipY), 0, 2 * sum,
+    ];
+  }
+  function normalizeGeometry(input) {
+    const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    return {
+      flipH: source.flipH === true,
+      flipV: source.flipV === true,
+      keystoneV: Math.round(clamp(finite(Number(source.keystoneV), 0), -100, 100)),
+      keystoneH: Math.round(clamp(finite(Number(source.keystoneH), 0), -100, 100)),
+    };
+  }
+  function geometryIsNeutral(geometry) {
+    const g = normalizeGeometry(geometry);
+    return !g.flipH && !g.flipV && !g.keystoneV && !g.keystoneH;
+  }
+  // === Spot heal =============================================================================
+  // One dab fills a disc from a nearby patch. The patch is chosen by matching the ring of pixels
+  // just outside the disc, so the fill picks up the surrounding texture and colour instead of a
+  // flat average; the result is then blended in with a soft edge so no seam is left behind.
+  function normalizeHealStrokes(input, limit = 400) {
+    if (!Array.isArray(input)) return [];
+    const strokes = [];
+    for (const entry of input.slice(0, limit)) {
+      if (!entry || typeof entry !== 'object') continue;
+      const x = finite(Number(entry.x), NaN), y = finite(Number(entry.y), NaN), r = finite(Number(entry.r), NaN);
+      if (![x, y, r].every(Number.isFinite)) continue;
+      strokes.push({x: clamp(x, 0, 1), y: clamp(y, 0, 1), r: clamp(r, 0.004, 0.3)});
+    }
+    return strokes;
+  }
+  function healRingSamples(size = 16) {
+    const count = Math.max(6, Math.min(48, Math.round(size)));
+    const points = [];
+    for (let index = 0; index < count; index++) {
+      const angle = index / count * Math.PI * 2;
+      points.push({x: Math.cos(angle), y: Math.sin(angle)});
+    }
+    return points;
+  }
+  // Candidate source offsets, ordered by distance so the closest usable patch wins ties.
+  function healPatchOffsets(radiusPixels, ring = 4) {
+    const offsets = [];
+    for (const factor of [1.35, 1.7, 2.1, 2.6, 3.2].slice(0, Math.max(1, ring))) {
+      for (let index = 0; index < 12; index++) {
+        const angle = index / 12 * Math.PI * 2 + (factor - 1.35) * 0.9;
+        offsets.push({x: Math.cos(angle) * radiusPixels * factor, y: Math.sin(angle) * radiusPixels * factor});
+      }
+    }
+    return offsets;
+  }
+
   // Snapshot / clipboard payloads carry the Adjust values, the Color Grade state, the crop angle
   // and the source photo name. `settings` keeps the existing sanitizeSettings shape so shared
   // look links stay byte-compatible.
@@ -199,6 +372,9 @@
       grade,
       straighten: clampStraighten(input.straighten),
       crop: position ? {x: clamp(finite(position.x, 0.5), 0, 1), y: clamp(finite(position.y, 0.5), 0, 1)} : null,
+      geometry: normalizeGeometry(input.geometry),
+      lens: normalizeLensBlur(input.lens),
+      heal: normalizeHealStrokes(input.heal),
       origin: typeof input.origin === 'string' ? input.origin.slice(0, 120) : null,
     };
   }
@@ -276,5 +452,5 @@
     args.push('output.' + container);
     return args;
   }
-  return {FORMATS, COMPARISONS, CROP_RATIO_PRESETS, STRAIGHTEN_LIMIT, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, cropRatioPreset, clampStraighten, straightenFillScale, normalizeFullSettings, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
+  return {FORMATS, COMPARISONS, CROP_RATIO_PRESETS, EXPORT_TYPES, EXPORT_TYPE_LABELS, EXPORT_PRESETS, KEYSTONE_LIMIT, STRAIGHTEN_LIMIT, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, cropRatioPreset, exportPreset, exportMimeType, exportExtension, exportQualityApplies, exportFormatFor, keystoneAmount, keystoneFillScale, keystoneMapPoint, keystoneInversePoint, flipPoint, geometryOverlayMatrix, normalizeGeometry, geometryIsNeutral, normalizeLensBlur, lensBlurRadius, normalizeHealStrokes, healRingSamples, healPatchOffsets, clampStraighten, straightenFillScale, normalizeFullSettings, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
 });
