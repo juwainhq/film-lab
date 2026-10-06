@@ -191,7 +191,7 @@ test('video timeline is an additive module with trim, cut, history, zoom, wavefo
 test('timeline output mapping covers concatenated cuts, dissolves, and black fades', () => {
   const mapper=timeline.match(/function mapOutputTime\(time, plan = getExportPlan\(\)\) \{[\s\S]*?\n  \}/)[0];
   const state=vm.createContext({getExportPlan:()=>({}),clamp:(n,min,max)=>Math.max(min,Math.min(max,n))});
-  vm.runInContext(`${mapper}\nthis.map=mapOutputTime;`,state);
+  vm.runInContext(`const state={clips:[]}; const fx=null; const MIN_CLIP_DURATION=0.1;\n${mapper}\nthis.map=mapOutputTime;`,state);
   const dissolve={transitionSeconds:.5,segments:[{start:0,end:2,transition:'dissolve'},{start:5,end:7,transition:'none'}]};
   assert.deepEqual(JSON.parse(JSON.stringify(state.map(1.75,dissolve))),{sourceTime:1.75,blendTime:5.25,blend:.5});
   const fadeOut={transitionSeconds:.5,segments:[{start:0,end:2,transition:'fade-to-black'},{start:4,end:5,transition:'none'}]};
@@ -433,7 +433,7 @@ test('V2+ composite against the actual preview frame and keep playback running f
 test('multi-timeline export mapping preserves trims, gap frames, transition choices, and configured duration', () => {
   const mapper=multiTimeline.match(/function mapOutputTime\(outputTime, plan\) \{[\s\S]*?\n  \}/)[0];
   const state=vm.createContext({});
-  vm.runInContext(`${mapper}\nthis.map=mapOutputTime;`,state);
+  vm.runInContext(`const state={clips:[]}; const fx=null; const MIN_CLIP_DURATION=0.1;\n${mapper}\nthis.map=mapOutputTime;`,state);
   const a={index:0,start:0,end:2,trimStart:1,trimEnd:3,source:'a.mp4',transition:'dissolve'};
   const b={index:1,start:2,end:4,trimStart:4,trimEnd:6,source:'b.mp4',transition:'none'};
   a.next=b;
@@ -467,7 +467,7 @@ test('multi-timeline export mapping preserves trims, gap frames, transition choi
 test('multi-timeline export plan honors transition duration and only overlaps adjacent dissolves', () => {
   const source=multiTimeline.match(/function getExportPlan\(clips = state\.clips\) \{[\s\S]*?\n  \}/)[0];
   const context=vm.createContext({});
-  vm.runInContext(`const state={media:new Map()}; const clipDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipEnd=c=>c.start+clipDuration(c); const transitionInfo=c=>({type:c?.transitionOut?.type||c?.transition||'none',duration:c?.transitionOut?.duration||0.5}); const getExportManifest=()=>({}); const getOverlaysAt=()=>[]; ${source}; this.setMedia=items=>state.media=new Map(items); this.plan=getExportPlan;`,context);
+  vm.runInContext(`const state={media:new Map()}; const clipDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipOutputDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipEnd=c=>c.start+clipDuration(c); const transitionInfo=c=>({type:c?.transitionOut?.type||c?.transition||'none',duration:c?.transitionOut?.duration||0.5}); const normalizeSpeed=value=>value||{rate:1,reverse:false,freeze:false,ramp:'none'}; const normalizeBlend=value=>value||'normal'; const normalizeOpacity=(value,fallback=1)=>Number.isFinite(Number(value))?Number(value):fallback; const normalizeChroma=value=>value||{enabled:false}; const normalizeKeyframes=value=>value||{position:[],scale:[],rotation:[],opacity:[]}; const getExportManifest=()=>({}); const getOverlaysAt=()=>[]; ${source}; this.setMedia=items=>state.media=new Map(items); this.plan=getExportPlan;`,context);
   const a={id:'a',mediaId:'ma',track:'main',start:0,trimStart:0,trimEnd:2,transition:'dissolve',transitionOut:{type:'dissolve',duration:1.2}};
   const b={id:'b',mediaId:'mb',track:'main',start:2,trimStart:0,trimEnd:2,transition:'none',transitionOut:{type:'none',duration:0.5}};
   context.setMedia([['ma',{type:'video',src:'a.mp4'}],['mb',{type:'video',src:'b.mp4'}]]);

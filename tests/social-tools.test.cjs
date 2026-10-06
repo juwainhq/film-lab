@@ -145,7 +145,10 @@ test('settings and look links round-trip all effect sliders, switches, scope, ex
   const clean=social.sanitizeSettings(input,ids,effects), hash=social.encodeSettings(clean);
   assert.match(hash,/^#look=v2\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
   assert.equal(clean.values.HighlightTint,68); assert.equal(clean.effects.grain,false); assert.equal(clean.preset,'Café / রঙ');
-  assert.ok(!hash.includes(' ')); assert.equal(ids.length,52); // 44 effect sliders + the 8 round-7 perspective / heal / lens / film-look controls
+  // 44 effect sliders + the 8 round-7 perspective / heal / lens / film-look controls + the 8
+  // round-8 video controls (clip speed, layer opacity, text size / stroke / box, chroma
+  // tolerance / softness / spill).
+  assert.ok(!hash.includes(' ')); assert.equal(ids.length,60);
 });
 test('settings imports clamp signed values, ignore unknown keys, and reject malformed or oversized links', () => {
   const input=snapshot(); input.values.Exposure=400; input.values.Grain=-400; input.values.Hall=NaN;

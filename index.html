@@ -491,7 +491,7 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 #workspacePill { display: inline-flex; align-items: center; padding: 5px 8px; border: 1px solid var(--panel-border); color: var(--text-dim); font: 500 9px 'JetBrains Mono',monospace; letter-spacing: .08em; text-transform: uppercase; }
 #sidebarControls { display: flex; flex-direction: column; gap: 24px; }
 #sidebarCollapseToggle { display: none; }
-#videoPlaybackControls,#videoCaptionPanel,#videoExportPanel,#editorTimeline { display: none; }
+#videoPlaybackControls,#videoCaptionPanel,#videoExportPanel,#videoFxPanel,#editorTimeline { display: none; }
 #captionOverlay { position: absolute; z-index: 8; transform: translate(-50%,-50%); max-width: 88%; color: #fff; font-weight: 700; line-height: 1.1; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; text-shadow: 0 2px 8px rgba(0,0,0,.9), 1px 1px 2px #000; cursor: move; touch-action: none; user-select: none; }
 #captionOverlay:focus-visible { outline: 1px dashed var(--text); outline-offset: 4px; }
 #captionOverlay[hidden] { display: none !important; }
@@ -516,12 +516,18 @@ input[type=range].subSlider::-moz-range-thumb { width: 9px; height: 9px; }
 #app[data-workspace="video"] #videoSeek { flex: 1; min-width: 40px; height: 18px; margin: 0; }
 #app[data-workspace="video"] #videoVolume { width: 76px; height: 18px; margin: 0; }
 #app[data-workspace="video"] #videoLoopToggle[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
-#app[data-workspace="video"] #videoCaptionPanel,#app[data-workspace="video"] #videoExportPanel { flex-direction: column; gap: 9px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+#app[data-workspace="video"] #videoCaptionPanel,#app[data-workspace="video"] #videoExportPanel,#app[data-workspace="video"] #videoFxPanel { flex-direction: column; gap: 9px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
 #app[data-workspace="video"] #sidebarViews > .sidebarPanel.active #videoCaptionPanel,
 #app[data-workspace="video"] #sidebarViews > .sidebarPanel.active #videoExportPanel { display: flex; }
 #app[data-workspace="video"] #sidebarViews > .sidebarPanel.active #videoTrimPanel { display: flex; flex-direction: column; gap: 9px; }
 #app[data-workspace="video"] #videoCaptionPanel .sectionLabel,#app[data-workspace="video"] #videoExportPanel .sectionLabel { margin-bottom: 2px; }
 #app[data-workspace="video"] #videoExportPanel .actionBtn.primary { margin-top: 4px; }
+#app[data-workspace="video"] #sidebarViews > .sidebarPanel.active #videoFxPanel { display: flex; }
+#app[data-workspace="video"] #canvasWrap.mtl-scene-base #glCanvas { visibility: hidden; }
+@media (pointer: coarse) {
+  .mtl-keyframe-marker { width: 14px; height: 14px; margin-left: -7px; top: 1px; }
+  .mtl-keyframe-easing { top: 20px; min-height: 30px; font-size: 10px; }
+}
 #app[data-workspace="video"] #editorTimeline { grid-column: 1; grid-row: 2; display: flex; min-height: 0; flex-direction: column; gap: 5px; padding: 7px 20px 9px; border-top: 1px solid var(--panel-border); background: var(--bg); }
 #app[data-workspace="video"] #editorTimeline[hidden] { display: none !important; }
 #app[data-workspace="video"] #backToDropBtn { z-index: 20; }
@@ -1531,6 +1537,60 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripTitle { overflow: hidden;
 body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto; flex-wrap: nowrap; justify-content: flex-end; margin-left: 0; }
 /* Touch: a 44px hit area for the toggle that never changes how it looks. It opens to the
    right of the button so the strip's own clipped edge cannot eat the target. */
+/* === CapCut-style video effects =============================================================
+   Keyframes, speed ramps, text / caption / sticker layers, blend modes and the chroma key all
+   render into one canvas that sits over the preview; the media elements stay mounted behind it
+   (hidden) so they keep decoding, and the export calls the same renderer. */
+.mtl-preview-overlay { position: absolute; overflow: hidden; }
+.mtl-preview-overlay .mtl-scene-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.mtl-preview-overlay > img,
+.mtl-preview-overlay > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; pointer-events: none; }
+.mtl-keyframe-marker { position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; background: var(--accent); border: 1px solid #000; transform: rotate(45deg); cursor: grab; pointer-events: auto; touch-action: none; z-index: 6; }
+.mtl-keyframe-marker:hover { background: #fff; }
+.mtl-keyframe-marker:active { cursor: grabbing; }
+.mtl-keyframe-marker.mtl-keyframe-selected { background: #fff; box-shadow: 0 0 0 2px var(--accent); z-index: 8; }
+/* The easing pill hangs off the selected diamond, so the curve travels with the key. */
+.mtl-keyframe-easing { position: absolute; top: 16px; left: 5px; transform: rotate(-45deg); min-height: 22px; padding: 0 4px; border: 1px solid var(--accent); border-radius: 11px; background: var(--bg); color: var(--text); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .04em; cursor: pointer; }
+.mtl-keyframe-easing:focus-visible { outline: 1px solid var(--accent); }
+/* Drag / resize / rotate handles for the selected sticker, drawn over the preview. */
+.mtl-layer-handles { position: absolute; z-index: 10; pointer-events: none; }
+.mtl-layer-handles[hidden] { display: none !important; }
+.mtl-layer-handle-box { position: absolute; border: 1px dashed var(--accent); }
+.mtl-layer-handle-body { position: absolute; inset: 0; cursor: move; pointer-events: auto; touch-action: none; }
+.mtl-layer-handle-resize, .mtl-layer-handle-rotate { position: absolute; width: 16px; height: 16px; padding: 0; border: 1px solid var(--accent); border-radius: 50%; background: var(--bg); color: var(--accent); pointer-events: auto; touch-action: none; }
+.mtl-layer-handle-resize { right: -8px; bottom: -8px; cursor: nwse-resize; }
+.mtl-layer-handle-rotate { left: -8px; top: -8px; cursor: grab; }
+.mtl-layer-handle-rotate::before { content: '↻'; font: 600 10px 'JetBrains Mono',monospace; }
+@media (pointer: coarse) {
+  .mtl-layer-handle-resize, .mtl-layer-handle-rotate { width: 26px; height: 26px; }
+  .mtl-layer-handle-resize { right: -13px; bottom: -13px; }
+  .mtl-layer-handle-rotate { left: -13px; top: -13px; }
+}
+.mtl-layer-block { position: absolute; top: 2px; bottom: 2px; min-width: 26px; padding: 0 4px; border: 1px solid var(--panel-border); background: rgba(255,255,255,.08); color: var(--text); font: 600 8px 'JetBrains Mono',monospace; letter-spacing: .04em; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+.mtl-layer-block:hover { border-color: var(--border-hover); }
+.mtl-layer-block.mtl-selected { border-color: var(--accent); color: var(--accent); }
+.mtl-layer-sticker { background: rgba(214,40,40,.22); }
+.mtl-caption-block { top: auto; bottom: 2px; height: 12px; background: rgba(76,201,240,.18); }
+.videoFxPanel { display: flex; flex-direction: column; gap: 9px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+.videoFxPanel .fxRow { display: flex; align-items: center; gap: 7px; }
+.videoFxPanel .fxRow > * { flex: 1 1 auto; min-width: 0; }
+.videoFxPanel .fxRow > .fxFixed { flex: 0 0 auto; }
+.videoFxPanel .fxValue { flex: 0 0 42px; color: var(--text-dim); font: 9px 'JetBrains Mono',monospace; text-align: right; font-variant-numeric: tabular-nums; }
+.stickerGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.stickerBtn { display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; padding: 5px 3px; border: 1px solid var(--panel-border); background: transparent; color: var(--text); font: 600 8px 'JetBrains Mono',monospace; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.stickerBtn:hover { border-color: var(--border-hover); background: var(--soft-bg); }
+.stickerBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.stickerBtn svg, .stickerBtn img { width: 24px; height: 24px; }
+.fxList { display: flex; flex-direction: column; gap: 5px; margin: 0; padding: 0; list-style: none; max-height: 168px; overflow-y: auto; scrollbar-width: thin; }
+.fxListItem { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border: 1px solid var(--panel-border); background: transparent; color: var(--text); font: 9px 'JetBrains Mono',monospace; }
+.fxListItem[aria-current="true"] { border-color: var(--accent); color: var(--accent); }
+.fxListItem .fxListText { flex: 1 1 auto; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.fxListItem .fxListTimes { color: var(--text-dim2); font-size: 8px; white-space: nowrap; }
+.fxSwatch { width: 34px; height: 26px; padding: 0; border: 1px solid var(--border-strong); background: #00ff00; cursor: pointer; }
+#videoFxEyebrowBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+#canvasWrap.videoFxPicking #glCanvas { cursor: crosshair; }
+.keyframeBadge { color: var(--accent); font: 600 9px 'JetBrains Mono',monospace; }
+@media (max-width: 767px) { .videoFxPanel { gap: 7px; } .stickerGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (pointer: coarse) {
   #carouselStrip #carouselToggleBtn { position: relative; }
   #carouselStrip #carouselToggleBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translateY(-50%); }
@@ -1538,6 +1598,9 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
   /* The Lightroom-style tools keep the same invisible 44px targets on touch screens. */
   .cropRatioBtn,.straightenResetBtn,.historyItem,#addSnapshotBtn,#deleteSnapshotBtn,#copyToPhotoBtn,#copyPhotoSettingsBtn,#wbEyedropperBtn,#wbAutoBtn,#selectPhotosBtn,#syncSelectedBtn,#splitToggleBtn { position: relative; min-height: 44px; }
   .geometryGrid .toolBtn,.exportPresetBtn,#healBrushBtn,#healUndoBtn,#healClearBtn,.healTools .toolBtn { position: relative; min-height: 44px; }
+  /* CapCut-style video tools keep 44px targets too. */
+  .stickerBtn,.fxList .fxListItem,.videoFxPanel .toolBtn,.videoFxPanel button,.videoFxPanel select,.videoFxPanel input[type="range"],.videoFxPanel input[type="text"] { position: relative; min-height: 44px; }
+  .mtl-toolbar #mtl-keyframe-btn,.mtl-toolbar #mtl-freeze-btn,.mtl-toolbar #mtl-reverse-btn { position: relative; min-height: 30px; }
   #addSnapshotBtn::before,#deleteSnapshotBtn::before,#copyToPhotoBtn::before,#copyPhotoSettingsBtn::before,#wbEyedropperBtn::before,#wbAutoBtn::before,#selectPhotosBtn::before,#syncSelectedBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translate(-50%,-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2441,6 +2504,88 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
         <div class="trimRow"><label for="trimOut">Out</label><output class="trimValue" id="trimOutValue">60.0s</output><input type="range" id="trimOut" min="0" max="60" step="0.01" value="60" aria-label="Trim out point"><input type="number" id="trimOutNumber" min="0" max="60" step="0.1" value="60" aria-label="Out point in seconds"></div>
         <div class="inlineActions"><button type="button" class="toolBtn" id="setTrimInBtn">Set in at playhead</button><button type="button" class="toolBtn" id="setTrimOutBtn">Set out at playhead</button></div>
         <p class="socialHint">Preview loops your selection. Maximum 60s. Video exports preserve the source aspect ratio. Encoding needs an internet connection.</p>
+      </section><section id="videoFxPanel" class="socialPanel video-only" aria-label="Video effects">
+        <div class="sectionLabel">Video Effects</div>
+        <p id="videoFxStatus" class="socialHint" role="status" aria-live="polite">Select a clip to keyframe, speed up, blend or chroma key it.</p>
+
+        <details class="exportExtras" open><summary>Speed &amp; ramps</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Speed</span><input type="range" id="sliderClipSpeed" min="0.1" max="8" step="0.1" value="1" aria-label="Clip speed"><output class="fxValue" id="valClipSpeed">1x</output></div>
+            <div class="fxRow" id="speedPresetRow" role="group" aria-label="Speed presets"><button type="button" class="choicePill" data-speed-preset="0.25" aria-pressed="false">0.25×</button><button type="button" class="choicePill" data-speed-preset="0.5" aria-pressed="false">0.5×</button><button type="button" class="choicePill active" data-speed-preset="1" aria-pressed="true">1×</button><button type="button" class="choicePill" data-speed-preset="2" aria-pressed="false">2×</button><button type="button" class="choicePill" data-speed-preset="4" aria-pressed="false">4×</button></div>
+            <div class="formatPills" role="group" aria-label="Speed ramp preset" id="speedRampPills">
+              <button type="button" class="choicePill active" data-speed-ramp="none" aria-pressed="true">Constant</button><button type="button" class="choicePill" data-speed-ramp="montage" aria-pressed="false">Montage</button><button type="button" class="choicePill" data-speed-ramp="hero" aria-pressed="false">Hero</button><button type="button" class="choicePill" data-speed-ramp="bullet" aria-pressed="false">Bullet</button>
+            </div>
+            <div class="fxRow"><button type="button" class="toolBtn fxFixed" id="fxFreezeBtn" aria-pressed="false">❄ Freeze frame</button><button type="button" class="toolBtn fxFixed" id="fxReverseBtn" aria-pressed="false">⇆ Reverse</button></div>
+            <p class="socialHint" id="speedStatus">Constant speed · 1x</p>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Keyframes</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <div class="fxRow"><button type="button" class="toolBtn" id="fxKeyframeBtn">◆ Keyframe all</button><button type="button" class="toolBtn" id="fxKeyframeClearBtn">✕ Clear at playhead</button></div>
+            <label class="fieldLabel" for="keyframeEasing">Easing</label>
+            <select id="keyframeEasing" class="socialSelect"><option value="linear">Linear</option><option value="hold">Hold</option><option value="ease-in">Ease in</option><option value="ease-out">Ease out</option><option value="ease-in-out">Ease in-out</option></select>
+            <div class="formatPills" role="group" aria-label="Keyframe property">
+              <button type="button" class="choicePill" data-keyframe-property="position" aria-pressed="false">Position</button><button type="button" class="choicePill" data-keyframe-property="scale" aria-pressed="false">Scale</button><button type="button" class="choicePill" data-keyframe-property="rotation" aria-pressed="false">Rotation</button><button type="button" class="choicePill" data-keyframe-property="opacity" aria-pressed="false">Opacity</button>
+            </div>
+            <output id="keyframeStatus" class="socialHint">No keyframes yet.</output>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Layer: blend &amp; opacity</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <label class="fieldLabel" for="layerBlendSelect">Blend mode</label>
+            <select id="layerBlendSelect" class="socialSelect"></select>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Opacity</span><input type="range" id="sliderLayerOpacity" min="0" max="100" step="1" value="100" aria-label="Layer opacity"><output class="fxValue" id="valLayerOpacity">100%</output></div>
+            <p class="socialHint">Applies to the selected overlay clip on V2 or a photo track.</p>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Text overlays</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <textarea id="fxTextInput" class="socialSelect" rows="2" maxlength="240" placeholder="Add a title — Enter for a new line" autocomplete="off" aria-label="Title text"></textarea>
+            <div class="fxRow"><button type="button" class="toolBtn" id="fxAddTextBtn">＋ Add text</button><button type="button" class="toolBtn" id="fxUpdateTextBtn">✓ Update</button></div>
+            <label class="fieldLabel" for="fxTextFont">Font</label>
+            <select id="fxTextFont" class="socialSelect"></select>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Size</span><input type="range" id="sliderTextSize" min="24" max="320" step="2" value="72" aria-label="Text size"><output class="fxValue" id="valTextSize">72</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Color</span><input type="color" id="fxTextColor" value="#ffffff" aria-label="Text colour"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Stroke</span><input type="color" id="fxTextStroke" value="#000000" aria-label="Text stroke colour"></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Stroke W</span><input type="range" id="sliderTextStroke" min="0" max="24" step="1" value="0" aria-label="Text stroke width"><output class="fxValue" id="valTextStroke">0</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Box</span><input type="color" id="fxTextBox" value="#000000" aria-label="Text background colour"><input type="range" id="sliderTextBox" min="0" max="100" step="5" value="55" aria-label="Text background opacity"></div>
+            <label class="fieldLabel" for="fxTextAnimation">Animation</label>
+            <select id="fxTextAnimation" class="socialSelect"></select>
+            <ul class="fxList" id="textLayerList" aria-label="Text and sticker layers"></ul>
+            <p class="socialHint">The animation runs over the text layer's own start → end.</p>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Captions</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <div class="fxRow"><input type="text" id="fxCaptionText" class="socialSelect" maxlength="120" placeholder="Caption line" autocomplete="off"></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 30px">In</span><input type="number" id="fxCaptionStart" class="socialSelect" min="0" step="0.1" value="0"><span class="fieldLabel fxFixed" style="flex:0 0 34px">Out</span><input type="number" id="fxCaptionEnd" class="socialSelect" min="0.2" step="0.1" value="2"></div>
+            <div class="fxRow"><button type="button" class="actionBtn" id="fxAddCaptionBtn">Add caption line</button><button type="button" class="actionBtn" id="fxInsertCaptionBtn">Add at playhead</button></div>
+            <div class="fxRow"><button type="button" class="toolBtn" id="fxUpdateCaptionBtn">✓ Save edits</button><button type="button" class="toolBtn" id="fxSplitCaptionBtn">✂ Split</button><button type="button" class="toolBtn" id="fxMergeCaptionBtn">⇥ Merge next</button></div>
+            <div class="fxRow"><button type="button" class="toolBtn" id="fxCaptionImportBtn">⤓ Import SRT / VTT</button><input type="file" id="fxCaptionFile" accept=".srt,.vtt,text/plain" hidden></div>
+            <ul class="fxList" id="captionLineList" aria-label="Caption lines"></ul>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Stickers</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <div class="stickerGrid" id="stickerGrid" role="group" aria-label="Built-in stickers"></div>
+            <p class="socialHint">Tap a sticker to drop it at the playhead for two seconds.</p>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Chroma key</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <label class="checkLabel"><input type="checkbox" id="chromaEnabled">Key out this clip's colour</label>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Key</span><input type="color" class="fxSwatch" id="chromaColor" value="#00ff00" aria-label="Chroma key colour"><button type="button" class="toolBtn" id="videoFxEyebrowBtn" aria-pressed="false">⌖ Pick from preview</button></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Tolerance</span><input type="range" id="sliderChromaTolerance" min="0" max="100" step="1" value="30" aria-label="Chroma key tolerance"><output class="fxValue" id="valChromaTolerance">30</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Softness</span><input type="range" id="sliderChromaSoftness" min="0" max="100" step="1" value="18" aria-label="Chroma key edge softness"><output class="fxValue" id="valChromaSoftness">18</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Spill</span><input type="range" id="sliderChromaSpill" min="0" max="100" step="1" value="45" aria-label="Chroma key spill removal"><output class="fxValue" id="valChromaSpill">45</output></div>
+            <p class="socialHint" id="chromaStatus">Chroma key runs in WebGL and is part of the exported frames.</p>
+          </div>
+        </details>
       </section><section id="videoExportPanel" class="socialPanel video-only" aria-label="Video export">
         <div class="sectionLabel">Video Export</div>
         <label class="fieldLabel" for="videoContainer">Format</label>
@@ -2520,7 +2665,7 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
     <section id="multi-timeline" class="video-only mtl-shell" hidden aria-label="Multi-clip editing timeline">
       <div class="mtl-media-row"><div class="mtl-media-heading"><span>MEDIA POOL</span><button type="button" id="mtl-add-clip">＋ Add</button><input type="file" id="mtl-file-input" accept="image/*,video/*" multiple hidden></div><div id="mtl-media-pool" class="mtl-media-pool" aria-label="Imported media clips"></div></div>
       <div class="mtl-toolbar" role="toolbar" aria-label="Multi-clip timeline tools">
-        <button type="button" id="mtl-play-pause" data-mtl-action="play-pause" aria-label="Play or pause">▶</button><button type="button" data-mtl-action="step-back" aria-label="Back five seconds">−5s</button><button type="button" data-mtl-action="step-forward" aria-label="Forward five seconds">+5s</button><button type="button" data-mtl-action="cut">✂ Split</button><button type="button" data-mtl-action="delete">▣ Delete</button><button type="button" data-mtl-action="undo" disabled>↩</button><button type="button" data-mtl-action="redo" disabled>↪</button><span class="mtl-tool-spacer"></span><button type="button" data-mtl-action="zoom-out" aria-label="Zoom out">−</button><input type="range" id="mtl-zoom-slider" min="25" max="400" step="5" value="100" aria-label="Timeline zoom"><output id="mtl-zoom-label">100%</output><button type="button" data-mtl-action="zoom-in" aria-label="Zoom in">+</button><output id="mtl-timecode">0:00.0 / 0:00.0</output><output id="mtl-selection-status">Select a clip</output>
+        <button type="button" id="mtl-play-pause" data-mtl-action="play-pause" aria-label="Play or pause">▶</button><button type="button" data-mtl-action="step-back" aria-label="Back five seconds">−5s</button><button type="button" data-mtl-action="step-forward" aria-label="Forward five seconds">+5s</button><button type="button" data-mtl-action="cut">✂ Split</button><button type="button" id="mtl-keyframe-btn" data-mtl-action="keyframe" aria-label="Keyframe position, scale, rotation and opacity at the playhead">◆ Keyframe</button><button type="button" id="mtl-freeze-btn" data-mtl-action="freeze" aria-label="Freeze the selected clip">❄ Freeze</button><button type="button" id="mtl-reverse-btn" data-mtl-action="reverse" aria-label="Reverse the selected clip">⇆ Reverse</button><button type="button" data-mtl-action="delete">▣ Delete</button><button type="button" data-mtl-action="undo" disabled>↩</button><button type="button" data-mtl-action="redo" disabled>↪</button><span class="mtl-tool-spacer"></span><button type="button" data-mtl-action="zoom-out" aria-label="Zoom out">−</button><input type="range" id="mtl-zoom-slider" min="25" max="400" step="5" value="100" aria-label="Timeline zoom"><output id="mtl-zoom-label">100%</output><button type="button" data-mtl-action="zoom-in" aria-label="Zoom in">+</button><output id="mtl-timecode">0:00.0 / 0:00.0</output><output id="mtl-selection-status">Select a clip</output>
       </div>
       <div id="mtl-ruler-scroll" class="mtl-ruler-scroll"><div id="mtl-ruler" class="mtl-ruler"><div id="mtl-ruler-playhead" class="mtl-ruler-playhead" role="slider" tabindex="0" aria-label="Timeline playhead" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></div></div></div>
       <div id="mtl-scroll" class="mtl-scroll" tabindex="0" aria-label="Multi-track timeline. Drag clips to arrange, resize their edges, or right-click for clip actions.">
@@ -2634,6 +2779,7 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
 })();
 </script>
 <script src="./social-tools.js"></script>
+<script src="./video-tools.js"></script>
 <script src="./color-grading.js"></script>
 <script src="./mask-stack.js"></script>
 <script>
@@ -4848,6 +4994,97 @@ function recreateFBOs(w,h){
   // Lens blur runs at half resolution: the wider kernel costs less and upsamples smoothly.
   fboLensBlurA=createFBO(hw,hh); fboLensBlurB=createFBO(hw,hh);
   lastPreviewRenderKey=null;
+}
+// === Chroma key pass =========================================================================
+// A dedicated program + framebuffer keys one clip frame at a time. The shader comes from
+// video-tools.js (the same source a Node test checks against the CPU reference), and the keyed
+// pixels come back as a canvas, which is what both the preview overlay and the export draw.
+const chromaFx=window.FilmVideo||null;
+let progChroma=null, fboChroma=null, chromaTexture=null, chromaOutCanvas=null, chromaOutCtx=null, chromaKeyCache={key:'',canvas:null};
+try{
+  if(chromaFx) progChroma=createProgram(vsSrc,chromaFx.CHROMA_FRAGMENT_SHADER);
+}catch(error){
+  progChroma=null;
+  console.warn('The chroma key shader is unavailable; the CPU keyer is used instead.',error);
+}
+function chromaSourceSize(source){
+  return {width:Math.max(1,source.videoWidth||source.naturalWidth||source.width||canvas.width||640),
+    height:Math.max(1,source.videoHeight||source.naturalHeight||source.height||canvas.height||480)};
+}
+function keyedCanvasFromPixels(pixels,width,height){
+  if(!chromaOutCanvas){ chromaOutCanvas=document.createElement('canvas'); chromaOutCtx=chromaOutCanvas.getContext('2d',{willReadFrequently:true}); }
+  if(chromaOutCanvas.width!==width||chromaOutCanvas.height!==height){ chromaOutCanvas.width=width; chromaOutCanvas.height=height; }
+  const image=chromaOutCtx.createImageData(width,height);
+  image.data.set(pixels);
+  chromaOutCtx.putImageData(image,0,0);
+  return chromaOutCanvas;
+}
+// Row flip is done on a Uint32 view, which is a plain array swap instead of a per-pixel copy.
+function flipRows32(pixels,width,height){
+  const view=new Uint32Array(pixels.buffer,pixels.byteOffset,Math.floor(pixels.length/4));
+  const row=new Uint32Array(width);
+  for(let y=0;y<Math.floor(height/2);y++){
+    const top=y*width, bottom=(height-1-y)*width;
+    row.set(view.subarray(top,top+width));
+    view.copyWithin(top,bottom,bottom+width);
+    view.set(row,bottom);
+  }
+  return view;
+}
+function chromaKeyFrame(source,chroma){
+  if(!source||!chromaFx) return source;
+  const settings=chromaFx.normalizeChromaKey(chroma);
+  if(!settings.enabled) return source;
+  // A video's currentTime names the frame; a canvas is live (the main preview frame changes every
+  // rAF), so its result is never cached — otherwise a stale keyed frame would be reused.
+  const liveSource=source.currentTime===undefined;
+  const frameKey=liveSource?'live':Number(source.currentTime).toFixed(4);
+  const cacheKey=`${frameKey}|${settings.color}|${settings.tolerance}|${settings.softness}|${settings.spill}|${source.videoWidth||source.width}`;
+  if(!liveSource&&chromaKeyCache.key===cacheKey&&chromaKeyCache.canvas) return chromaKeyCache.canvas;
+  const full=chromaSourceSize(source);
+  const scale=Math.min(1,1280/Math.max(full.width,full.height));
+  const width=Math.max(2,Math.round(full.width*scale)), height=Math.max(2,Math.round(full.height*scale));
+  const uniforms=chromaFx.chromaUniforms(settings);
+  try{
+    if(progChroma){
+      if(!chromaTexture){ chromaTexture=gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,chromaTexture);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE); }
+      if(!fboChroma||fboChroma.width!==width||fboChroma.height!==height){ if(fboChroma) deleteFBO(fboChroma); fboChroma=createFBO(width,height); }
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,chromaTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,source);
+      gl.bindFramebuffer(gl.FRAMEBUFFER,fboChroma.fbo); gl.viewport(0,0,width,height);
+      gl.useProgram(progChroma); bindQuad(progChroma);
+      gl.uniform1i(gl.getUniformLocation(progChroma,'u_image'),0);
+      gl.uniform3f(gl.getUniformLocation(progChroma,'u_keyColor'),uniforms.color[0],uniforms.color[1],uniforms.color[2]);
+      gl.uniform1f(gl.getUniformLocation(progChroma,'u_tolerance'),uniforms.tolerance);
+      gl.uniform1f(gl.getUniformLocation(progChroma,'u_softness'),uniforms.softness);
+      gl.uniform1f(gl.getUniformLocation(progChroma,'u_spill'),uniforms.spill);
+      gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+      gl.pixelStorei(gl.PACK_ALIGNMENT,1);
+      const pixels=new Uint8ClampedArray(width*height*4);
+      gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+      flipRows32(pixels,width,height);
+      const keyed=keyedCanvasFromPixels(pixels,width,height);
+      if(!liveSource) chromaKeyCache={key:cacheKey,canvas:keyed};
+      gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+      return keyed;
+    }
+  }catch(error){
+    console.warn('The WebGL chroma key pass failed; falling back to the CPU keyer.',error);
+    progChroma=null;
+  }
+  // No-WebGL fallback: same maths on the CPU.
+  if(!chromaOutCanvas){ chromaOutCanvas=document.createElement('canvas'); chromaOutCtx=chromaOutCanvas.getContext('2d',{willReadFrequently:true}); }
+  if(chromaOutCanvas.width!==width||chromaOutCanvas.height!==height){ chromaOutCanvas.width=width; chromaOutCanvas.height=height; }
+  chromaOutCtx.clearRect(0,0,width,height);
+  chromaOutCtx.drawImage(source,0,0,width,height);
+  const image=chromaOutCtx.getImageData(0,0,width,height);
+  image.data.set(chromaFx.chromaKeyPixels(image.data,settings));
+  chromaOutCtx.putImageData(image,0,0);
+  if(!liveSource) chromaKeyCache={key:cacheKey,canvas:chromaOutCanvas};
+  return chromaOutCanvas;
 }
 function setFullResolutionRendering(enabled){
   const next=!!enabled;
@@ -10821,6 +11058,15 @@ window.filmLabTimelineBridge={
       uploadVideoTexture(); updateVideoPlayback(); render(performance.now());
     }
   },
+  chromaKeyFrame(source,chroma){ try{ return chromaKeyFrame(source,chroma); }catch(error){ console.warn('Chroma key failed for this frame',error); return source; } },
+  onEffectsChanged(clip,details){
+    syncVideoFxPanel();
+    const label=details?.action==='removed'?'Keyframe removed':details?.action==='added'?'Keyframe added':null;
+    if(label) showToast(label,1600);
+    else if(typeof details?.action==='string'&&details.action.includes('freeze')) showToast(details.action==='freeze-on'?'Freeze frame added':'Freeze removed',1600);
+    else if(typeof details?.action==='string'&&details.action.includes('reverse')) showToast(details.action==='reverse-on'?'Clip reversed':'Clip plays forward',1600);
+    render(performance.now());
+  },
   play(){ if(videoEl?.paused) videoEl.play().catch(()=>{}); },
   pause(){ videoEl?.pause(); }
 };
@@ -10830,6 +11076,370 @@ initializeColorGrading(); setupSliderNumberEditing(); updateFromSliders(); updat
 syncHeaderHeight(); installPreviewFitObserver(); schedulePreviewFit();
 window.addEventListener('dragover',e=> e.preventDefault());
 window.addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ e.preventDefault(); handleFiles(e.dataTransfer.files); } });
+
+// === CapCut-style video effects panel ========================================================
+// The panel is a thin view over the timeline model: every control writes through
+// window.multiTimeline (clip effects, layers, captions) and then asks the shared renderer to
+// repaint, so the preview and the export can never drift apart.
+const videoFx=fx => fx;
+const fxRuntime=window.FilmVideo;
+let selectedLayerId=null, fxColorPicking=false;
+// Dropping a layer at the playhead starts it a hair earlier so its fade-in has already begun: the
+// sticker or title is visible (and draggable) in the paused preview the moment it is added.
+const FX_LEAD_IN=0.3;
+const fxClip=()=>{
+  const selected=window.TL?.selectedClip||null;
+  const clips=window.filmLabState?.clips||[];
+  return (selected&&clips.find(clip=>clip.id===selected.id))||clips.find(clip=>clip.track==='main')||null;
+};
+const fxLayers=()=>window.multiTimeline?.layers||[];
+const fxLayer=id=>fxLayers().find(layer=>layer.id===id)||null;
+const fxPlayhead=()=>Number(window.TL?.playhead)||0;
+function setFxStatus(message){ const node=$('videoFxStatus'); if(node) node.textContent=message; }
+function fxRangeValue(id){ const node=$(id); return node?Number(node.value):0; }
+function fxSetRange(id,value){ const node=$(id); if(node){ node.value=String(value); } }
+
+// -- speed -------------------------------------------------------------------------------------
+function fxApplySpeed(patch,{commit=false}={}){
+  const clip=fxClip();
+  if(!clip){ setFxStatus('Add a clip to the timeline first.'); return; }
+  window.multiTimeline?.updateClip(clip.id,{speed:patch});
+  syncVideoFxPanel();
+  if(commit) showToast(`Speed ${patch.rate!==undefined?`${patch.rate}x`:''}`.trim(),1500);
+}
+$('sliderClipSpeed')?.addEventListener('input',()=>fxApplySpeed({rate:Number($('sliderClipSpeed').value)}));
+$('sliderClipSpeed')?.addEventListener('change',()=>fxApplySpeed({rate:Number($('sliderClipSpeed').value)},{commit:true}));
+document.querySelectorAll('[data-speed-ramp]').forEach(button=>button.addEventListener('click',()=>fxApplySpeed({ramp:button.dataset.speedRamp},{commit:true})));
+document.querySelectorAll('[data-speed-preset]').forEach(button=>button.addEventListener('click',()=>{
+  const rate=Number(button.dataset.speedPreset);
+  fxSetRange('sliderClipSpeed',rate);
+  fxApplySpeed({rate},{commit:true});
+}));
+$('fxFreezeBtn')?.addEventListener('click',()=>{ window.multiTimeline?.toggleFreezeFrame(); syncVideoFxPanel(); });
+$('fxReverseBtn')?.addEventListener('click',()=>{ window.multiTimeline?.toggleReverse(); syncVideoFxPanel(); });
+
+// -- keyframes ---------------------------------------------------------------------------------
+function fxAddKeyframe(property){
+  const result=window.multiTimeline?.keyframe(property?[property]:null);
+  syncVideoFxPanel();
+  if(result) setFxStatus(`${result.action==='removed'?'Removed':'Keyframed'} ${result.properties.join(', ')} at ${result.time.toFixed(2)}s (${$('keyframeEasing').value}).`);
+}
+$('fxKeyframeBtn')?.addEventListener('click',()=>fxAddKeyframe(null));
+$('fxKeyframeClearBtn')?.addEventListener('click',()=>{
+  const clip=fxClip();
+  if(!clip) return;
+  const time=fxPlayhead()-clip.start;
+  const result=fxRuntime?.removeKeyframesAt(clip.keyframes,time);
+  if(!result||!result.removed){ setFxStatus('No keyframes at the playhead.'); return; }
+  window.multiTimeline?.updateClip(clip.id,{keyframes:result.keyframes});
+  setFxStatus(`Removed ${result.removed} keyframe${result.removed===1?'':'s'}.`);
+  syncVideoFxPanel();
+});
+document.querySelectorAll('[data-keyframe-property]').forEach(button=>button.addEventListener('click',()=>fxAddKeyframe(button.dataset.keyframeProperty)));
+
+// -- blend + opacity --------------------------------------------------------------------------
+function fxBlendSelect(){
+  const select=$('layerBlendSelect');
+  if(!select||select.options.length) return;
+  for(const mode of (fxRuntime?.BLEND_MODES||['normal'])){
+    const option=document.createElement('option');
+    option.value=mode; option.textContent=fxRuntime?.BLEND_LABELS?.[mode]||mode;
+    select.appendChild(option);
+  }
+}
+fxBlendSelect();
+$('layerBlendSelect')?.addEventListener('change',()=>{
+  const clip=fxClip();
+  if(!clip) return;
+  window.multiTimeline?.updateClip(clip.id,{blend:$('layerBlendSelect').value});
+  setFxStatus(`Blend: ${$('layerBlendSelect').value}.`);
+});
+$('sliderLayerOpacity')?.addEventListener('input',()=>{
+  const clip=fxClip();
+  const percent=Number($('sliderLayerOpacity').value);
+  $('valLayerOpacity').textContent=`${percent}%`;
+  if(clip) window.multiTimeline?.updateClip(clip.id,{opacity:percent/100});
+});
+
+// -- text -------------------------------------------------------------------------------------
+function fxStyleFromControls(){
+  return {
+    font:$('fxTextFont')?.value||'inter',
+    size:fxRangeValue('sliderTextSize')||72,
+    color:$('fxTextColor')?.value||'#ffffff',
+    stroke:$('fxTextStroke')?.value||'#000000',
+    strokeWidth:fxRangeValue('sliderTextStroke')||0,
+    background:$('fxTextBox')?.value||'transparent',
+    backgroundOpacity:(fxRangeValue('sliderTextBox')||0)/100,
+    animation:$('fxTextAnimation')?.value||'fade',
+  };
+}
+function fxFillSelect(select,entries,labels){
+  if(!select||select.options.length) return;
+  for(const entry of entries){
+    const option=document.createElement('option');
+    option.value=typeof entry==='string'?entry:entry.id;
+    option.textContent=labels?.[option.value]||(typeof entry==='string'?entry:entry.label);
+    select.appendChild(option);
+  }
+}
+fxFillSelect($('fxTextFont'),fxRuntime?.TEXT_FONTS||[]);
+fxFillSelect($('fxTextAnimation'),(fxRuntime?.TEXT_ANIMATIONS||[]).map(entry=>entry.id),(fxRuntime?.TEXT_ANIMATIONS||[]).reduce((all,entry)=>({...all,[entry.id]:entry.label}),{}));
+// The model's own default is a fade, so a freshly added title eases in rather than popping.
+if($('fxTextAnimation')&&fxRuntime?.TEXT_ANIMATIONS?.some(entry=>entry.id==='fade')) $('fxTextAnimation').value='fade';
+$('fxAddTextBtn')?.addEventListener('click',()=>{
+  const text=$('fxTextInput').value.trim()||'Your text';
+  const at=fxPlayhead();
+  const start=Math.max(0,at-FX_LEAD_IN);
+  const layer=window.multiTimeline?.addLayer({kind:'text',text,start,end:start+3,style:fxStyleFromControls()});
+  if(layer){ selectedLayerId=layer.id; window.multiTimeline?.selectLayer?.(layer.id); setFxStatus(`Text layer added at ${at.toFixed(2)}s.`); }
+  window.multiTimeline?.refreshLayers?.();
+  syncVideoFxPanel();
+});
+$('fxUpdateTextBtn')?.addEventListener('click',()=>{
+  if(!selectedLayerId){ setFxStatus('Select a text layer on the TEXT lane first.'); return; }
+  window.multiTimeline?.updateLayer(selectedLayerId,{text:$('fxTextInput').value,style:fxStyleFromControls()});
+  setFxStatus('Text layer updated.');
+  syncVideoFxPanel();
+});
+for(const id of ['sliderTextSize','sliderTextStroke','sliderTextBox']){
+  $(id)?.addEventListener('input',()=>{ $('val'+id.replace('slider',''))?.replaceChildren(String(fxRangeValue(id))); syncTextReadouts(); });
+}
+function syncTextReadouts(){
+  const size=$('valTextSize'), stroke=$('valTextStroke');
+  if(size) size.textContent=String(fxRangeValue('sliderTextSize'));
+  if(stroke) stroke.textContent=String(fxRangeValue('sliderTextStroke'));
+}
+
+// -- captions ---------------------------------------------------------------------------------
+function renderCaptionList(){
+  const list=$('captionLineList');
+  if(!list) return;
+  list.replaceChildren();
+  for(const line of (window.multiTimeline?.captions||[])){
+    const item=document.createElement('li');
+    item.className='fxListItem';
+    item.setAttribute('aria-current',String(line.id===selectedCaptionId));
+    const text=document.createElement('button');
+    text.type='button'; text.className='fxListText'; text.textContent=line.text;
+    text.addEventListener('click',()=>{ selectedCaptionId=line.id; $('fxCaptionText').value=line.text; $('fxCaptionStart').value=String(line.start); $('fxCaptionEnd').value=String(line.end); renderCaptionList(); });
+    const times=document.createElement('span');
+    times.className='fxListTimes'; times.textContent=`${line.start.toFixed(1)}–${line.end.toFixed(1)}s`;
+    const remove=document.createElement('button');
+    remove.type='button'; remove.className='fxListText fxFixed'; remove.style.flex='0 0 auto'; remove.textContent='✕';
+    remove.setAttribute('aria-label',`Remove caption ${line.text}`);
+    remove.addEventListener('click',()=>{ window.multiTimeline?.removeCaption(line.id); renderCaptionList(); });
+    item.append(text,times,remove);
+    list.appendChild(item);
+  }
+}
+let selectedCaptionId=null;
+$('fxAddCaptionBtn')?.addEventListener('click',()=>{
+  const caption=window.multiTimeline?.addCaption({text:$('fxCaptionText').value.trim()||'Caption line',start:Number($('fxCaptionStart').value)||0,end:Number($('fxCaptionEnd').value)||2});
+  if(caption){ selectedCaptionId=caption.id; renderCaptionList(); setFxStatus(`Caption added ${caption.start.toFixed(1)}–${caption.end.toFixed(1)}s.`); }
+});
+$('fxUpdateCaptionBtn')?.addEventListener('click',()=>{
+  if(!selectedCaptionId){ setFxStatus('Pick a caption line first.'); return; }
+  const saved=window.multiTimeline?.updateCaption(selectedCaptionId,{text:$('fxCaptionText').value.trim()||'Caption line',start:Number($('fxCaptionStart').value)||0,end:Number($('fxCaptionEnd').value)||2});
+  if(saved){ setFxStatus(`Caption saved ${saved.start.toFixed(1)}–${saved.end.toFixed(1)}s.`); renderCaptionList(); }
+});
+$('fxSplitCaptionBtn')?.addEventListener('click',()=>{
+  const line=(window.multiTimeline?.captions||[]).find(entry=>entry.id===selectedCaptionId);
+  if(!line){ setFxStatus('Pick a caption line first.'); return; }
+  const inside=Math.min(line.end-0.2,Math.max(line.start+0.2,fxPlayhead()));
+  const parts=window.multiTimeline?.splitCaption(line.id,Number.isFinite(inside)?inside:(line.start+line.end)/2);
+  if(parts?.length){ selectedCaptionId=parts[1].id; renderCaptionList(); setFxStatus('Caption split at the playhead.'); }
+});
+$('fxMergeCaptionBtn')?.addEventListener('click',()=>{
+  if(!selectedCaptionId){ setFxStatus('Pick a caption line first.'); return; }
+  const merged=window.multiTimeline?.mergeCaption(selectedCaptionId,1);
+  if(merged){ renderCaptionList(); setFxStatus(`Merged into “${merged.text}”.`); }
+  else setFxStatus('No later caption line to merge with.');
+});
+$('fxCaptionImportBtn')?.addEventListener('click',()=>$('fxCaptionFile')?.click());
+$('fxCaptionFile')?.addEventListener('change',async event=>{
+  const file=event.target.files?.[0];
+  event.target.value='';
+  if(!file) return;
+  try{
+    const text=await file.text();
+    const imported=window.multiTimeline?.importCaptions(text)||[];
+    if(imported.length){ setFxStatus(`Imported ${imported.length} caption line${imported.length===1?'':'s'} from ${file.name}.`); renderCaptionList(); }
+    else setFxStatus(`${file.name} has no readable subtitle timings.`);
+  }catch(error){
+    setFxStatus(`${file.name} could not be read.`);
+  }
+});
+$('fxInsertCaptionBtn')?.addEventListener('click',()=>{
+  const at=fxPlayhead();
+  $('fxCaptionStart').value=at.toFixed(1);
+  $('fxCaptionEnd').value=(at+2).toFixed(1);
+  const caption=window.multiTimeline?.addCaption({text:$('fxCaptionText').value.trim()||'Caption line',start:at,end:at+2});
+  if(caption){ selectedCaptionId=caption.id; renderCaptionList(); setFxStatus('Caption line added at the playhead.'); }
+});
+
+// -- stickers ---------------------------------------------------------------------------------
+function buildStickerGrid(){
+  const grid=$('stickerGrid');
+  if(!grid||grid.children.length||!fxRuntime) return;
+  for(const sticker of fxRuntime.STICKERS){
+    const button=document.createElement('button');
+    button.type='button'; button.className='stickerBtn'; button.dataset.sticker=sticker.id;
+    button.setAttribute('aria-label',`Add ${sticker.label} sticker`);
+    button.innerHTML=`${sticker.svg}<span>${sticker.label}</span>`;
+    button.addEventListener('click',()=>{
+      const at=fxPlayhead();
+      const start=Math.max(0,at-FX_LEAD_IN);
+      const layer=window.multiTimeline?.addLayer({kind:'sticker',sticker:sticker.id,start,end:start+2,transform:{x:0,y:-0.35,scale:0.3}});
+      if(layer){ selectedLayerId=layer.id; window.multiTimeline?.selectLayer?.(layer.id); setFxStatus(`${sticker.label} sticker added at ${at.toFixed(2)}s — drag it in the preview.`); }
+      // The inline SVG decodes asynchronously: repaint as soon as it is paintable.
+      fxRuntime?.preloadStickerImages?.().then(()=>window.multiTimeline?.refreshLayers?.());
+      syncVideoFxPanel();
+    });
+    grid.appendChild(button);
+  }
+}
+buildStickerGrid();
+// Decode every sticker up front: they are inline SVG data URLs, so this stays offline and makes
+// the first drop instant.
+fxRuntime?.preloadStickerImages?.().then(()=>window.multiTimeline?.refreshLayers?.());
+
+// -- chroma key -------------------------------------------------------------------------------
+function chromaFromControls(){
+  return {enabled:!!$('chromaEnabled')?.checked,color:$('chromaColor')?.value||'#00ff00',
+    tolerance:fxRangeValue('sliderChromaTolerance'),softness:fxRangeValue('sliderChromaSoftness'),spill:fxRangeValue('sliderChromaSpill')};
+}
+function fxApplyChroma(patch){
+  const clip=fxClip();
+  if(!clip){ setFxStatus('Select an overlay clip on V2 or a photo track to chroma key it.'); return; }
+  window.multiTimeline?.updateClip(clip.id,{chroma:{...chromaFromControls(),...patch}});
+  syncVideoFxPanel();
+}
+$('chromaEnabled')?.addEventListener('change',()=>fxApplyChroma({enabled:$('chromaEnabled').checked}));
+$('chromaColor')?.addEventListener('input',()=>fxApplyChroma({}));
+for(const id of ['sliderChromaTolerance','sliderChromaSoftness','sliderChromaSpill']){
+  $(id)?.addEventListener('input',()=>{ fxApplyChroma({}); const out=$('val'+id.replace('slider','')); if(out) out.textContent=String(fxRangeValue(id)); });
+}
+function fxPickChromaColor(event){
+  const rect=canvas.getBoundingClientRect();
+  const x=Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width)));
+  const y=Math.max(0,Math.min(1,(event.clientY-rect.top)/Math.max(1,rect.height)));
+  const scratch=document.createElement('canvas'); scratch.width=canvas.width; scratch.height=canvas.height;
+  const context=scratch.getContext('2d',{willReadFrequently:true});
+  context.drawImage(canvas,0,0);
+  const pixel=context.getImageData(Math.round(x*(canvas.width-1)),Math.round(y*(canvas.height-1)),1,1).data;
+  const hex=fxRuntime.rgbToHex(pixel[0],pixel[1],pixel[2]);
+  $('chromaColor').value=hex;
+  setFxChromaPicking(false);
+  fxApplyChroma({enabled:true,color:hex});
+  setFxStatus(`Key colour picked: ${hex}.`);
+}
+function setFxChromaPicking(on){
+  fxColorPicking=!!on;
+  $('videoFxEyebrowBtn')?.setAttribute('aria-pressed',String(fxColorPicking));
+  canvasWrap.classList.toggle('videoFxPicking',fxColorPicking);
+}
+$('videoFxEyebrowBtn')?.addEventListener('click',()=>setFxChromaPicking(!fxColorPicking));
+canvas.addEventListener('pointerdown',event=>{
+  if(!fxColorPicking) return;
+  event.preventDefault(); event.stopPropagation();
+  fxPickChromaColor(event);
+},true);
+document.addEventListener('keydown',event=>{ if(event.key==='Escape'&&fxColorPicking) setFxChromaPicking(false); });
+// A selected diamond answers to the keyboard: Escape deselects it, Delete removes that moment.
+document.addEventListener('keydown',event=>{
+  const picked=window.multiTimeline?.selectedKeyframe;
+  if(!picked||fxColorPicking) return;
+  const target=event.target;
+  if(target instanceof HTMLElement&&target.closest('input,textarea,select,[contenteditable="true"]')) return;
+  if(event.key==='Escape'){ window.multiTimeline.clearKeyframeSelection?.(); syncVideoFxPanel(); }
+});
+
+// -- shared state sync ------------------------------------------------------------------------
+window.addEventListener('film-lab-layer-selected',event=>{
+  selectedLayerId=event.detail?.id||null;
+  const layer=fxLayer(selectedLayerId);
+  if(layer&&layer.kind==='text'){
+    $('fxTextInput').value=layer.text;
+    if(layer.style){
+      $('fxTextFont').value=layer.style.font; $('fxTextAnimation').value=layer.style.animation;
+      fxSetRange('sliderTextSize',layer.style.size); fxSetRange('sliderTextStroke',layer.style.strokeWidth);
+      fxSetRange('sliderTextBox',Math.round(layer.style.backgroundOpacity*100));
+      $('fxTextColor').value=layer.style.color; $('fxTextStroke').value=layer.style.stroke;
+    }
+    syncTextReadouts();
+  }
+  syncVideoFxPanel();
+});
+window.addEventListener('film-lab-clip-selected',()=>syncVideoFxPanel());
+function syncVideoFxPanel(){
+  const clip=fxClip();
+  const speed=clip?.speed||{rate:1,ramp:'none',freeze:false,reverse:false};
+  fxSetRange('sliderClipSpeed',speed.rate);
+  const speedValue=$('valClipSpeed'); if(speedValue) speedValue.textContent=`${speed.rate}x`;
+  document.querySelectorAll('[data-speed-preset]').forEach(button=>{
+    const active=Math.abs(Number(button.dataset.speedPreset)-speed.rate)<0.001;
+    button.classList.toggle('active',active);
+    button.setAttribute('aria-pressed',String(active));
+  });
+  $('fxFreezeBtn')?.setAttribute('aria-pressed',String(!!speed.freeze));
+  $('fxReverseBtn')?.setAttribute('aria-pressed',String(!!speed.reverse));
+  const rampLabel=(fxRuntime?.SPEED_RAMPS||[]).find(entry=>entry.id===speed.ramp)?.label||'Constant';
+  const speedStatus=$('speedStatus');
+  if(speedStatus) speedStatus.textContent=`${rampLabel} ramp · ${speed.rate}x${speed.reverse?' · reversed':''}${speed.freeze?' · frozen':''}`;
+  document.querySelectorAll('[data-speed-ramp]').forEach(button=>{ const active=button.dataset.speedRamp===speed.ramp; button.classList.toggle('active',active); button.setAttribute('aria-pressed',String(active)); });
+  const blend=$('layerBlendSelect'); if(blend&&clip) blend.value=clip.blend||'normal';
+  const opacity=Math.round((clip?.opacity??1)*100);
+  fxSetRange('sliderLayerOpacity',opacity);
+  const opacityValue=$('valLayerOpacity'); if(opacityValue) opacityValue.textContent=`${opacity}%`;
+  const keyframes=clip?.keyframes||{};
+  const times=fxRuntime?fxRuntime.keyframeTimes(keyframes):[];
+  const badge=$('keyframeStatus');
+  const picked=window.multiTimeline?.selectedKeyframe||null;
+  if(badge) badge.textContent=(picked?`Selected ${picked.time.toFixed(2)}s · ${picked.easing} · `:'')+(times.length?`${times.length} keyframe time${times.length===1?'':'s'} · ${fxRuntime.KEYFRAME_PROPERTIES.filter(property=>(keyframes[property]||[]).length).map(property=>fxRuntime.PROPERTY_LABELS[property]).join(', ')}`:'No keyframes yet.');
+  document.querySelectorAll('[data-keyframe-property]').forEach(button=>{
+    const list=keyframes[button.dataset.keyframeProperty]||[];
+    const at=fxRuntime?fxRuntime.keyframeAt(keyframes,button.dataset.keyframeProperty,Math.max(0,fxPlayhead()-(clip?.start||0))):null;
+    button.setAttribute('aria-pressed',String(!!at));
+    button.classList.toggle('active',!!at);
+    button.title=`${list.length} keyframe${list.length===1?'':'s'} on this property`;
+  });
+  const chroma=clip?.chroma||{enabled:false,color:'#00ff00',tolerance:30,softness:18,spill:45};
+  if($('chromaEnabled')) $('chromaEnabled').checked=!!chroma.enabled;
+  if($('chromaColor')) $('chromaColor').value=chroma.color;
+  fxSetRange('sliderChromaTolerance',chroma.tolerance); fxSetRange('sliderChromaSoftness',chroma.softness); fxSetRange('sliderChromaSpill',chroma.spill);
+  for(const [id,value] of [['valChromaTolerance',chroma.tolerance],['valChromaSoftness',chroma.softness],['valChromaSpill',chroma.spill]]){
+    const node=$(id); if(node) node.textContent=String(Math.round(value));
+  }
+  const chromaStatus=$('chromaStatus');
+  if(chromaStatus) chromaStatus.textContent=chroma.enabled?`Keying ${chroma.color} · tolerance ${chroma.tolerance} · softness ${chroma.softness} (WebGL).`:'Chroma key runs in WebGL and is part of the exported frames.';
+  renderFxLayerList();
+  renderCaptionList();
+}
+function renderFxLayerList(){
+  const list=$('textLayerList');
+  if(!list) return;
+  list.replaceChildren();
+  for(const layer of fxLayers()){
+    const item=document.createElement('li');
+    item.className='fxListItem';
+    item.setAttribute('aria-current',String(layer.id===selectedLayerId));
+    const pick=document.createElement('button');
+    pick.type='button'; pick.className='fxListText';
+    pick.textContent=layer.kind==='sticker'?`✦ ${layer.sticker}`:layer.text;
+    pick.addEventListener('click',()=>{ selectedLayerId=layer.id; window.multiTimeline?.selectLayer?.(layer.id); if(layer.kind==='text') $('fxTextInput').value=layer.text; syncVideoFxPanel(); });
+    const times=document.createElement('span');
+    times.className='fxListTimes'; times.textContent=`${layer.start.toFixed(1)}–${layer.end.toFixed(1)}s`;
+    const remove=document.createElement('button');
+    remove.type='button'; remove.className='fxListText'; remove.style.flex='0 0 auto'; remove.textContent='✕';
+    remove.setAttribute('aria-label','Remove layer');
+    remove.addEventListener('click',()=>{ window.multiTimeline?.removeLayer(layer.id); if(selectedLayerId===layer.id) selectedLayerId=null; syncVideoFxPanel(); });
+    item.append(pick,times,remove);
+    list.appendChild(item);
+  }
+}
+syncTextReadouts();
+syncVideoFxPanel();
 
 // === Snapshots, edit history, crop ratios, straighten and per-photo settings ==================
 // Everything below is additive: it reads the existing settings / grade state and never changes the
