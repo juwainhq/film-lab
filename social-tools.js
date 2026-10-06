@@ -11,7 +11,20 @@
     portrait: {label: 'Portrait post', width: 1080, height: 1350},
     story: {label: 'Story / Reel', width: 1080, height: 1920},
     landscape: {label: 'Landscape', width: 1080, height: 566},
+    // Added for the Lightroom-style crop presets. Both ratios stay exact so a 16:9 or 3:2
+    // frame never shifts the crop by a rounding error.
+    wide: {label: 'Wide 16:9', width: 1600, height: 900},
+    threeTwo: {label: 'Photo 3:2', width: 1080, height: 720},
   });
+  // The crop preset row reads like Lightroom's ratio list and drives the existing formats.
+  const CROP_RATIO_PRESETS = Object.freeze([
+    Object.freeze({id: '1:1', label: '1:1', format: 'square'}),
+    Object.freeze({id: '4:5', label: '4:5', format: 'portrait'}),
+    Object.freeze({id: '16:9', label: '16:9', format: 'wide'}),
+    Object.freeze({id: '3:2', label: '3:2', format: 'threeTwo'}),
+    Object.freeze({id: '9:16', label: '9:16', format: 'story'}),
+    Object.freeze({id: 'original', label: 'Original', format: 'original'}),
+  ]);
   const COMPARISONS = Object.freeze({
     square: {label: 'Square pair · 1:1', width: 1080, height: 1080},
     landscape: {label: 'Landscape pair · 2:1', width: 2160, height: 1080},
@@ -153,6 +166,42 @@
       : new Uint8Array(Buffer.from(padded, 'base64'));
     return sanitizeSettings(JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes)), ids, effectNames);
   }
+  // Straighten is a Lightroom-style ±45° rotation of the whole frame. The preview and the export
+  // rotate about the frame centre and scale up just enough to keep the corners covered, so the
+  // crop rectangle never shows a transparent wedge.
+  const STRAIGHTEN_LIMIT = 45;
+  function clampStraighten(angle, limit = STRAIGHTEN_LIMIT) {
+    const value = Number(angle);
+    if (!Number.isFinite(value)) return 0;
+    return clamp(Math.round(value * 2) / 2, -Math.abs(limit), Math.abs(limit)) + 0;
+  }
+  function straightenFillScale(width, height, angle) {
+    const w = Math.max(1, Number(width) || 1), h = Math.max(1, Number(height) || 1);
+    const radians = Math.abs(clampStraighten(angle)) * Math.PI / 180;
+    if (!radians) return 1;
+    const cosine = Math.cos(radians), sine = Math.sin(radians);
+    return cosine + sine * Math.max(h / w, w / h);
+  }
+  function cropRatioPreset(id) {
+    return CROP_RATIO_PRESETS.find(preset => preset.id === id || preset.format === id) || null;
+  }
+  // Snapshot / clipboard payloads carry the Adjust values, the Color Grade state, the crop angle
+  // and the source photo name. `settings` keeps the existing sanitizeSettings shape so shared
+  // look links stay byte-compatible.
+  function normalizeFullSettings(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Not a Film Lab settings payload');
+    const source = input.settings && typeof input.settings === 'object' ? input.settings : input;
+    if (!source.values || typeof source.values !== 'object') throw new Error('Not a Film Lab settings payload');
+    const grade = input.grade && typeof input.grade === 'object' && !Array.isArray(input.grade) ? JSON.parse(JSON.stringify(input.grade)) : null;
+    const position = input.crop && typeof input.crop === 'object' ? input.crop : null;
+    return {
+      settings: JSON.parse(JSON.stringify(source)),
+      grade,
+      straighten: clampStraighten(input.straighten),
+      crop: position ? {x: clamp(finite(position.x, 0.5), 0, 1), y: clamp(finite(position.y, 0.5), 0, 1)} : null,
+      origin: typeof input.origin === 'string' ? input.origin.slice(0, 120) : null,
+    };
+  }
   function safeFilename(name) {
     const stem = String(name || 'photo').replace(/\.[^.]+$/, '').normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
@@ -227,5 +276,5 @@
     args.push('output.' + container);
     return args;
   }
-  return {FORMATS, COMPARISONS, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
+  return {FORMATS, COMPARISONS, CROP_RATIO_PRESETS, STRAIGHTEN_LIMIT, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, cropRatioPreset, clampStraighten, straightenFillScale, normalizeFullSettings, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};
 });

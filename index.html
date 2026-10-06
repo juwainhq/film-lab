@@ -1535,6 +1535,9 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
   #carouselStrip #carouselToggleBtn { position: relative; }
   #carouselStrip #carouselToggleBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translateY(-50%); }
   body[data-mode="photo"] #app #carouselStrip { padding-top: 12px; }
+  /* The Lightroom-style tools keep the same invisible 44px targets on touch screens. */
+  .cropRatioBtn,.straightenResetBtn,.historyItem,#addSnapshotBtn,#deleteSnapshotBtn,#copyToPhotoBtn,#copyPhotoSettingsBtn,#wbEyedropperBtn,#wbAutoBtn,#selectPhotosBtn,#syncSelectedBtn,#splitToggleBtn { position: relative; min-height: 44px; }
+  #addSnapshotBtn::before,#deleteSnapshotBtn::before,#copyToPhotoBtn::before,#copyPhotoSettingsBtn::before,#wbEyedropperBtn::before,#wbAutoBtn::before,#selectPhotosBtn::before,#syncSelectedBtn::before { content: ''; position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; min-width: 100%; min-height: 100%; max-width: none; max-height: none; transform: translate(-50%,-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
   #carouselStrip,
@@ -1552,6 +1555,52 @@ body #presetChips .chip .presetColorSwatch,
 body #savedPresetChips .chip .presetColorSwatch { position: relative; top: auto; right: auto; bottom: auto; left: auto; display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; flex: 0 0 auto; margin: 0; border: 1px solid var(--panel-border); background-size: cover; background-position: center; background-repeat: no-repeat; }
 body #presetChips .chip .presetColorSwatch::after,
 body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px auto; width: 18px; height: 11px; opacity: .5; background-position: center; background-repeat: no-repeat; background-size: 100% 100%; }
+/* === Lightroom-style photo tools: draggable before/after, snapshots and history, WB
+   eyedropper, crop ratios, straighten, and per-photo copy / sync. All of it is additive; the
+   existing rules above are left untouched and only extended where a control needs new paint. */
+#splitToggleBtn { position: absolute; z-index: 12; left: 50%; bottom: 18px; display: inline-flex; align-items: center; gap: 8px; margin-left: 92px; padding: 8px 13px; border: 1px solid var(--border-strong); background: rgba(0,0,0,.82); color: #fff; font: 500 9px Inter,system-ui,sans-serif; letter-spacing: .14em; text-transform: uppercase; cursor: pointer; touch-action: none; user-select: none; }
+#splitToggleBtn:hover,#splitToggleBtn[aria-pressed="true"] { border-color: var(--accent); color: #fff; }
+#splitToggleBtn[aria-pressed="true"] { background: var(--accent); }
+#splitToggleBtn:focus-visible { outline: 1px solid var(--text); outline-offset: 3px; }
+#splitDivider { pointer-events: auto; cursor: ew-resize; touch-action: none; width: 2px; background: #fff; }
+#splitDivider::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 44px; min-width: 44px; max-width: none; transform: translateX(-50%); background: transparent; }
+#splitDivider:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+#splitDivider.dragging { background: var(--accent); }
+.cropRatioRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 4px; }
+.cropRatioLabel { flex: 0 0 auto; color: var(--text-dim2); font: 8px 'JetBrains Mono',monospace; letter-spacing: .16em; text-transform: uppercase; }
+.cropRatioBtn { position: relative; flex: 1 1 auto; min-width: 48px; min-height: 34px; padding: 6px 8px; border: 1px solid var(--panel-border); background: transparent; color: var(--text); font: 600 9px 'JetBrains Mono',monospace; letter-spacing: .08em; cursor: pointer; }
+.cropRatioBtn:hover { border-color: var(--border-hover); background: var(--soft-bg); }
+.cropRatioBtn[aria-pressed="true"] { border-color: var(--accent); background: var(--soft-bg); color: var(--accent); }
+.cropRatioBtn:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.cropStraightenRow { margin-top: 10px; }
+.cropStraightenRow .subVal { font-variant-numeric: tabular-nums; }
+.straightenResetBtn { width: 100%; min-height: 34px; margin-top: 6px; }
+.gradeWbHint { margin: -2px 0 6px; color: var(--text-dim2); font-size: 9px; line-height: 1.5; }
+#canvasWrap.wbPicking #glCanvas { cursor: crosshair; }
+.snapshotHistory { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--panel-border); }
+.snapshotHistory .savedHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.snapshotHistory .historyHeading { margin-top: 6px; }
+.historyList { display: flex; flex-direction: column; gap: 4px; max-height: 232px; margin: 0; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; }
+.historyItem { width: 100%; min-height: 34px; padding: 6px 9px; border: 1px solid var(--panel-border); background: transparent; color: var(--text); font: 9px 'JetBrains Mono',monospace; letter-spacing: .05em; text-align: left; cursor: pointer; }
+.historyItem:hover { border-color: var(--border-hover); background: var(--soft-bg); }
+.historyItem[aria-current="true"] { border-color: var(--accent); color: var(--accent); background: var(--soft-bg); }
+.historyItem .historyTime { color: var(--text-dim2); }
+.historyItem:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+#photoThumbnails .photoThumb.is-selected { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+#photoThumbnails .photoThumb.is-selected::after { content: '✓'; position: absolute; top: 4px; right: 4px; padding: 0 3px; background: var(--accent); color: var(--inverse); font: 600 9px Inter,system-ui,sans-serif; }
+#photoThumbnails .photoThumb { position: relative; }
+body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { position: relative; inset: auto; left: auto; margin: 0; flex: 0 1 auto; min-width: 44px; max-width: calc(100% - 200px); min-height: 44px; padding: 8px 12px; transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#carouselStrip.collapsed #selectPhotosBtn,#carouselStrip.collapsed #syncSelectedBtn { display: none !important; }
+@media (max-width: 767px) {
+  #previewControls #splitToggleBtn { position: relative; inset: auto; left: auto; margin: 0; flex: 0 1 auto; min-width: 44px; min-height: 44px; padding: 8px 9px; white-space: nowrap; }
+  #splitToggleBtn span { display: none; }
+  #splitDivider::before { width: 52px; min-width: 52px; max-width: none; }
+  .cropRatioBtn { flex: 1 1 44px; min-height: 44px; }
+  .straightenResetBtn { min-height: 44px; }
+  .historyItem { min-height: 44px; }
+  #selectPhotosBtn,#syncSelectedBtn { min-height: 34px; }
+}
+
 </style>
 </head>
 <body data-mode="empty">
@@ -1600,13 +1649,14 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
         <canvas id="maskOverlayCanvas" aria-hidden="true"></canvas>
         <div id="maskBrushCursor" aria-hidden="true"></div>
         <div id="cropOverlay" hidden><div id="cropFrame" role="group" tabindex="0" aria-label="Crop frame. Drag to reposition, or use arrow keys."><span id="cropFrameLabel"></span></div></div>
-        <div id="splitDivider" hidden><span class="splitBadge before">BEFORE</span><span class="splitBadge after">AFTER</span></div>
+        <div id="splitDivider" role="separator" aria-orientation="vertical" aria-label="Before and after split. Drag, or use the arrow keys." aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0" hidden><span class="splitBadge before">BEFORE</span><span class="splitBadge after">AFTER</span></div>
         <button type="button" id="maskDoneBtn" aria-label="Finish painting subject mask">✓ Finish mask</button>
         <div id="beforeLabel">BEFORE</div>
         <div id="captionOverlay" class="video-only" hidden tabindex="0" aria-label="Video caption. Drag to reposition, use arrow keys for fine adjustment."></div>
       </div>
       <div id="previewControls" aria-label="Preview controls">
         <button type="button" id="holdCompareBtn" aria-label="Hold to compare with the original" aria-pressed="false">◑ <span>Hold to compare</span></button>
+        <button type="button" id="splitToggleBtn" aria-label="Toggle the draggable before and after split" aria-pressed="false" title="Before / after split — drag the divider">◧ <span>Split</span></button>
         <div id="zoomControls" role="group" aria-label="Preview zoom and rotation controls">
           <span class="zoomInstructions" aria-hidden="true">Scroll to zoom · drag when zoomed</span>
           <button type="button" id="rotateMediaBtn" aria-label="Rotate media 90 degrees clockwise" title="Rotate media 90° clockwise">↻</button>
@@ -1648,9 +1698,9 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
         <input type="range" id="videoSeek" min="0" max="60" step="0.01" value="0" aria-label="Video playback position">
       </div>
       <section id="carouselStrip" class="photo-only" aria-label="Carousel photos" hidden>
-        <div class="stripHead"><button type="button" id="carouselToggleBtn" class="carouselToggleBtn" aria-expanded="true" aria-controls="photoThumbnails" aria-label="Hide photos" title="Hide photos"><span class="panelChevron" aria-hidden="true"></span></button><span class="stripTitle" id="carouselCount">Carousel / 01 of 01</span><div class="stripActions"><button type="button" id="exportZipBtn" disabled>Carousel ZIP <span id="zipCount">0 photos</span></button><button type="button" id="applyAllBtn">↗ Apply to all</button><button type="button" id="addPhotosBtn">+ Add</button><button type="button" id="removePhotoBtn">Remove</button></div></div>
+        <div class="stripHead"><button type="button" id="carouselToggleBtn" class="carouselToggleBtn" aria-expanded="true" aria-controls="photoThumbnails" aria-label="Hide photos" title="Hide photos"><span class="panelChevron" aria-hidden="true"></span></button><span class="stripTitle" id="carouselCount">Carousel / 01 of 01</span><div class="stripActions"><button type="button" id="exportZipBtn" disabled>Carousel ZIP <span id="zipCount">0 photos</span></button><button type="button" id="applyAllBtn">↗ Apply to all</button><button type="button" id="selectPhotosBtn" aria-pressed="false" title="Pick photos to receive this edit">☑ Select</button><button type="button" id="syncSelectedBtn" title="Copy this edit onto the selected photos">⇄ Sync selected</button><button type="button" id="addPhotosBtn">+ Add</button><button type="button" id="removePhotoBtn">Remove</button></div></div>
         <div id="photoThumbnails" role="group" aria-label="Switch photo"></div>
-        <p id="carouselHint" class="socialHint">One shared edit. Reposition the crop on each photo.</p>
+        <p id="carouselHint" class="socialHint">One shared edit. Reposition the crop on each photo. Copy / paste or sync gives a photo its own edit.</p>
       </section>
       <div id="exportProgress" role="dialog" aria-modal="true" aria-labelledby="progressTitle">
         <div id="progressHead"><b id="progressTitle">Exporting</b><span id="progressPct">0%</span></div>
@@ -1690,7 +1740,17 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
           <button type="button" class="toolBtn" id="shareSettingsBtn">↗ Share this look as a link</button>
           <div id="shareLinkRow" hidden><label class="fieldLabel" for="shareLinkInput">Look link / no photos included</label><input type="text" id="shareLinkInput" readonly spellcheck="false" aria-label="Shareable look link"></div>
           <p class="socialHint" id="settingsStatus" role="status" aria-live="polite">Copy on this browser, paste in another session. Links carry settings, never images.</p>
+          <div class="inlineActions photo-only"><button type="button" class="toolBtn" id="copyToPhotoBtn" title="Copy this edit onto the photo open in the carousel">⧉ Paste onto this photo</button><button type="button" class="toolBtn" id="copyPhotoSettingsBtn" title="Copy every setting of the open photo">⧉ Copy this photo's settings</button></div>
         </div>
+      </section>
+      <section class="snapshotHistory" aria-label="Snapshots and edit history">
+        <div class="savedHeading"><span class="sectionLabel">Snapshots</span><button type="button" class="textAction" id="addSnapshotBtn">＋ Add snapshot</button></div>
+        <div id="snapshotChips" class="savedPresetGrid" role="group" aria-label="Saved snapshots"></div>
+        <p id="snapshotsEmpty" class="savedEmpty">Snapshots keep every setting — Adjust, Grade, crop angle and export options.</p>
+        <button type="button" class="toolBtn" id="deleteSnapshotBtn" hidden>Delete selected snapshot</button>
+        <div class="savedHeading historyHeading"><span class="sectionLabel">History</span><button type="button" class="textAction" id="clearHistoryBtn">Clear</button></div>
+        <ol id="historyList" class="historyList" aria-label="Edit history. Click a step to go back to it."></ol>
+        <p id="historyEmpty" class="savedEmpty">Every edit you make is listed here.</p>
       </section>
           </section>
           <section class="sidebarPanel" id="adjustPanel" data-panel="adjust" role="tabpanel" aria-labelledby="adjustTab" hidden>
@@ -1922,7 +1982,9 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
                 <div class="gradeGroupHeading">Color</div>
                 <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Vibrance</div><div class="subVal" id="valGradeVibrance">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeVibrance" min="-100" max="100" value="0" data-grade-default="0" aria-label="Vibrance"></div>
                 <div class="gradeControlRow"><div class="subHead"><div class="subLabel">Saturation</div><div class="subVal" id="valGradeSaturation">0</div></div><input class="subSlider gradeSlider" type="range" id="sliderGradeSaturation" min="-100" max="100" value="0" data-grade-default="0" aria-label="Saturation"></div>
-                <div class="gradeGroupHeading">Auto tone <button type="button" class="toolBtn" id="gradeAutoBtn" title="Estimate exposure, contrast, whites and blacks from the current image">Auto</button></div>
+                <div class="gradeGroupHeading">White balance tools <button type="button" class="toolBtn" id="wbEyedropperBtn" aria-pressed="false" title="Click a neutral point on the photo to set Temperature and Tint">⦿ Eyedropper</button><button type="button" class="toolBtn" id="wbAutoBtn" title="Neutralize the average colour cast of the whole photo">Auto WB</button></div>
+                <p class="gradeWbHint" id="wbStatus" role="status" aria-live="polite">Eyedropper: click a grey or white point to set Temperature and Tint.</p>
+                <div class="gradeGroupHeading">Auto tone <button type="button" class="toolBtn" id="gradeAutoBtn" title="Estimate exposure, contrast, highlights, shadows, whites and blacks from the current image">Auto</button></div>
               </div>
             </details>
             <details class="gradeSection" id="gradeToneCurveSection" data-grade-section="curve">
@@ -2257,6 +2319,16 @@ body #savedPresetChips .chip .presetColorSwatch::after { inset: auto 5px 5px aut
             <button type="button" class="formatBtn" data-format="landscape" aria-pressed="false"><span>Landscape</span><small>1.91:1 · 1080 × 566</small></button>
           </div>
           <button type="button" class="formatBtn originalFormat" data-format="original" aria-pressed="true"><span>Original size / no crop</span><small id="sourceDimensions">—</small></button>
+          <div class="cropRatioRow" role="group" aria-label="Crop aspect ratio presets">
+            <span class="cropRatioLabel">Aspect</span>
+            <button type="button" class="cropRatioBtn" id="cropRatio1x1" data-format="square" aria-pressed="false" aria-label="Crop to 1:1 square">1:1</button>
+            <button type="button" class="cropRatioBtn" id="cropRatio4x5" data-format="portrait" aria-pressed="false" aria-label="Crop to 4:5 portrait">4:5</button>
+            <button type="button" class="cropRatioBtn" id="cropRatio16x9" data-format="wide" aria-pressed="false" aria-label="Crop to 16:9 wide">16:9</button>
+            <button type="button" class="cropRatioBtn" id="cropRatio3x2" data-format="threeTwo" aria-pressed="false" aria-label="Crop to 3:2 classic">3:2</button>
+            <button type="button" class="cropRatioBtn" id="cropRatio9x16" data-format="story" aria-pressed="false" aria-label="Crop to 9:16 vertical">9:16</button>
+            <button type="button" class="cropRatioBtn" id="cropRatioOriginal" data-format="original" aria-pressed="true" aria-label="Keep the original aspect ratio">Orig</button>
+          </div>
+          <div class="subRow cropStraightenRow" id="straightenRow"><div class="subHead"><div class="subLabel">Straighten <span>−45° → +45°</span></div><div class="subVal" id="valStraighten">0°</div></div><input class="subSlider" type="range" id="sliderStraighten" min="-45" max="45" step="0.5" value="0" aria-label="Straighten angle in degrees"><button type="button" class="toolBtn straightenResetBtn" id="straightenResetBtn">Reset angle</button></div>
           <div class="outputRow"><span>Output dimensions</span><output id="outputDimensions" aria-live="polite">Upload to see size</output></div>
           <p class="socialHint" id="cropHint">Pick a format. Drag the crop frame to keep your subject in view.</p>
           <div class="cropTools"><button type="button" class="toolBtn" id="cropPreviewBtn" aria-pressed="false">Reposition crop</button><button type="button" class="toolBtn" id="centerCropBtn">Center</button></div>
@@ -2564,6 +2636,9 @@ function effectValue(group,value,neutral=0){ return effectEnabled[group]?value:n
 let photos=[], activePhotoIndex=-1, currentPhoto=null, nextPhotoId=1;
 let videoSourceFile=null, videoObjectUrl=null, mediaBusy=false, exportBusy=false, cancelRequested=false, encodingVideo=false;
 let exportOptions={...social.DEFAULT_EXPORT}, photoExportOptions={...social.DEFAULT_EXPORT}, cropEditing=false, cropDrag=null, splitPreview=false;
+// Lightroom-style split view: the boundary the user drags between the original and the edit.
+let splitPosition=0.5, splitDragging=false, dividerPointerId=null;
+let selectedPhotoIds=new Set();
 let videoCrop={x:0.5,y:0.5}, videoTrim={start:0,end:0};
 let captionPosition={x:0.5,y:0.82}, captionDrag=null, captionKeyframes=[];
 let videoRotation=0, videoFrameCanvas=null, videoFrameContext=null, videoGrainSeed=randomGrainSeed();
@@ -2904,7 +2979,8 @@ function onGradeSliderInput(){
 }
 function onGradeSliderCommit(){
   if(gradeApplyingSnapshot)return;
-  commitGradeSnapshot(); updateGradeIndicators(); scheduleGradeRender();
+  if(commitGradeSnapshot()) pushHistory('Color grade');
+  updateGradeIndicators(); scheduleGradeRender();
 }
 function localMaskCanCaptureKeyboard(){
   return appState.mode==='photo' && activeSidebarTab==='mask' && localMasks.length>0 && !maskLayerBusy;
@@ -3444,11 +3520,14 @@ function runGradeAuto(){
     gradeApplyingSnapshot=true;
     try{
       for(const [name,value] of Object.entries(adjustments)){
-        const slider=$(`sliderGrade${name}`); if(!slider)continue;
+        // The histogram helper names its keys in lowercase (exposure, …) while the Grade sliders
+        // are sliderGradeExposure; skips anything that is not a number (percentiles).
+        if(!Number.isFinite(value))continue;
+        const slider=$(`sliderGrade${name[0].toUpperCase()}${name.slice(1)}`); if(!slider)continue;
         slider.value=String(value); slider.dispatchEvent(new Event('input',{bubbles:true}));
       }
     }finally{gradeApplyingSnapshot=false;}
-    updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); commitGradeSnapshot(); showToast('Auto tone applied');
+    updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); if(commitGradeSnapshot()) pushHistory('Auto tone'); showToast('Auto tone applied');
   }catch(error){console.warn('Color grading Auto tone failed; existing settings were kept.',error);showToast('Auto tone could not read this image');}
 }
 function drawGradeCurve(){
@@ -4383,7 +4462,7 @@ in vec2 v_texCoord;
 uniform sampler2D u_image; uniform sampler2D u_original; uniform sampler2D u_subjectMask; uniform sampler2D u_floydResult;
 uniform vec2 u_resolution;
 uniform int u_algorithm; uniform int u_colorMode; uniform int u_paletteSize; uniform int u_downscale;
-uniform int u_backgroundOnly; uniform int u_splitPreview; uniform int u_floydReady;
+uniform int u_backgroundOnly; uniform int u_splitPreview; uniform int u_floydReady; uniform float u_splitPosition;
 uniform float u_strength; uniform float u_steps; uniform float u_threshold; uniform float u_dotSize; uniform float u_angle;
 uniform vec3 u_duotoneShadow; uniform vec3 u_duotoneHighlight; uniform vec3 u_customShadow; uniform vec3 u_customHighlight;
 out vec4 outColor;
@@ -4419,7 +4498,7 @@ vec3 mapPalette(vec3 color,int mode,float levels,float thresholdShift){
 }
 void main(){
   vec4 fullSource=texture(u_image,v_texCoord);
-  if(u_splitPreview==1 && v_texCoord.x<0.5){ outColor=texture(u_original,v_texCoord); return; }
+  if(u_splitPreview==1 && v_texCoord.x<u_splitPosition){ outColor=texture(u_original,v_texCoord); return; }
   float amount=clamp(abs(u_strength),0.0,1.0);
   if(amount<0.001){ outColor=fullSource; return; }
   float factor=float(max(u_downscale,1));
@@ -5020,6 +5099,7 @@ function renderDitherPass(timeMs,strength,backgroundOnly){
   gl.uniform1i(gl.getUniformLocation(progDither,'u_downscale'),dither.downscale);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_backgroundOnly'),backgroundOnly?1:0);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_splitPreview'),splitPreview?1:0);
+  gl.uniform1f(gl.getUniformLocation(progDither,'u_splitPosition'),splitPosition);
   gl.uniform1i(gl.getUniformLocation(progDither,'u_floydReady'),floydReady);
   gl.uniform1f(gl.getUniformLocation(progDither,'u_strength'),appliedStrength);
   gl.uniform1f(gl.getUniformLocation(progDither,'u_steps'),params.ditherSteps);
@@ -7683,6 +7763,117 @@ function rotatePhotoMask(saved,degrees){
   if(saved.auto) saved.auto=rotateCanvas(saved.auto,saved.auto.width,saved.auto.height,degrees);
   saved.strokes=saved.strokes.map(stroke=>({...stroke,points:stroke.points.map(point=>({x:1-point.y,y:point.x}))}));
 }
+// === Lightroom-style straighten and white balance sampling ==================================
+// A downscaled copy of the straightened source feeds the white balance tools. Reading it instead
+// of the graded canvas keeps the eyedropper honest: the sample is raw sensor-ish colour, so the
+// value it produces makes the picked point neutral no matter what the sliders already say.
+const PHOTO_SAMPLE_MAX=256;
+let photoSampleCanvas=null, photoSampleContext=null, photoSampleKey=null;
+function applyStraightenToSource(source,width,height,angle){
+  const degrees=social.clampStraighten(angle);
+  if(!degrees) return source;
+  const output=document.createElement('canvas');
+  output.width=width; output.height=height;
+  const context=output.getContext('2d');
+  const scale=social.straightenFillScale(width,height,degrees);
+  context.imageSmoothingEnabled=true; context.imageSmoothingQuality='high';
+  context.translate(width/2,height/2);
+  context.rotate(degrees*Math.PI/180);
+  context.scale(scale,scale);
+  context.drawImage(source,-width/2,-height/2,width,height);
+  return output;
+}
+function buildPhotoSampleCanvas(source,width,height,key){
+  const scale=Math.min(1,PHOTO_SAMPLE_MAX/Math.max(width,height));
+  if(!photoSampleCanvas){
+    photoSampleCanvas=document.createElement('canvas');
+    photoSampleContext=photoSampleCanvas.getContext('2d',{willReadFrequently:true});
+  }
+  photoSampleCanvas.width=Math.max(1,Math.round(width*scale));
+  photoSampleCanvas.height=Math.max(1,Math.round(height*scale));
+  if(!photoSampleContext) return;
+  photoSampleContext.clearRect(0,0,photoSampleCanvas.width,photoSampleCanvas.height);
+  photoSampleContext.drawImage(source,0,0,photoSampleCanvas.width,photoSampleCanvas.height);
+  photoSampleKey=key===undefined||key===null?null:key;
+}
+function photoSampleReady(){ return !!photoSampleContext && !isVideo && !!currentPhoto && photoSampleKey===currentPhoto.id; }
+function samplePhotoPixel(normalizedX,normalizedY,radius=1){
+  if(!photoSampleReady()) return null;
+  const width=photoSampleCanvas.width, height=photoSampleCanvas.height;
+  const x=Math.max(0,Math.min(width-1,Math.round(normalizedX*width)));
+  const y=Math.max(0,Math.min(height-1,Math.round(normalizedY*height)));
+  const left=Math.max(0,x-radius), top=Math.max(0,y-radius);
+  const boxWidth=Math.min(width-left,x+radius+1-left), boxHeight=Math.min(height-top,y+radius+1-top);
+  const data=photoSampleContext.getImageData(left,top,boxWidth,boxHeight).data;
+  let red=0, green=0, blue=0, count=0;
+  for(let index=0;index+3<data.length;index+=4){ red+=data[index]; green+=data[index+1]; blue+=data[index+2]; count++; }
+  if(!count) return null;
+  return {r:red/count,g:green/count,b:blue/count};
+}
+function averagePhotoPixels(){
+  if(!photoSampleReady()) return null;
+  const width=photoSampleCanvas.width, height=photoSampleCanvas.height;
+  const data=photoSampleContext.getImageData(0,0,width,height).data;
+  let red=0, green=0, blue=0, count=0, allRed=0, allGreen=0, allBlue=0, allCount=0;
+  for(let index=0;index+3<data.length;index+=4){
+    const r=data[index], g=data[index+1], b=data[index+2];
+    allRed+=r; allGreen+=g; allBlue+=b; allCount++;
+    const luma=(0.2126*r+0.7152*g+0.0722*b)/255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b);
+    // Neutral pixels only: saturated subject colour would drag the average off grey.
+    if(luma<0.18||luma>0.92||(max>0&&(max-min)/max>0.28)) continue;
+    red+=r; green+=g; blue+=b; count++;
+  }
+  if(count>=Math.max(24,allCount*0.02)) return {r:red/count,g:green/count,b:blue/count};
+  if(allCount) return {r:allRed/allCount,g:allGreen/allCount,b:allBlue/allCount};
+  return null;
+}
+function gradeLegacyTemperatureValue(){ return effectEnabled.color?Number(sliders.Temperature?.value||0):0; }
+function applyGradeWhiteBalance(result,label){
+  const temperatureSlider=$('sliderGradeTemperature'), tintSlider=$('sliderGradeTint');
+  if(!temperatureSlider||!tintSlider) return;
+  gradeApplyingSnapshot=true;
+  try{
+    temperatureSlider.value=String(result.temperature); temperatureSlider.dispatchEvent(new Event('input',{bubbles:true}));
+    tintSlider.value=String(result.tint); tintSlider.dispatchEvent(new Event('input',{bubbles:true}));
+  }finally{ gradeApplyingSnapshot=false; }
+  updateGradeIndicators(); invalidateGradePreview(); scheduleGradeRender(); commitGradeSnapshot(); pushHistory(label);
+}
+function setWbStatus(text){ const status=$('wbStatus'); if(status) status.textContent=text; }
+let wbPicking=false;
+function setWbPicking(on){
+  wbPicking=!!on;
+  canvasWrap.classList.toggle('wbPicking',wbPicking);
+  $('wbEyedropperBtn').setAttribute('aria-pressed',String(wbPicking));
+  setWbStatus(wbPicking?'Click a neutral grey or white point on the photo.':'Eyedropper: click a grey or white point to set Temperature and Tint.');
+}
+function reportWhiteBalance(result,label,source){
+  if(!result||!result.usable){
+    setWbStatus('That point is too dark or too bright — pick a mid-tone neutral area.');
+    showToast('Pick a mid-tone neutral area',4500);
+    return false;
+  }
+  applyGradeWhiteBalance(result,label);
+  const suffix=result.saturated?' (at the slider limit — a stronger cast needs a manual tweak)':'';
+  setWbStatus(`${source}: Temperature ${result.temperature>0?'+':''}${result.temperature}, Tint ${result.tint>0?'+':''}${result.tint}${suffix}`);
+  showToast(`${source} applied${suffix}`,4500);
+  return true;
+}
+function runAutoWhiteBalance(){
+  if(!hasContent||!currentPhoto){ showToast('Open a photo to use Auto white balance'); return; }
+  const sample=averagePhotoPixels();
+  if(!sample){ showToast('Auto white balance needs a loaded photo',4500); return; }
+  reportWhiteBalance(colorGrading.whiteBalanceFromSample(sample,{legacyTemperature:gradeLegacyTemperatureValue()}),'Auto WB','Auto white balance');
+}
+function runWbEyedropperAt(clientX,clientY){
+  if(!hasContent||!currentPhoto){ showToast('Open a photo to use the eyedropper'); return; }
+  if(!photoSampleReady()){ showToast('The eyedropper is ready once the photo finishes loading',4500); return; }
+  const box=canvas.getBoundingClientRect();
+  if(!box.width||!box.height) return;
+  const sample=samplePhotoPixel((clientX-box.left)/box.width,(clientY-box.top)/box.height,2);
+  if(!sample){ showToast('Could not read that pixel',4500); return; }
+  reportWhiteBalance(colorGrading.whiteBalanceFromSample(sample,{legacyTemperature:gradeLegacyTemperatureValue()}),'Eyedropper','White balance set from a neutral point');
+}
 function uploadPhoto(item,img,resetView=true){
   const maximum=Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE),gl.getParameter(gl.MAX_RENDERBUFFER_SIZE));
   const scale=Math.min(1,maximum/Math.max(img.naturalWidth,img.naturalHeight));
@@ -7696,7 +7887,10 @@ function uploadPhoto(item,img,resetView=true){
   }
   const rotation=((item.rotation||0)%360+360)%360, swapped=rotation===90||rotation===270;
   const w=swapped?baseH:baseW, h=swapped?baseW:baseH;
-  const source=rotateCanvas(baseSource,baseW,baseH,rotation);
+  // Straighten is baked in here: the crop frame, the masks, the histogram, the preview and the
+  // exported file all read the same straightened pixels, so what you frame is what you download.
+  const source=applyStraightenToSource(rotateCanvas(baseSource,baseW,baseH,rotation),w,h,item.straighten);
+  buildPhotoSampleCanvas(source,w,h,item.id);
   createLookPreviewSource(item,source);
   item.width=w; item.height=h; item.grainSeed=item.grainSeed||randomGrainSeed();
   if(canvas.width!==w || canvas.height!==h || !fboSharpened){ canvas.width=w; canvas.height=h; recreateFBOs(w,h); }
@@ -7712,11 +7906,14 @@ function uploadPhoto(item,img,resetView=true){
   setWorkspaceMode('photo');
   restorePhotoMask(item,source,w,h);
   restoreMaskBackgroundForPhoto(item);
+  applyPhotoSettingsOverride(item);
   dropZone.style.display='none'; canvasWrap.style.display='flex';
   if(resetView) resetPreviewZoom(); else updatePreviewZoom();
   schedulePreviewFit();
   $('processVideoBtn').style.display='none';
   $('downloadBtn').innerHTML='⤓ Original-size PNG';
+  syncStraightenControl();
+  beginPhotoHistory(item);
   updateSocialUI();
   if(!exportBusy&&!mediaBusy){if(typeof render==='function')render(performance.now());if(typeof renderGradePresetCards==='function')renderGradePresetCards();}
 }
@@ -7731,7 +7928,9 @@ async function createThumbnail(img,rotation=0){
 function clearPhotos(){
   photos.forEach(photo=>{ if(photo.thumbUrl) URL.revokeObjectURL(photo.thumbUrl); });
   photos=[]; activePhotoIndex=-1; currentPhoto=null;
-  renderPhotoStrip();
+  selectedPhotoIds.clear(); photoSelectMode=false; photoSettingsClipboard=null;
+  resetHistoryTimeline();
+  renderPhotoStrip(); renderPhotoSelectionBar();
 }
 function unloadVideo(){
   videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load();
@@ -7771,7 +7970,7 @@ async function handleFiles(fileList,{append=false}={}){
   updateSocialUI();
   try{
     for(let i=0;i<chosen.length;i++){
-      const item={id:nextPhotoId++,file:chosen[i],blob:chosen[i],converted:false,rotation:0,grainSeed:randomGrainSeed(),crop:{x:0.5,y:0.5},mask:null,maskBackground:null,thumbUrl:null};
+      const item={id:nextPhotoId++,file:chosen[i],blob:chosen[i],converted:false,rotation:0,grainSeed:randomGrainSeed(),crop:{x:0.5,y:0.5},straighten:0,settings:null,mask:null,maskBackground:null,thumbUrl:null};
       try{
         const img=await decodePhoto(item);
         if(token!==fileLoadId) return;
@@ -8210,6 +8409,7 @@ function userChangedSliders(){
   selectedPresetName=null;
   activePresetName=null; syncPresetSelection();
   updateFromSliders(); updateSliderUI(); floydLastKey=null; updateClusterSummaries();
+  scheduleHistoryCommit('Adjust sliders');
   if(hasContent) scheduleSliderRender();
 }
 function updateDitherControlVisibility(){
@@ -9015,7 +9215,10 @@ function updateSplitDivider(){
   const divider=$('splitDivider'); divider.hidden=!hasContent || !splitPreview || showOriginal;
   if(divider.hidden) return;
   const box=canvas.getBoundingClientRect(), wrap=canvasWrap.getBoundingClientRect();
-  Object.assign(divider.style,{left:`${box.left-wrap.left+box.width/2}px`,top:`${box.top-wrap.top}px`,height:`${box.height}px`,bottom:'auto'});
+  const percent=Math.round(splitPosition*100);
+  Object.assign(divider.style,{left:`${box.left-wrap.left+box.width*splitPosition}px`,top:`${box.top-wrap.top}px`,height:`${box.height}px`,bottom:'auto'});
+  divider.setAttribute('aria-valuenow',String(percent));
+  divider.setAttribute('aria-valuetext',`${percent} percent original, ${100-percent} percent edited`);
 }
 function setCropPanelOpen(open,scroll=false){
   $('cropPanelBody').hidden=!open;
@@ -9118,6 +9321,8 @@ function updateSocialUI(){
   $('centerCropBtn').disabled=!hasContent||ratio===null||locked;
   $('cropHint').textContent=isVideo?(ratio===null?'Original size keeps the full frame. Choose an aspect ratio to crop the Reel.':'Choose a Reel frame ratio, then drag to compose the shot.'):(exportOptions.comparison?'Both panels use the same framing. Drag the crop; arrow keys fine-tune it.':ratio===null?'Original size keeps the full image. Choose an Instagram format to crop.':'Drag the frame to reposition. Arrow keys fine-tune; Shift moves faster.');
   $('splitPreviewBtn').disabled=!hasContent||locked; $('splitPreviewBtn').setAttribute('aria-pressed',String(splitPreview));
+  const splitToggle=$('splitToggleBtn');
+  if(splitToggle){ splitToggle.disabled=!hasContent||locked; splitToggle.setAttribute('aria-pressed',String(splitPreview)); }
   $('videoTrimPanel').hidden=!isVideo;
   $('downloadBtn').disabled=!hasContent||locked;
   $('processVideoBtn').disabled=!isVideo||!hasContent||locked;
@@ -9251,6 +9456,15 @@ $('cropPreviewBtn').addEventListener('click',()=>{
   updateSocialUI();
 });
 $('centerCropBtn').addEventListener('click',()=>{ Object.assign(getCropPosition(),{x:0.5,y:0.5}); updateCropOverlay(); });
+$('wbEyedropperBtn').addEventListener('click',()=>setWbPicking(!wbPicking));
+$('wbAutoBtn').addEventListener('click',runAutoWhiteBalance);
+canvas.addEventListener('pointerdown',event=>{
+  if(!wbPicking) return;
+  event.preventDefault(); event.stopPropagation();
+  setWbPicking(false);
+  runWbEyedropperAt(event.clientX,event.clientY);
+},true);
+document.addEventListener('keydown',event=>{ if(event.key==='Escape'&&wbPicking) setWbPicking(false); });
 $('exportFileType').addEventListener('change',e=>{
   exportOptions.type=e.target.value;
   if(needsTransparentMaskPng()&&exportOptions.type!=='png'){forceMaskBackgroundPng(true);updateSocialUI();return;}
@@ -9275,10 +9489,47 @@ $('exportComparison').addEventListener('change',e=>{
 });
 $('comparisonFormat').addEventListener('change',e=>{ exportOptions.comparisonFormat=e.target.value; updateSocialUI(); });
 $('comparisonLabels').addEventListener('change',e=>{ exportOptions.labels=e.target.checked; });
-$('splitPreviewBtn').addEventListener('click',()=>{
-  splitPreview=!splitPreview; showOriginal=false; beforeLabel.classList.remove('show');
-  updateSocialUI(); render(performance.now());
+// Draggable before / after split. The same `splitPreview` flag drives the shader, so the export
+// panel button, the preview toggle and the divider all stay in step.
+function setSplitPreview(on){
+  splitPreview=!!on; showOriginal=false; beforeLabel.classList.remove('show');
+  if(splitPreview&&cropEditing){ cropEditing=false; setMaskPaintMode(null); }
+  invalidateGradePreview(); scheduleGradeRender(); updateSocialUI(); updateSplitDivider();
+  try{render(performance.now());}catch(error){console.warn('Split preview could not be drawn.',error);}
+}
+function moveSplitTo(clientX){
+  const box=canvas.getBoundingClientRect();
+  if(!box.width) return;
+  splitPosition=Math.max(0.08,Math.min(0.92,(clientX-box.left)/box.width));
+  lastPreviewRenderKey=null; updateSplitDivider(); scheduleGradeRender();
+  try{render(performance.now());}catch(error){}
+}
+$('splitToggleBtn').addEventListener('click',()=>setSplitPreview(!splitPreview));
+$('splitDivider').addEventListener('pointerdown',event=>{
+  if(!splitPreview) return;
+  splitDragging=true; dividerPointerId=event.pointerId;
+  $('splitDivider').classList.add('dragging');
+  $('splitDivider').setPointerCapture(event.pointerId);
+  moveSplitTo(event.clientX); event.preventDefault();
 });
+$('splitDivider').addEventListener('pointermove',event=>{ if(splitDragging&&event.pointerId===dividerPointerId) moveSplitTo(event.clientX); });
+const endSplitDrag=event=>{
+  if(!splitDragging||(event&&event.pointerId!==dividerPointerId)) return;
+  splitDragging=false; dividerPointerId=null; $('splitDivider').classList.remove('dragging');
+  try{ $('splitDivider').releasePointerCapture(event.pointerId); }catch(error){}
+};
+$('splitDivider').addEventListener('pointerup',endSplitDrag);
+$('splitDivider').addEventListener('pointercancel',endSplitDrag);
+$('splitDivider').addEventListener('keydown',event=>{
+  const step=event.shiftKey?0.1:0.02;
+  if(event.key==='ArrowLeft'||event.key==='ArrowRight'){
+    event.preventDefault();
+    splitPosition=Math.max(0.08,Math.min(0.92,splitPosition+(event.key==='ArrowLeft'?-step:step)));
+    lastPreviewRenderKey=null; updateSplitDivider(); scheduleGradeRender();
+    try{render(performance.now());}catch(error){}
+  }
+});
+$('splitPreviewBtn').addEventListener('click',()=>setSplitPreview(!splitPreview));
 const cropFrame=$('cropFrame');
 cropFrame.addEventListener('dblclick',e=>e.stopPropagation());
 cropFrame.addEventListener('pointerdown',e=>{
@@ -10231,6 +10482,336 @@ initializeColorGrading(); setupSliderNumberEditing(); updateFromSliders(); updat
 syncHeaderHeight(); installPreviewFitObserver(); schedulePreviewFit();
 window.addEventListener('dragover',e=> e.preventDefault());
 window.addEventListener('drop',e=>{ if(e.dataTransfer.files.length){ e.preventDefault(); handleFiles(e.dataTransfer.files); } });
+
+// === Snapshots, edit history, crop ratios, straighten and per-photo settings ==================
+// Everything below is additive: it reads the existing settings / grade state and never changes the
+// meaning of a stored value or an existing control.
+const HISTORY_LIMIT=30, SNAPSHOT_KEY='film_lab_snapshots_v1', SNAPSHOT_LIMIT=12;
+let historyEntries=[], historyIndex=-1, historyApplying=false;
+let historyPendingTimer=null, historyPendingLabel=null;
+let snapshots=[], snapshotSelection=null;
+let photoSettingsClipboard=null, photoSelectMode=false, suppressPhotoOverride=false;
+let straightenTimer=null, straightenToken=0;
+
+function fullSettingsSnapshot(originName){
+  let settings=null, grade=null;
+  try{ settings=settingsSnapshot(); }catch(error){ console.warn('The current settings could not be captured.',error); }
+  if(!settings) return null;
+  try{ grade=makeGradeSnapshot(); }catch(error){ grade=null; }
+  const position=(!isVideo&&currentPhoto)?currentPhoto.crop:videoCrop;
+  return {
+    app:'film-lab', version:1, settings, grade,
+    straighten:social.clampStraighten(currentPhoto?currentPhoto.straighten:0),
+    crop:{x:Number(position?.x)||0.5,y:Number(position?.y)||0.5},
+    origin:originName||currentPhoto?.file?.name||null,
+  };
+}
+// Synchronous part of a restore: sliders, effects, dither, export options and the color grade.
+// The straighten angle is applied by the caller because it re-renders the source pixels.
+function restoreFullSettings(payload,{crop=false}={}){
+  let data=null;
+  try{ data=social.normalizeFullSettings(payload); }
+  catch(error){ console.warn('That settings payload could not be read.',error); return null; }
+  historyApplying=true;
+  try{
+    restoreSettings(data.settings);
+    if(data.grade) applyGradeSnapshot(data.grade);
+    if(crop&&currentPhoto&&!isVideo&&data.crop){
+      currentPhoto.crop={x:Math.max(0,Math.min(1,Number(data.crop.x))),y:Math.max(0,Math.min(1,Number(data.crop.y)))};
+      updateCropOverlay();
+    }
+  }finally{ historyApplying=false; }
+  return data;
+}
+async function applySettingsPayload(payload,{crop=false,straighten=false,reason=''}={}){
+  const data=restoreFullSettings(payload,{crop});
+  if(!data) return null;
+  if(straighten&&currentPhoto&&!isVideo){
+    const angle=social.clampStraighten(data.straighten);
+    if(social.clampStraighten(currentPhoto.straighten)!==angle){
+      currentPhoto.straighten=angle;
+      syncStraightenControl();
+      await refreshStraightenPixels(currentPhoto);
+    }
+  }
+  if(reason) $('settingsStatus').textContent=reason;
+  return data;
+}
+// A photo that owns a payload keeps that edit; every other photo keeps sharing the live edit.
+function applyPhotoSettingsOverride(item){
+  if(suppressPhotoOverride||!item||isVideo||!item.settings) return;
+  try{ restoreFullSettings(item.settings,{crop:false}); }
+  catch(error){ console.warn('This photo’s saved settings could not be restored.',error); }
+}
+function syncStraightenControl(){
+  const slider=$('sliderStraighten'), readout=$('valStraighten'), reset=$('straightenResetBtn');
+  if(!slider) return;
+  const available=!isVideo&&!!currentPhoto;
+  const angle=available?social.clampStraighten(currentPhoto.straighten):0;
+  slider.value=String(angle); slider.disabled=!available;
+  if(readout) readout.textContent=`${angle>0?'+':''}${angle}`;
+  if(reset) reset.disabled=!available||!angle;
+}
+async function refreshStraightenPixels(item){
+  if(!item||isVideo||currentPhoto!==item) return;
+  try{
+    const img=await decodePhoto(item);
+    if(currentPhoto!==item) return;
+    suppressPhotoOverride=true;
+    try{ uploadPhoto(item,img,false); }finally{ suppressPhotoOverride=false; }
+    syncStraightenControl();
+  }catch(error){ console.warn('Straighten could not be applied.',error); showToast('Straighten could not be applied'); }
+}
+function scheduleStraightenRefresh(){
+  const item=currentPhoto; if(!item||isVideo) return;
+  const token=++straightenToken;
+  if(straightenTimer!==null) clearTimeout(straightenTimer);
+  straightenTimer=setTimeout(()=>{
+    straightenTimer=null;
+    if(token!==straightenToken||currentPhoto!==item) return;
+    refreshStraightenPixels(item);
+  },150);
+}
+function setStraightenAngle(value,{commit=false}={}){
+  if(!currentPhoto||isVideo) return;
+  const next=social.clampStraighten(value);
+  if(next===social.clampStraighten(currentPhoto.straighten)) return;
+  currentPhoto.straighten=next;
+  syncStraightenControl();
+  scheduleStraightenRefresh();
+  if(commit) scheduleHistoryCommit(`Straighten ${next>0?'+':''}${next}°`);
+}
+
+// --- edit history --------------------------------------------------------------------------
+function resetHistoryTimeline(){ historyEntries=[]; historyIndex=-1; renderHistoryList(); }
+function beginPhotoHistory(item){
+  if(!item) return;
+  const current=historyEntries[historyIndex];
+  if(current&&current.photo===item.id){ return; }
+  resetHistoryTimeline();
+  pushHistory(`Opened ${item.file?.name||'photo'}`);
+}
+function pushHistory(label){
+  if(historyApplying||!hasContent) return;
+  const payload=fullSettingsSnapshot(currentPhoto?.file?.name);
+  if(!payload) return;
+  const entry={label:String(label||'Edit').slice(0,64),payload,photo:currentPhoto?.id??null,at:Date.now()};
+  const current=historyEntries[historyIndex];
+  if(current&&current.photo===entry.photo&&JSON.stringify(current.payload.settings)===JSON.stringify(entry.payload.settings)&&JSON.stringify(current.payload.grade)===JSON.stringify(entry.payload.grade)&&current.payload.straighten===entry.payload.straighten) return;
+  historyEntries=historyEntries.slice(0,historyIndex+1);
+  historyEntries.push(entry);
+  if(historyEntries.length>HISTORY_LIMIT) historyEntries.splice(0,historyEntries.length-HISTORY_LIMIT);
+  historyIndex=historyEntries.length-1;
+  renderHistoryList();
+}
+function scheduleHistoryCommit(label){
+  if(historyApplying) return;
+  historyPendingLabel=label;
+  if(historyPendingTimer!==null) clearTimeout(historyPendingTimer);
+  historyPendingTimer=setTimeout(()=>{
+    historyPendingTimer=null;
+    const pending=historyPendingLabel; historyPendingLabel=null;
+    pushHistory(pending||'Edit');
+  },400);
+}
+async function applyHistoryEntry(index){
+  const entry=historyEntries[index];
+  if(!entry) return;
+  historyIndex=index; renderHistoryList();
+  await applySettingsPayload(entry.payload,{crop:true,straighten:true});
+  showToast(`Back to “${entry.label}”`,3500);
+}
+function renderHistoryList(){
+  const list=$('historyList'), empty=$('historyEmpty');
+  if(!list) return;
+  list.replaceChildren();
+  historyEntries.forEach((entry,index)=>{
+    const item=document.createElement('li');
+    const button=document.createElement('button');
+    button.type='button'; button.className='historyItem';
+    button.dataset.historyIndex=String(index);
+    button.textContent=entry.label;
+    button.setAttribute('aria-label',`History step ${index+1}: ${entry.label}`);
+    if(index===historyIndex) button.setAttribute('aria-current','true');
+    button.addEventListener('click',()=>applyHistoryEntry(index));
+    item.appendChild(button); list.appendChild(item);
+  });
+  if(empty) empty.hidden=historyEntries.length>0;
+  $('clearHistoryBtn').disabled=!historyEntries.length;
+  if(historyIndex>=0) list.scrollTop=list.scrollHeight;
+}
+
+// --- snapshots -----------------------------------------------------------------------------
+function loadSnapshots(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(SNAPSHOT_KEY)||'[]');
+    snapshots=Array.isArray(raw)?raw.filter(entry=>entry&&typeof entry.name==='string'&&entry.payload).slice(0,SNAPSHOT_LIMIT):[];
+  }catch(error){ snapshots=[]; }
+}
+function saveSnapshots(){
+  try{ localStorage.setItem(SNAPSHOT_KEY,JSON.stringify(snapshots.slice(0,SNAPSHOT_LIMIT))); }
+  catch(error){ console.warn('Snapshots could not be saved on this browser.',error); }
+}
+function renderSnapshotChips(){
+  const host=$('snapshotChips'), empty=$('snapshotsEmpty');
+  if(!host) return;
+  host.replaceChildren();
+  snapshots.forEach(entry=>{
+    const button=document.createElement('button');
+    button.type='button'; button.className='chip';
+    button.textContent=entry.name;
+    button.setAttribute('aria-pressed',String(entry.name===snapshotSelection));
+    button.title=`Apply snapshot “${entry.name}”`;
+    button.addEventListener('click',()=>applySnapshot(entry.name));
+    host.appendChild(button);
+  });
+  if(empty) empty.hidden=snapshots.length>0;
+  $('deleteSnapshotBtn').hidden=!snapshotSelection||!snapshots.some(entry=>entry.name===snapshotSelection);
+}
+function addSnapshot(){
+  if(!hasContent){ showToast('Open a photo or video to save a snapshot'); return; }
+  const name=(prompt('Snapshot name:')||'').trim();
+  if(!name) return;
+  let payload=null;
+  try{ payload=fullSettingsSnapshot(); }catch(error){ payload=null; }
+  if(!payload){ showToast('This edit could not be snapshotted'); return; }
+  snapshots=snapshots.filter(entry=>entry.name!==name);
+  snapshots.push({name:name.slice(0,40),payload,at:Date.now()});
+  if(snapshots.length>SNAPSHOT_LIMIT) snapshots=snapshots.slice(-SNAPSHOT_LIMIT);
+  snapshotSelection=name.slice(0,40);
+  saveSnapshots(); renderSnapshotChips();
+  showToast(`Snapshot “${snapshotSelection}” saved`,3500);
+}
+async function applySnapshot(name){
+  const entry=snapshots.find(candidate=>candidate.name===name);
+  if(!entry) return;
+  snapshotSelection=name; renderSnapshotChips();
+  await applySettingsPayload(entry.payload,{crop:true,straighten:true});
+  pushHistory(`Snapshot “${name}”`);
+  showToast(`Snapshot “${name}” applied`,3500);
+}
+function deleteSnapshot(){
+  if(!snapshotSelection) return;
+  snapshots=snapshots.filter(entry=>entry.name!==snapshotSelection);
+  snapshotSelection=null; saveSnapshots(); renderSnapshotChips();
+  showToast('Snapshot deleted');
+}
+
+// --- per-photo copy, paste and sync --------------------------------------------------------
+function stashPhotoSettings(){
+  const payload=fullSettingsSnapshot(currentPhoto?.file?.name);
+  if(!payload) return null;
+  photoSettingsClipboard=payload;
+  return payload;
+}
+function photoIndexLabel(item){
+  const index=photos.indexOf(item);
+  return index<0?'this photo':`photo ${index+1}`;
+}
+async function copyPhotoSettings({quiet=false}={}){
+  if(!currentPhoto||isVideo){ showToast('Open a carousel photo first'); return null; }
+  const payload=stashPhotoSettings();
+  if(!payload){ showToast('This edit could not be captured'); return null; }
+  let stored=false;
+  try{ localStorage.setItem('film_lab_settings_clipboard_v1',JSON.stringify(payload.settings)); stored=true; }catch(error){}
+  $('settingsStatus').textContent=`Copied every setting of ${photoIndexLabel(currentPhoto)}. Open another photo and paste, or use Sync selected.`;
+  if(!quiet) showToast(stored?'Settings copied for the carousel':'Settings copied',3000);
+  return payload;
+}
+async function pastePhotoSettings({quiet=false}={}){
+  if(!currentPhoto||isVideo){ showToast('Open a carousel photo first'); return false; }
+  let payload=photoSettingsClipboard;
+  if(!payload){ try{ payload=await copyPhotoSettings({quiet:true}); }catch(error){ payload=null; } }
+  if(!payload){ showToast('Copy settings first',4000); return false; }
+  currentPhoto.settings=JSON.parse(JSON.stringify(payload));
+  await applySettingsPayload(payload,{crop:false,straighten:true});
+  pushHistory(`Pasted settings → ${photoIndexLabel(currentPhoto)}`);
+  $('settingsStatus').textContent=`Settings pasted onto ${photoIndexLabel(currentPhoto)}. Its crop and mask are unchanged.`;
+  if(!quiet) showToast(`Settings pasted onto ${photoIndexLabel(currentPhoto)}`,3500);
+  renderPhotoSelectionBar();
+  return true;
+}
+async function syncSettingsToPhotos(targets,{label='Synced' }={}){
+  if(!currentPhoto||isVideo){ showToast('Open a carousel photo first'); return 0; }
+  const payload=stashPhotoSettings();
+  if(!payload) return 0;
+  let count=0;
+  for(const item of targets){
+    if(!item||item===currentPhoto) continue;
+    item.settings=JSON.parse(JSON.stringify(payload));
+    item.straighten=payload.straighten;
+    count++;
+  }
+  if(count){
+    pushHistory(`${label} → ${count} photo${count===1?'':'s'}`);
+    showToast(`${label} onto ${count} photo${count===1?'':'s'}`,3500);
+  }else showToast('Pick at least one other photo to sync');
+  renderPhotoSelectionBar();
+  return count;
+}
+function renderPhotoSelectionBar(){
+  const select=$('selectPhotosBtn'), sync=$('syncSelectedBtn');
+  if(!select||!sync) return;
+  const count=selectedPhotoIds.size;
+  select.setAttribute('aria-pressed',String(photoSelectMode));
+  select.textContent=photoSelectMode?'☑ Selecting':'☑ Select';
+  sync.textContent=count?`⇄ Sync selected (${count})`:'⇄ Sync selected';
+  sync.disabled=!photos.length||isVideo;
+  $('photoThumbnails').querySelectorAll('.photoThumb').forEach((button,index)=>{
+    const photo=photos[index];
+    const selected=!!photo&&selectedPhotoIds.has(photo.id);
+    button.classList.toggle('is-selected',selected);
+    button.dataset.selected=String(selected);
+  });
+}
+function togglePhotoSelection(photo){
+  if(!photo) return;
+  if(selectedPhotoIds.has(photo.id)) selectedPhotoIds.delete(photo.id);
+  else selectedPhotoIds.add(photo.id);
+  renderPhotoSelectionBar();
+}
+async function pasteSettingsToOpenPhoto(){
+  return pastePhotoSettings();
+}
+$('selectPhotosBtn').addEventListener('click',()=>{
+  photoSelectMode=!photoSelectMode;
+  if(!photoSelectMode) selectedPhotoIds.clear();
+  renderPhotoSelectionBar();
+  $('carouselHint').textContent=photoSelectMode?'Pick photos, then Sync selected copies this edit onto them.':'One shared edit. Reposition the crop on each photo. Copy / paste or sync gives a photo its own edit.';
+});
+$('syncSelectedBtn').addEventListener('click',()=>{
+  if(!photos.length){ showToast('Add photos to the carousel first'); return; }
+  if(selectedPhotoIds.size){
+    const targets=photos.filter(photo=>selectedPhotoIds.has(photo.id)&&photo!==currentPhoto);
+    syncSettingsToPhotos(targets,{label:'Synced'});
+  }else{
+    syncSettingsToPhotos(photos.filter(photo=>photo!==currentPhoto),{label:'Synced to all'});
+  }
+});
+$('copyPhotoSettingsBtn').addEventListener('click',()=>copyPhotoSettings());
+$('copyToPhotoBtn').addEventListener('click',pasteSettingsToOpenPhoto);
+$('applyAllBtn').addEventListener('click',()=>{ syncSettingsToPhotos(photos.filter(photo=>photo!==currentPhoto),{label:'Applied to all'}); });
+$('addSnapshotBtn').addEventListener('click',addSnapshot);
+$('deleteSnapshotBtn').addEventListener('click',deleteSnapshot);
+$('clearHistoryBtn').addEventListener('click',()=>{ resetHistoryTimeline(); showToast('History cleared'); });
+$('straightenResetBtn').addEventListener('click',()=>{ setStraightenAngle(0,{commit:true}); });
+$('sliderStraighten').addEventListener('input',event=>setStraightenAngle(event.target.value));
+$('sliderStraighten').addEventListener('change',event=>{ setStraightenAngle(event.target.value,{commit:true}); });
+document.querySelectorAll('[data-format]').forEach(button=>button.addEventListener('click',()=>{
+  const label=social.cropRatioPreset(button.dataset.format);
+  scheduleHistoryCommit(`Crop ${label?label.label:button.dataset.format}`);
+}));
+// Selection clicks are intercepted before the thumbnail's own activatePhoto listener runs.
+$('photoThumbnails').addEventListener('click',event=>{
+  if(!photoSelectMode) return;
+  const button=event.target.closest('.photoThumb');
+  if(!button) return;
+  event.preventDefault(); event.stopPropagation();
+  togglePhotoSelection(photos[[...$('photoThumbnails').children].indexOf(button)]);
+},true);
+new MutationObserver(()=>renderPhotoSelectionBar()).observe($('photoThumbnails'),{childList:true});
+loadSnapshots(); renderSnapshotChips(); renderHistoryList(); renderPhotoSelectionBar();
+
 // FFmpeg is initialized only after a video upload succeeds; exports await the shared loader promise.
 console.log('Film Lab — Instagram tools · 44 signed controls — WebGL2', gl.getParameter(gl.VERSION));
 })();

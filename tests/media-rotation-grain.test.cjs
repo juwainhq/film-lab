@@ -37,7 +37,8 @@ test('rotation controls change photo pixels and video frame pixels, not just pre
   assert.match(html, /id="rotateMediaBtn" aria-label="Rotate media 90 degrees clockwise"/);
   assert.match(script, /function rotateCanvas\(source,width,height,degrees\)/);
   assert.match(script, /ctx\.drawImage\(source,-width\/2,-height\/2,width,height\)/);
-  assert.match(script, /const source=rotateCanvas\(baseSource,baseW,baseH,rotation\)/);
+  assert.match(script, /const source=applyStraightenToSource\(rotateCanvas\(baseSource,baseW,baseH,rotation\),w,h,item\.straighten\)/);
+  assert.match(script, /function applyStraightenToSource\(source,width,height,angle\)/);
   assert.match(script, /videoFrameContext\.drawImage\(videoEl,-sourceW\/2,-sourceH\/2,sourceW,sourceH\)/);
   assert.match(script, /videoRotation=\(videoRotation\+90\)%360/);
   assert.match(script, /item\.rotation=\(\(item\.rotation\|\|0\)\+90\)%360/);

@@ -100,7 +100,7 @@
     const histogram = new Uint32Array(256);
     const source = pixels && (pixels.data || pixels);
     if (!source || typeof source.length !== 'number') {
-      return { exposure: 0, contrast: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0] };
+      return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0] };
     }
     let total = 0;
     for (let offset = 0; offset + 3 < source.length; offset += 4) {
@@ -112,7 +112,7 @@
       histogram[luminance]++;
       total++;
     }
-    if (!total) return { exposure: 0, contrast: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0] };
+    if (!total) return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0] };
 
     const p02 = percentile(histogram, total, 0.02);
     const p50 = percentile(histogram, total, 0.50);
@@ -123,13 +123,84 @@
     const contrast = clamp((0.82 / spread - 1) * 55, -35, 35);
     const whites = clamp((0.95 - p99) * 150, -30, 30);
     const blacks = clamp((0.025 - p02) * 150, -30, 30);
+    // Highlights and shadows reuse the same percentiles: bright pixels above 0.90 get recovered
+    // (negative) and shadows below 0.10 get opened up (positive). Flat images therefore gain a
+    // little shape instead of staying lifeless, exactly like the whites / blacks pair.
+    const highlights = clamp((0.90 - p98) * 70, -20, 20);
+    const shadows = clamp((0.10 - p02) * 70, -20, 20);
     return {
       exposure: Math.round(exposure / 0.05) * 0.05,
       contrast: Math.round(contrast),
+      highlights: Math.round(highlights),
+      shadows: Math.round(shadows),
       whites: Math.round(whites),
       blacks: Math.round(blacks),
       percentiles: [p02, p50, p98, p99]
     };
+  }
+
+  // === White balance =======================================================================
+  // The shader multiplies linear light by exp2() channel gains:
+  //   R = exp2( 0.38·t + 0.12·ti)   G = exp2(-0.40·ti)   B = exp2(-0.38·t + 0.12·ti)
+  // where t = temperature/100 and ti = tint/100. Solving "make this sample neutral" therefore
+  // means matching the R−G and B−G gain differences, which form a 2×2 linear system:
+  //   R−G = 0.38t + 0.52ti      B−G = -0.38t + 0.52ti
+  // Inverting it gives the temperature / tint pair below, in the same units as the sliders.
+  const WB_R = 0.38, WB_TINT_SHARED = 0.12, WB_G = -0.40;
+  function srgbToLinear(channel) {
+    const value = clamp(Number(channel) || 0, 0, 1);
+    return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+  }
+  function whiteBalanceGains(temperature, tint) {
+    const t = clamp(Number(temperature) || 0, -100, 100) / 100;
+    const ti = clamp(Number(tint) || 0, -100, 100) / 100;
+    return [
+      Math.pow(2, WB_R * t + WB_TINT_SHARED * ti),
+      Math.pow(2, WB_G * ti),
+      Math.pow(2, -WB_R * t + WB_TINT_SHARED * ti)
+    ];
+  }
+  const whiteBalanceExponents = (temperature, tint) => {
+    const t = clamp(Number(temperature) || 0, -100, 100) / 100;
+    const ti = clamp(Number(tint) || 0, -100, 100) / 100;
+    return [WB_R * t + WB_TINT_SHARED * ti, WB_G * ti, -WB_R * t + WB_TINT_SHARED * ti];
+  };
+  // `sample` is the pixel that should read as neutral, in sRGB 0–255. `options.legacyTemperature`
+  // is the Adjust-tab Temperature slider, which also applies neutral channel gains; its share is
+  // subtracted so the Grade pair finishes the job instead of doubling it.
+  function whiteBalanceFromSample(sample, options = {}) {
+    const red = Number(sample?.r), green = Number(sample?.g), blue = Number(sample?.b);
+    if (![red, green, blue].every(Number.isFinite)) {
+      return {temperature: 0, tint: 0, usable: false, reason: 'no-sample', linear: [0, 0, 0]};
+    }
+    const linear = [srgbToLinear(red / 255), srgbToLinear(green / 255), srgbToLinear(blue / 255)];
+    const clipped = linear.some(value => value < 0.0015) || linear.some(value => value > 0.97);
+    if (clipped) return {temperature: 0, tint: 0, usable: false, reason: 'clipped', linear};
+    // Channels are compared as log2 ratios, so a common exposure factor cancels out.
+    const log = linear.map(value => Math.log2(value));
+    const legacy = clamp(Number(options.legacyTemperature) || 0, -100, 100) / 100;
+    const dRG = (log[1] - log[0]) - WB_R * legacy;
+    const dBG = (log[1] - log[2]) + WB_R * legacy;
+    const wantedTemperature = (dRG - dBG) / (2 * WB_R) * 100;
+    const wantedTint = (dRG + dBG) / (2 * (WB_TINT_SHARED - WB_G)) * 100;
+    const temperature = clamp(wantedTemperature, -100, 100);
+    const tint = clamp(wantedTint, -100, 100);
+    const saturated = Math.abs(wantedTemperature) > 100.5 || Math.abs(wantedTint) > 100.5;
+    return {
+      temperature: Math.round(temperature) + 0,
+      tint: Math.round(tint) + 0,
+      usable: true,
+      saturated,
+      reason: saturated ? 'clamped' : 'ok',
+      linear,
+    };
+  }
+  function isWhiteBalanced(sample, temperature, tint, tolerance = 0.02) {
+    const linear = [srgbToLinear(Number(sample?.r) / 255), srgbToLinear(Number(sample?.g) / 255), srgbToLinear(Number(sample?.b) / 255)];
+    const gains = whiteBalanceGains(temperature, tint);
+    const balanced = linear.map((value, index) => value * gains[index]);
+    const mean = balanced.reduce((sum, value) => sum + value, 0) / 3 || 1;
+    return balanced.every(value => Math.abs(value - mean) / mean <= tolerance);
   }
 
   function parseCubeLut(sourceText) {
@@ -176,5 +247,5 @@
     return {size, data, domainMin: new Float32Array(domainMin), domainMax: new Float32Array(domainMax)};
   }
 
-  return Object.freeze({ monotoneCurveSamples, isIdentityCurve, autoAdjustFromPixels, parseCubeLut });
+  return Object.freeze({ monotoneCurveSamples, isIdentityCurve, autoAdjustFromPixels, whiteBalanceGains, whiteBalanceFromSample, isWhiteBalanced, parseCubeLut });
 });

@@ -61,19 +61,31 @@ test('curve samples clamp malformed points and remain finite with repeated x coo
   assert.equal(samples[255], 255);
 });
 
-test('histogram Auto returns bounded exposure, contrast, whites and blacks and ignores transparent pixels', () => {
+test('histogram Auto returns bounded exposure, contrast, highlights, shadows, whites and blacks and ignores transparent pixels', () => {
   const neutral = new Uint8ClampedArray([128, 128, 128, 255, 128, 128, 128, 255]);
   const auto = grading.autoAdjustFromPixels({data: neutral});
-  assert.deepEqual(Object.keys(auto).sort(), ['blacks', 'contrast', 'exposure', 'percentiles', 'whites']);
+  assert.deepEqual(Object.keys(auto).sort(), ['blacks', 'contrast', 'exposure', 'highlights', 'percentiles', 'shadows', 'whites']);
   assert.ok(auto.exposure >= -1.5 && auto.exposure <= 1.5);
   assert.ok(auto.contrast >= -35 && auto.contrast <= 35);
+  assert.ok(auto.highlights >= -20 && auto.highlights <= 20);
+  assert.ok(auto.shadows >= -20 && auto.shadows <= 20);
   assert.ok(auto.whites >= -30 && auto.whites <= 30);
   assert.ok(auto.blacks >= -30 && auto.blacks <= 30);
   assert.equal(auto.percentiles.length, 4);
   assert.ok(grading.autoAdjustFromPixels(new Uint8ClampedArray([20, 20, 20, 255])).exposure > 0);
   assert.ok(grading.autoAdjustFromPixels(new Uint8ClampedArray([235, 235, 235, 255])).exposure < 0);
+  // A bright image with clipped highlights recovers them; a dark one opens its shadows.
+  const bright = new Uint8ClampedArray(256 * 4);
+  const dark = new Uint8ClampedArray(256 * 4);
+  for (let index = 0; index < 256; index++) {
+    const value = index;
+    bright.set([210 + Math.round(value / 6), 210 + Math.round(value / 6), 210 + Math.round(value / 6), 255], index * 4);
+    dark.set([Math.round(value / 4.5), Math.round(value / 4.5), Math.round(value / 4.5), 255], index * 4);
+  }
+  assert.ok(grading.autoAdjustFromPixels(bright).highlights < 0);
+  assert.ok(grading.autoAdjustFromPixels(dark).shadows > 0);
   assert.deepEqual(grading.autoAdjustFromPixels(new Uint8ClampedArray([0, 0, 0, 0])), {
-    exposure: 0, contrast: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0]
+    exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, percentiles: [0, 0, 0, 0]
   });
 });
 
@@ -287,6 +299,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v11'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v12'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

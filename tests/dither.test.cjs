@@ -41,7 +41,7 @@ test('Dither uses an independent post-composite pass with all requested modes an
   assert.match(ditherShader,/float rank=u_algorithm==1\?bayerRank\(ivec2\(lowPixel\),4\):u_algorithm==2\?bayerRank\(ivec2\(lowPixel\),8\):0\.0/);
   assert.match(ditherShader,/vec2 sampleUV=clamp\(\(lowPixel\+vec2\(0\.5\)\)\*factor\/u_resolution/);
   assert.match(ditherShader,/float area=u_backgroundOnly==1\?1\.0-smoothstep\(0\.05,0\.95,texture\(u_subjectMask,sampleUV\)\.r\):1\.0/);
-  assert.match(ditherShader,/if\(u_splitPreview==1 && v_texCoord\.x<0\.5\)\{ outColor=texture\(u_original,v_texCoord\); return; \}/);
+  assert.match(ditherShader,/if\(u_splitPreview==1 && v_texCoord\.x<u_splitPosition\)\{ outColor=texture\(u_original,v_texCoord\); return; \}/);
   assert.match(ditherShader,/outColor=vec4\(mix\(source,printed,amount\*area\),fullSource\.a\)/);
   assert.match(script,/gl\.activeTexture\(gl\.TEXTURE2\); gl\.bindTexture\(gl\.TEXTURE_2D,subjectMaskTexture\)/);
   assert.match(script,/const subjectProtected=!!autoSubjectMask \|\| maskStrokes\.some\(s=>s\.mode==='protect'\)/);
