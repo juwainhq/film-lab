@@ -436,7 +436,7 @@ test('slider calibration: white balance, tone, detail, noise, vibrance and vigne
   }
 });
 
-test('stored looks and links migrate to the new vignette direction without changing the look', {timeout: 240000}, async t => {
+test('stored looks and links migrate the vignette direction and the stronger white balance without changing the look', {timeout: 240000}, async t => {
   if (!available) {
     t.skip('Playwright and/or a Chromium build are not available in this environment');
     return;
@@ -457,7 +457,7 @@ test('stored looks and links migrate to the new vignette direction without chang
         format: 'film-lab-color-presets', version: 1,
         presets: [{name: 'Old grade', category: 'My Looks', snapshot: {values: {sliderGradeVignette: 18, sliderGradeContrast: 12}}}],
       }));
-      localStorage.setItem('film_lab_presets_v4', JSON.stringify([{name: 'Old look', values: {VignStrength: 40, Exposure: -20}, version: 2}]));
+      localStorage.setItem('film_lab_presets_v4', JSON.stringify([{name: 'Old look', values: {VignStrength: 40, Exposure: -20, Temperature: 40}, version: 2}]));
     }, hash: `#look=v1.${legacyLook}`});
     const shared = await page.evaluate(() => Number(document.getElementById('sliderVignStrength').value));
     assert.equal(shared, -60, `a v1 look link must load as the negated value, saw ${shared}`);
@@ -492,9 +492,11 @@ test('stored looks and links migrate to the new vignette direction without chang
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('film_lab_presets_v4') || '[]'));
     const migratedLook = stored.find(item => item.name === 'Old look');
     assert.ok(migratedLook, 'the saved custom look should survive');
-    assert.equal(migratedLook.version, 3, 'custom presets move to data version 3');
+    assert.equal(migratedLook.version, 4, 'custom presets move to data version 4');
     assert.equal(migratedLook.values.VignStrength, -40, `stored vignette must be negated, saw ${migratedLook.values.VignStrength}`);
     assert.equal(migratedLook.values.Exposure, -20, 'version 2 exposure is already in the signed range and must not be halved again');
+    // The white balance is 1.9x stronger now, so a saved look's Temperature is rescaled by 0.20/0.38.
+    assert.equal(migratedLook.values.Temperature, 21, `stored temperature must be rescaled for the stronger slider, saw ${migratedLook.values.Temperature}`);
     assert.deepEqual(errors.filter(text => /shader|precision/i.test(text)), []);
     await context.close();
   } finally {

@@ -35,9 +35,13 @@ test('look cards preview the loaded photo, render one per frame, and cache on th
   assert.match(script, /return thumb\.toDataURL\('image\/jpeg',0\.6\);/);
   assert.match(script, /lookPreviewFrame=requestAnimationFrame\(renderNextLookPreview\);/);
   assert.match(script, /Object\.defineProperty\(next\.values,'lookPreview',\{value:url/);
-  assert.match(script, /lookPreviewSource=source;[\s\S]*?lookPreviewKey=`\$\{item\?\.id\|\|'photo'\}:\$\{\+\+lookPreviewGeneration\}`/);
+  assert.match(script, /lookPreviewSource=source;[\s\S]*?lookPreviewKey=`\$\{key\}:\$\{\+\+lookPreviewGeneration\}`/);
+  assert.match(script, /function createLookPreviewSource\(item,img\)\{\n  buildLookPreviewSource\(img,img\?\.naturalWidth\|\|img\?\.width,img\?\.naturalHeight\|\|img\?\.height,item\?\.id\|\|'photo','photo'\);/);
+  // A loaded video becomes the source too, so the video looks grid shows a frame of the clip.
+  assert.match(script, /function createVideoLookPreviewSource\(\)\{\n  if\(!videoEl\|\|!videoEl\.videoWidth[\s\S]*?buildLookPreviewSource\(videoEl,videoEl\.videoWidth,videoEl\.videoHeight,'video','video'\);/);
   // The thumbnail is built once per loaded photo, inside uploadPhoto, and never from a slider move.
-  assert.equal((script.match(/createLookPreviewSource\(/g) || []).length, 2);
+  assert.equal((script.match(/createLookPreviewSource\(/g) || []).length, 2, 'one definition, one call from uploadPhoto');
+  assert.equal((script.match(/createVideoLookPreviewSource\(/g) || []).length, 2, 'one definition, one call when a clip loads');
   assert.match(script, /const source=applyHealToSource\(straightened,w,h,item\.healStrokes\);\n  photoHealCanvas=ensureHealCanvas\(source,w,h\);\n  buildPhotoSampleCanvas\(source,w,h,item\.id\);\n  createLookPreviewSource\(item,source\);/);
   const sliderPath = script.slice(script.indexOf('function userChangedSliders(){'), script.indexOf('function updateDitherControlVisibility(){'));
   assert.doesNotMatch(sliderPath, /LookPreview|createLookPreviewSource/);

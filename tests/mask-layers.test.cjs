@@ -117,7 +117,7 @@ test('the shell ships the new files offline: MIME types, staging and service wor
   assert.doesNotMatch(stage, /^\s*'vendor',$/m);
   assert.doesNotMatch(stage, /^\s*'mask-stack\.js',$/m);
   assert.match(stage, /'\.arena-tmp',/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v18';/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v19';/);
   assert.match(serviceWorker, /'mask-stack\.js'/);
   assert.match(serviceWorker, /'mask-pro-worker\.mjs'/);
   assert.match(serviceWorker, /path\.includes\('onnxruntime-web'\)/);

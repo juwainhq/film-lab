@@ -136,18 +136,30 @@
   // Version 2 flips the vignette slider to Lightroom's direction (negative darkens, positive
   // lightens). Version 1 payloads and #look=v1 links are migrated by negating the stored value so
   // every saved look keeps the corners it had.
-  const SETTINGS_VERSION = 2;
+  const SETTINGS_VERSION = 3;
   const VIGNETTE_ID = 'VignStrength';
+  const TEMPERATURE_ID = 'Temperature';
+  // Version 2 flipped the vignette; version 3 rescaled the stored Temperature because the white
+  // balance slider is 1.9x stronger (0.20 -> 0.38 in log2 space), so an old value means more now
+  // than it did. Both migrations are applied per stored version, never twice.
+  const VIGNETTE_VERSION = 2, WHITE_BALANCE_VERSION = 3;
+  const WHITE_BALANCE_RESCALE = 0.20 / 0.38;
   function sanitizeSettings(input, ids, effectNames) {
-    if (!input || typeof input !== 'object' || Array.isArray(input) || ![1, SETTINGS_VERSION].includes(Number(input.version)) || !input.values || typeof input.values !== 'object' || Array.isArray(input.values)) {
+    if (!input || typeof input !== 'object' || Array.isArray(input) || ![1, 2, SETTINGS_VERSION].includes(Number(input.version)) || !input.values || typeof input.values !== 'object' || Array.isArray(input.values)) {
       throw new Error('Not a Film Lab settings file');
     }
-    const legacyVignette = Number(input.version) < SETTINGS_VERSION;
+    const version = Number(input.version);
+    const legacyVignette = version < VIGNETTE_VERSION;
+    const legacyWhiteBalance = version < WHITE_BALANCE_VERSION;
     const values = {};
     let recognized = 0;
     for (const id of ids) {
       if (own(input.values, id) && typeof input.values[id] === 'number' && Number.isFinite(input.values[id])) recognized++;
-      const value = legacyVignette && id === VIGNETTE_ID ? -finite(input.values[id], 0) : finite(input.values[id], 0);
+      let value = finite(input.values[id], 0);
+      if (legacyVignette && id === VIGNETTE_ID) value = -value;
+      // Old looks kept their colour: a stored temperature from the weaker slider is scaled back so
+      // the photo renders exactly as it used to.
+      if (legacyWhiteBalance && id === TEMPERATURE_ID) value *= WHITE_BALANCE_RESCALE;
       values[id] = Math.round(clamp(value, -100, 100)) + 0; // +0 keeps a negated zero from becoming JSON -0
     }
     if (!recognized) throw new Error('No compatible settings found');
@@ -167,7 +179,7 @@
     return '#look=v' + SETTINGS_VERSION + '.' + encoded.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
   }
   function decodeSettings(hash, ids, effectNames) {
-    if (typeof hash !== 'string' || hash.length > 16000 || !/^#look=v[12]\.[A-Za-z0-9_-]+$/.test(hash)) throw new Error('Invalid look link');
+    if (typeof hash !== 'string' || hash.length > 16000 || !/^#look=v[123]\.[A-Za-z0-9_-]+$/.test(hash)) throw new Error('Invalid look link');
     const encoded = hash.slice(9).replace(/-/g, '+').replace(/_/g, '/');
     const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
     const bytes = typeof atob === 'function'

@@ -112,9 +112,13 @@ test('3D .cube LUT parser accepts identity cubes and supported sizes, and report
   assert.throws(() => grading.parseCubeLut('LUT_3D_SIZE 17\nDOMAIN_MIN 1 0 0\nDOMAIN_MAX 1 1 1\n0 0 0\n'), /DOMAIN_MAX must be greater/);
 });
 
-test('Grade is a photo-only tab with neutral Basic controls, editable ranges, and a mobile compare button', () => {
-  assert.match(html, /class="sidebarTab photo-only" id="gradeTab"[^>]*data-tab="grade"/);
-  assert.match(html, /class="sidebarPanel photo-only gradeDashboard" id="colorGradePanel"/);
+test('Grade is a shared tab with neutral Basic controls, editable ranges, and a mobile compare button', () => {
+  // The Grade tab and its panel are shared with the video sidebar (round 12); Mask stays photo-only.
+  assert.match(html, /class="sidebarTab" id="gradeTab"[^>]*data-tab="grade"/);
+  assert.match(html, /class="sidebarPanel gradeDashboard" id="colorGradePanel"/);
+  assert.match(html, /class="sidebarTab photo-only" id="maskTab"[^>]*data-tab="mask"/);
+  assert.match(html, /class="sidebarPanel photo-only" id="maskPanel"/);
+  assert.doesNotMatch(html, /class="sidebarTab photo-only" id="gradeTab"/);
   assert.match(html, /<details class="gradeSection" id="gradeBasicSection"[^>]*open>/);
   assert.match(html, /id="gradeToneCurveSection" data-grade-section="curve">/);
   assert.match(html, /id="gradeHslSection" data-grade-section="hsl">/);
@@ -128,8 +132,12 @@ test('Grade is a photo-only tab with neutral Basic controls, editable ranges, an
   assert.match(html, /id="gradeResetAllBtn"/);
   assert.match(html, /class="toolBtn gradeMobileBefore" id="gradeBeforeBtn"/);
   assert.match(html, /confirm\('Reset all color grading controls, tone curves, LUT, and HSL mixer settings\?'\)/);
-  assert.match(appScript, /if\(name==='grade'&&appState\.mode!=='photo'\)return/);
-  assert.match(appScript, /\['mask','grade'\]\.includes\(activeSidebarTab\)/);
+  // Only Mask is guarded now: Grade opens in the video sidebar too, and switching into video mode
+  // no longer bounces an open Grade tab back to Looks.
+  assert.match(appScript, /if\(name==='mask'&&appState\.mode!=='photo'\)return;/);
+  assert.doesNotMatch(appScript, /if\(name==='grade'&&appState\.mode!=='photo'\)return/);
+  assert.match(appScript, /if\(mode==='video'&&activeSidebarTab==='mask'\)\{userSelectedSidebarTab=false;selectSidebarTab\('looks'\);\}/);
+  assert.match(appScript, /gradePanelVersion\.textContent=mode==='video'\?'VIDEO · 01':'PHOTO · 01'/);
 });
 
 test('tone curve provides RGB and channel tabs, touch-capable point editing, fixed endpoints and LUT upload', () => {
@@ -299,6 +307,6 @@ test('live histogram uses downscaled readback and remains throttled to roughly t
 
 test('the helper is part of the versioned offline and Capacitor app shells', () => {
   assert.match(html, /<script src="\.\/color-grading\.js"><\/script>/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v18'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v19'/);
   assert.match(serviceWorker, /'color-grading\.js'/);
 });

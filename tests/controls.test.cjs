@@ -234,7 +234,7 @@ test('eighteen complete presets, legacy translations and v4 upgrades retain old 
   assert.equal(migrated.values.Exposure, 20);
   assert.equal(migrated.values.HallDir, -30);
   assert.equal(migrated.values.Bloom, 30);
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.equal(upgradeV4Preset(migrated), migrated);
   // Version 3 flips the vignette slider to Lightroom's direction, so saved values are negated
   // and pre-version-3 presets keep the exact corners they were saved with.
@@ -243,6 +243,12 @@ test('eighteen complete presets, legacy translations and v4 upgrades retain old 
   assert.equal(vignette.values.Exposure, 40, 'version 2 exposure is already in range');
   assert.equal(upgradeV4Preset({name:'Saved',version:3,values:{VignStrength:-60}}).values.VignStrength, -60);
   assert.equal(upgradeV4Preset({name:'Ancient',values:{Exposure:40,VignStrength:-12}}).values.VignStrength, 12);
+  // Version 4 rescales a stored Temperature, because the white balance is now 1.9x stronger.
+  const whiteBalance=upgradeV4Preset({name:'Saved',version:3,values:{Temperature:40,Exposure:20}});
+  assert.equal(whiteBalance.values.Temperature, 21, 'an old look keeps the colour it was tuned for');
+  assert.equal(whiteBalance.values.Exposure, 20, 'nothing but Temperature is rescaled');
+  assert.equal(whiteBalance.version, 4);
+  assert.equal(upgradeV4Preset({name:'Saved',version:4,values:{Temperature:21}}).values.Temperature, 21, 'version 4 is never scaled twice');
   assert.match(script, /const dur=340/);
   assert.match(script, /film_lab_presets_v4/);
 });
@@ -359,7 +365,7 @@ test('selecting, adjusting, saving, and deleting looks keeps both preset control
   assert.match(script, /\$\('presetSelect'\)\.addEventListener\('change',e=>\{[\s\S]*?if\(availablePresets\.has\(name\)\) schedulePresetApplication\(name,availablePresets\.get\(name\),customPresetDither\.get\(name\)\)/);
   assert.match(script, /activePresetName=name;selectedPresetName=name;syncPresetSelection\(\);[\s\S]*?const beginTransition=now=>\{[\s\S]*?if\(ditherOptions\)setDitherSettings\(ditherOptions\);[\s\S]*?setDitherScope/);
   assert.match(script, /activePresetName=null; syncPresetSelection\(\);\n  updateFromSliders/);
-  assert.match(script, /customPresets\.push\(\{name,values,version:3,dither:getDitherSettings\(\)\}\); saveCustom\(\);\n  activePresetName=name; renderChips\(\)/);
+  assert.match(script, /customPresets\.push\(\{name,values,version:4,dither:getDitherSettings\(\)\}\); saveCustom\(\);\n  activePresetName=name; renderChips\(\)/);
   assert.match(script, /\$\('deletePresetBtn'\)\.addEventListener\('click',\(\)=>\{ if\(activePresetName\) deleteCustomPreset\(activePresetName\); \}\)/);
   assert.match(styles, /#deletePresetBtn\[hidden\] \{ display: none; \}/);
 });

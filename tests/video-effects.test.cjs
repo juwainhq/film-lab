@@ -452,7 +452,7 @@ test('the timeline and the editor wire every round-8 control without removing ex
   // The service worker ships the new module.
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   assert.match(sw, /'video-tools\.js'/);
-  assert.match(sw, /const CACHE = 'filmlab-v18';/);
+  assert.match(sw, /const CACHE = 'filmlab-v19';/);
   // Nothing was renamed away.
   for (const id of ['mtl-play-pause', 'mtl-zoom-slider', 'mtl-main-track', 'mtl-text-track', 'mtl-audio-track', 'videoExportPanel', 'videoCaptionPanel']) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -1441,6 +1441,159 @@ test('keyframes, speed, text, stickers, blends and the chroma key survive previe
     assert.deepEqual(shaderErrors, [], `no shader errors: ${shaderErrors.join(' | ')}`);
     const layerWarnings = warnings.filter(message => /video layer could not be drawn|Chroma key failed/i.test(message));
     assert.deepEqual(layerWarnings, [], `the renderer swallowed an error: ${layerWarnings.join(' | ')}`);
+    await context.close();
+  } finally {
+    await browser.close();
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+/* ---------------------------------------------------- round-12: video grading */
+/* One browser check for the two round-12 fixes on the video side: the sidebar shares the photo
+   Grade panel (LOOKS / ADJUST / GRADE / EXPORT), moving Grade Temperature to +100 changes the
+   preview canvas, the look cards draw a frame of the loaded clip instead of a gradient swatch, and
+   the sidebar scrolls so the looks grid is reachable. */
+test('the video sidebar opens the shared Grade panel and Temperature moves the preview frame', {timeout: 600000}, async t => {
+  if (!available) {
+    t.skip('Playwright and a Chromium build are needed for this test');
+    return;
+  }
+  const browser = await launchWithWebgl2();
+  if (!browser) {
+    t.skip('this Chromium cannot create a WebGL2 context, so the Film Lab preview cannot boot');
+    return;
+  }
+  const server = await startStaticServer();
+  try {
+    const context = await browser.newContext({viewport: {width: 1440, height: 900}, serviceWorkers: 'block'});
+    await context.route('**/sw.js', route => route.abort());
+    await context.route('https://fonts.googleapis.com/**', route => route.fulfill({body: '', contentType: 'text/css'}));
+    await context.route('https://fonts.gstatic.com/**', route => route.fulfill({body: '', contentType: 'font/woff2'}));
+    const page = await context.newPage();
+    const errors = [];
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text().slice(0, 220)); });
+    page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
+    const clip = await recordWebm(browser);
+    assert.ok(clip.length > 1000, 'the recorded WebM fixture is empty');
+    await page.goto(`http://127.0.0.1:${PORT}/index.html`, {waitUntil: 'domcontentloaded'});
+    await page.waitForFunction(() => document.getElementById('presetSelect')?.options.length > 1, null, {timeout: 30000});
+    await page.setInputFiles('#videoPickerInput', {name: 'clip.webm', mimeType: 'video/webm', buffer: clip});
+    await page.waitForFunction(() => document.body.dataset.mode === 'video', null, {timeout: 90000});
+    await page.waitForFunction(() => window.multiTimeline?.isReady?.(), null, {timeout: 60000});
+    await page.waitForTimeout(1200);
+    // The clip's own colours animate, so a before/after comparison only means something on one
+    // fixed frame: every sample parks playback on the same 0.5s frame first and reports where it
+    // landed, so a moving clip can never masquerade as a grading change.
+    const sample = () => page.evaluate(async () => {
+      // The scrubber is the app's own seek: moving it pauses playback and lands on that frame, which
+      // is the only way a looping two-second clip stays still while the frame is read back. The seek
+      // is retried, because a clip that is still buffering ignores the first one.
+      const video = document.getElementById('videoEl');
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const seek = document.getElementById('videoSeek');
+        seek.value = '0.5';
+        seek.dispatchEvent(new Event('input', {bubbles: true}));
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (video.paused && Math.abs(video.currentTime - 0.5) < 0.02) break;
+      }
+      // Two frames of the render loop: the parked frame is drawn before the canvas is read back.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const base = document.getElementById('glCanvas');
+      const scratch = document.createElement('canvas');
+      scratch.width = 96; scratch.height = 96;
+      const ctx = scratch.getContext('2d', {willReadFrequently: true});
+      ctx.drawImage(base, 0, 0, 96, 96);
+      const pixels = ctx.getImageData(0, 0, 96, 96).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let index = 0; index < pixels.length; index += 4) { r += pixels[index]; g += pixels[index + 1]; b += pixels[index + 2]; n++; }
+      return {mean: [r / n, g / n, b / n], time: Math.round(video.currentTime * 1000) / 1000, paused: video.paused};
+    });
+
+    // --- the video sidebar offers the same four tabs, Grade included --------------------------
+    const tabs = await page.evaluate(() => [...document.querySelectorAll('#sidebarTabs .sidebarTab')]
+      .filter(tab => getComputedStyle(tab).display !== 'none')
+      .map(tab => tab.dataset.tab));
+    assert.deepEqual(tabs, ['looks', 'adjust', 'grade', 'export'], `video tabs are LOOKS / ADJUST / GRADE / EXPORT, saw ${tabs.join(', ')}`);
+    const panel = await page.evaluate(() => {
+      document.getElementById('gradeTab').click();
+      const grade = document.getElementById('colorGradePanel');
+      return {
+        active: grade.classList.contains('active'), hidden: grade.hidden, display: getComputedStyle(grade).display,
+        version: document.getElementById('gradePanelVersion').textContent,
+        sliders: ['sliderGradeTemperature', 'sliderGradeTint', 'sliderGradeExposure', 'sliderGradeContrast', 'sliderGradeHighlights', 'sliderGradeShadows', 'sliderGradeWhites', 'sliderGradeBlacks', 'sliderGradeTexture', 'sliderGradeClarity', 'sliderGradeDehaze', 'sliderGradeVibrance', 'sliderGradeSaturation', 'sliderGradeVignette']
+          .filter(id => !document.getElementById(id)),
+        wheels: document.querySelectorAll('#colorGradePanel .gradeWheelPicker').length,
+        hsl: document.querySelectorAll('#colorGradePanel [data-hsl-control]').length,
+        curve: !!document.getElementById('gradeCurveCanvas'),
+        curveReset: !!document.getElementById('gradeCurveResetBtn'),
+        shared: !!document.getElementById('colorGradePanel')?.closest('#sidebarViews'),
+      };
+    });
+    assert.ok(panel.active && panel.hidden === false && panel.display === 'flex', `the shared Grade panel opens in the video sidebar (${JSON.stringify(panel)})`);
+    assert.equal(panel.version, 'VIDEO · 01', 'the panel says which workspace it is grading');
+    assert.deepEqual(panel.sliders, [], 'every grading slider is present in video mode');
+    assert.ok(panel.wheels >= 3 && panel.hsl >= 24 && panel.curve && panel.curveReset, `wheels (${panel.wheels}), HSL (${panel.hsl}), curve (${panel.curve}) and its reset are all there`);
+    assert.ok(panel.shared, 'video mode reuses the one colorGradePanel rather than a copy');
+
+    // --- Grade Temperature +100 changes the preview canvas -----------------------------------
+    const before = await sample();
+    const beforeTime = before.time;
+    await page.evaluate(() => {
+      const slider = document.getElementById('sliderGradeTemperature');
+      slider.value = '100';
+      slider.dispatchEvent(new Event('input', {bubbles: true}));
+    });
+    await page.waitForTimeout(600);
+    const after = await sample();
+    const afterTime = after.time;
+    const delta = before.mean.map((value, index) => after.mean[index] - value);
+    const moved = delta.reduce((total, value) => total + Math.abs(value), 0) / 3;
+    assert.ok(Math.abs(beforeTime - afterTime) < 0.02, `both samples read the same parked frame (${beforeTime}s vs ${afterTime}s)`);
+    assert.ok(moved >= 3, `Temperature +100 must move the graded video frame (mean colour moved ${moved.toFixed(2)} levels: ${before.mean.map(v => v.toFixed(1))} -> ${after.mean.map(v => v.toFixed(1))} at ${beforeTime}s)`);
+    assert.ok(delta[0] > 1.5 && delta[2] < -1.5, `+100 warms the frame: red up ${delta[0].toFixed(2)}, blue down ${delta[2].toFixed(2)} (frame at ${beforeTime}s -> ${afterTime}s)`);
+    // The same value reaches the export frame: the export canvas renders the graded preview frame.
+    const exported = await page.evaluate(() => new Promise(resolve => {
+      const canvas = document.getElementById('glCanvas');
+      const scratch = document.createElement('canvas');
+      scratch.width = 32; scratch.height = 32;
+      const ctx = scratch.getContext('2d', {willReadFrequently: true});
+      ctx.drawImage(canvas, 0, 0, 32, 32);
+      const pixels = ctx.getImageData(0, 0, 32, 32).data;
+      let r = 0, b = 0, n = 0;
+      for (let index = 0; index < pixels.length; index += 4) { r += pixels[index]; b += pixels[index + 2]; n++; }
+      resolve([r / n, b / n]);
+    }));
+    assert.ok(exported[0] > before.mean[0] - 1 || exported[1] < before.mean[2] + 1, 'the export readback sees the graded frame too');
+
+    // --- look cards draw a frame of the clip, and the sidebar scrolls to reach them ----------
+    await page.evaluate(() => document.getElementById('looksTab').click());
+    await page.waitForTimeout(4000);
+    const looks = await page.evaluate(() => {
+      const sidebar = document.getElementById('sidebar');
+      const cards = [...document.querySelectorAll('#presetChips .chip[data-preset-name]')];
+      const previews = cards.filter(card => card.querySelector('.presetColorSwatch')?.classList.contains('hasPreview'));
+      const swatch = previews[0]?.querySelector('.presetColorSwatch');
+      const image = swatch ? getComputedStyle(swatch).backgroundImage : '';
+      const last = cards[cards.length - 1];
+      sidebar.scrollTop = sidebar.scrollHeight;
+      const scrolledToBottom = sidebar.scrollTop;
+      const box = sidebar.getBoundingClientRect();
+      if (last) last.scrollIntoView({block: 'center'});
+      const cardBox = last ? last.getBoundingClientRect() : null;
+      return {
+        cards: cards.length, previews: previews.length, dataUrl: /data:image\//.test(image),
+        scrollable: sidebar.scrollHeight > sidebar.clientHeight + 20,
+        scrolledToBottom,
+        lastCardReachable: Boolean(cardBox && cardBox.top >= box.top - 2 && cardBox.bottom <= box.bottom + 2),
+      };
+    });
+    assert.ok(looks.cards >= 4, `the looks grid is rendered in video mode (${looks.cards} cards)`);
+    assert.ok(looks.previews >= 1 && looks.dataUrl, `video look cards show a frame of the clip (${looks.previews} previews, dataURL ${looks.dataUrl})`);
+    assert.ok(looks.scrollable, 'the video sidebar scrolls instead of cutting the looks grid off');
+    assert.ok(looks.scrolledToBottom > 0 && looks.lastCardReachable, `the last look card is reachable by scrolling (scrolled to ${looks.scrolledToBottom}, reachable ${looks.lastCardReachable})`);
+
+    const shaderErrors = errors.filter(message => /shader|No precision specified/i.test(message));
+    assert.deepEqual(shaderErrors, [], `no shader errors: ${shaderErrors.join(' | ')}`);
     await context.close();
   } finally {
     await browser.close();
