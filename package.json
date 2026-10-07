@@ -1,6 +1,6 @@
 {
   "name": "film-lab",
-  "version": "1.0.5",
+  "version": "2.0.0",
   "description": "Cinematic photo and video editor",
   "author": "Film Lab",
   "main": "electron/main.js",
