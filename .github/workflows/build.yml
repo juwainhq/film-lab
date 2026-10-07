@@ -79,6 +79,7 @@ jobs:
     needs: [build, android]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -108,7 +109,19 @@ jobs:
         run: |
           echo "SHORT_SHA=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)" >> "$GITHUB_ENV"
           echo "BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
-      # electron-builder stamps the version into its file names (`Film Lab Setup 1.0.5.exe`), which
+          # The installers carry this version, so read it from package.json instead of hard-coding
+          # it: the release name and notes then follow a version bump on their own.
+          version=$(node -p 'require("./package.json").version' 2>/dev/null || true)
+          if [ -z "$version" ]; then
+            version=$(sed -n 's/^[[:space:]]*"version": "\([^"]*\)".*$/\1/p' package.json | head -n 1)
+          fi
+          if [ -z "$version" ]; then
+            echo "could not read the app version from package.json" >&2
+            exit 1
+          fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "app version: $version"
+      # electron-builder stamps the version into its file names (`Film Lab Setup 2.0.0.exe`), which
       # would change every download link on a version bump. The rolling release therefore publishes
       # fixed names: the links below stay valid across builds.
       - name: Collect installers under stable names
@@ -126,8 +139,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # This job has no checkout, so `gh` needs --repo to know which repository to talk to
-          # (without it gh shells out to git and fails, which used to be swallowed by `|| true`).
+          # Pass --repo explicitly: `gh` otherwise resolves the repository by shelling out to git,
+          # which fails outright in a job without a checkout.
           if gh release delete latest-build --cleanup-tag --yes --repo "$GITHUB_REPOSITORY"; then
             echo "deleted the latest-build release and its tag"
           else
@@ -143,11 +156,15 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
         uses: softprops/action-gh-release@v1
         with:
-          name: latest-build
+          # The tag stays `latest-build` so the download links never change; the title carries the
+          # app version that was just built, read from package.json above.
+          name: latest-build v${{ env.APP_VERSION }}
           tag_name: latest-build
           target_commitish: ${{ github.sha }}
           body: |
-            Rolling Film Lab build from `${{ github.ref_name }}` at commit `${{ env.SHORT_SHA }}` (built ${{ env.BUILD_DATE }}).
+            Rolling **Film Lab v${{ env.APP_VERSION }}** build from `${{ github.ref_name }}` at commit `${{ env.SHORT_SHA }}` (built ${{ env.BUILD_DATE }}).
+
+            The installers keep fixed file names, so these download links stay valid between versions:
 
             - **Windows:** `FilmLab-Setup.exe`
             - **Mac:** `FilmLab.dmg`
