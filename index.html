@@ -1543,6 +1543,13 @@ body[data-mode="photo"] #carouselStrip.collapsed .stripActions { flex: 0 0 auto;
    (hidden) so they keep decoding, and the export calls the same renderer. */
 .mtl-preview-overlay { position: absolute; overflow: hidden; }
 .mtl-preview-overlay .mtl-scene-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+#focusHandle { position: absolute; z-index: 9; display: grid; place-items: center; width: 30px; height: 30px; margin: -15px 0 0 -15px; border: 1px solid #fff; border-radius: 50%; background: rgba(0,0,0,.45); color: #fff; font: 13px 'JetBrains Mono',monospace; cursor: grab; touch-action: none; box-shadow: 0 1px 6px rgba(0,0,0,.6); }
+#focusHandle[hidden] { display: none !important; }
+#focusHandle:active { cursor: grabbing; }
+#focusHandle:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+#app[data-workspace="video"] #focusFrame { position: absolute; z-index: 8; border: 1px dashed rgba(255,255,255,.85); pointer-events: none; }
+#audioWaveCanvas { display: block; width: 100%; height: 48px; border: 1px solid var(--panel-border); background: var(--bg); }
+#audioWaveCanvas[data-empty="true"] { opacity: .4; }
 .mtl-preview-overlay > img,
 .mtl-preview-overlay > video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; pointer-events: none; }
 .mtl-keyframe-marker { position: absolute; top: 3px; width: 10px; height: 10px; margin-left: -5px; background: var(--accent); border: 1px solid #000; transform: rotate(45deg); cursor: grab; pointer-events: auto; touch-action: none; z-index: 6; }
@@ -2586,6 +2593,33 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
             <p class="socialHint" id="chromaStatus">Chroma key runs in WebGL and is part of the exported frames.</p>
           </div>
         </details>
+
+        <details class="exportExtras"><summary>Audio</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <canvas id="audioWaveCanvas" width="560" height="96" role="img" aria-label="Audio waveform of the loaded clip"></canvas>
+            <p class="socialHint" id="audioWaveStatus" role="status" aria-live="polite">Load a clip to draw its waveform.</p>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Volume</span><input type="range" id="sliderAudioGain" min="0" max="200" step="1" value="100" aria-label="Audio volume"><output class="fxValue" id="valAudioGain">100%</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Fade in</span><input type="range" id="sliderAudioFadeIn" min="0" max="5" step="0.1" value="0" aria-label="Audio fade in"><output class="fxValue" id="valAudioFadeIn">0.0s</output></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Fade out</span><input type="range" id="sliderAudioFadeOut" min="0" max="5" step="0.1" value="0" aria-label="Audio fade out"><output class="fxValue" id="valAudioFadeOut">0.0s</output></div>
+            <div class="fxRow"><button type="button" class="toolBtn" id="audioKeyframeBtn">◆ Volume keyframe</button><button type="button" class="toolBtn" id="audioKeyframeClearBtn">✕ Clear keys</button></div>
+            <div class="fxRow"><button type="button" class="toolBtn" id="audioNormalizeBtn" aria-pressed="false">⇕ Normalize</button><button type="button" class="toolBtn" id="audioDenoiseBtn" aria-pressed="false">≋ Noise reduction</button></div>
+            <div class="fxRow" id="audioDenoiseRow" hidden><span class="fieldLabel fxFixed" style="flex:0 0 54px">Noise floor</span><input type="range" id="sliderAudioDenoise" min="0" max="40" step="1" value="12" aria-label="Noise reduction amount"><output class="fxValue" id="valAudioDenoise">12 dB</output></div>
+            <ul class="fxList" id="audioKeyframeList" aria-label="Volume keyframes"></ul>
+            <div class="fxRow"><button type="button" class="actionBtn" id="audioRecordBtn">● Record voice</button><button type="button" class="actionBtn" id="audioRecordStopBtn" disabled>■ Stop</button></div>
+            <ul class="fxList" id="audioTakeList" aria-label="Voice takes"></ul>
+            <p class="socialHint" id="audioStatus" role="status" aria-live="polite">Audio edits are baked into the export.</p>
+          </div>
+        </details>
+
+        <details class="exportExtras"><summary>Look / LUT</summary>
+          <div class="videoFxPanel" style="border-top:0;padding-top:0;gap:8px">
+            <div class="formatPills" role="group" aria-label="Apply the look to" id="lookScopePills"><button type="button" class="choicePill active" data-look-scope="clip" aria-pressed="true">This clip</button><button type="button" class="choicePill" data-look-scope="timeline" aria-pressed="false">Whole timeline</button></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Look</span><select id="lookSelect" class="socialSelect"></select></div>
+            <div class="fxRow"><span class="fieldLabel fxFixed" style="flex:0 0 54px">Strength</span><input type="range" id="sliderLookIntensity" min="0" max="100" step="1" value="100" aria-label="Look strength"><output class="fxValue" id="valLookIntensity">100%</output></div>
+            <div class="fxRow"><button type="button" class="toolBtn" id="lookImportBtn">⤓ Import .cube</button><button type="button" class="toolBtn" id="lookClearBtn">✕ No look</button><input type="file" id="lookLutFile" accept=".cube,text/plain" hidden></div>
+            <p class="socialHint" id="lookStatus" role="status" aria-live="polite">Pick a look for the selected clip, or for the whole timeline.</p>
+          </div>
+        </details>
       </section><section id="videoExportPanel" class="socialPanel video-only" aria-label="Video export">
         <div class="sectionLabel">Video Export</div>
         <label class="fieldLabel" for="videoContainer">Format</label>
@@ -2595,7 +2629,19 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
         <select id="videoQuality" class="socialSelect sourceControl" aria-hidden="true" tabindex="-1"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option></select>
         <div class="qualityPills" role="group" aria-label="Video quality"><button type="button" class="choicePill" data-video-quality="low" aria-pressed="false">Low</button><button type="button" class="choicePill active" data-video-quality="medium" aria-pressed="true">Medium</button><button type="button" class="choicePill" data-video-quality="high" aria-pressed="false">High</button></div>
         <label class="fieldLabel" for="videoResolution">Resolution</label>
-        <select id="videoResolution" class="socialSelect"><option value="original">Original</option><option value="1080">1080p</option><option value="720">720p</option></select>
+        <select id="videoResolution" class="socialSelect"><option value="original">Original</option><option value="1080">1080p</option><option value="720">720p</option><option value="2160">4K</option></select>
+        <label class="fieldLabel" for="videoFps">Frame rate</label>
+        <select id="videoFps" class="socialSelect"><option value="24">24 fps</option><option value="30" selected>30 fps</option><option value="60">60 fps</option></select>
+        <label class="fieldLabel" for="videoBitrate">Bitrate / quality</label>
+        <select id="videoBitrate" class="socialSelect"><option value="economy">Economy · 4 Mbps</option><option value="standard" selected>Standard · 8 Mbps</option><option value="high">High · 16 Mbps</option><option value="max">Max · 28 Mbps</option></select>
+        <p class="socialHint" id="videoDeliveryEstimate" role="status" aria-live="polite">Estimated size: —</p>
+        <label class="fieldLabel" for="videoAspect">Aspect</label>
+        <div class="formatPills" role="group" aria-label="Aspect preset" id="aspectPills"><button type="button" class="choicePill active" data-aspect="original" aria-pressed="true">Original</button><button type="button" class="choicePill" data-aspect="9:16" aria-pressed="false">9:16</button><button type="button" class="choicePill" data-aspect="1:1" aria-pressed="false">1:1</button><button type="button" class="choicePill" data-aspect="4:5" aria-pressed="false">4:5</button><button type="button" class="choicePill" data-aspect="16:9" aria-pressed="false">16:9</button></div>
+        <div class="fxRow"><button type="button" class="toolBtn" id="autoReframeBtn" aria-pressed="false">⌖ Auto-reframe</button><button type="button" class="toolBtn" id="focusResetBtn">◎ Centre focus</button></div>
+        <p class="socialHint" id="framingStatus" role="status" aria-live="polite">Drag the focus dot on the preview to choose what stays in frame.</p>
+        <label class="checkLabel"><input type="checkbox" id="stabilizeEnabled">Stabilise on export</label>
+        <div class="fxRow" id="stabilizeRow" hidden><span class="fieldLabel fxFixed" style="flex:0 0 54px">Strength</span><input type="range" id="sliderStabilize" min="0" max="100" step="1" value="50" aria-label="Stabilisation strength"><output class="fxValue" id="valStabilize">50%</output></div>
+        <p class="socialHint" id="stabilizeStatus" role="status" aria-live="polite">Stabilisation adds one extra pass over the finished file.</p>
         <details class="exportExtras videoAdvanced"><summary>More video options</summary>
         <input type="hidden" id="videoFrameFormat" value="original">
         <input type="hidden" id="videoExportRange" value="trimmed">
@@ -2625,6 +2671,7 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
         <div id="timelinePlayhead" aria-hidden="true"></div>
       </div>
       <div id="audioWaveform" role="img" aria-label="Audio waveform"></div>
+      <button type="button" id="focusHandle" hidden aria-label="Drag to choose the focus point of the crop">◎</button>
     </section>
     <section id="timeline-module" class="video-only" aria-label="Video editing timeline">
       <div class="timeline-toolbar">
@@ -2780,6 +2827,7 @@ body[data-mode="photo"] #app #mainArea #previewControls #splitToggleBtn { positi
 </script>
 <script src="./social-tools.js"></script>
 <script src="./video-tools.js"></script>
+<script src="./audio-tools.js"></script>
 <script src="./color-grading.js"></script>
 <script src="./mask-stack.js"></script>
 <script>
@@ -3390,7 +3438,7 @@ function registerGradeLut(name,parsed){
   const fingerprint=gradeLutFingerprint(record);
   for(const [id,existing] of gradeLutRegistry){if(existing.fingerprint===fingerprint){activeGradeLutId=id;return id;}}
   record.fingerprint=fingerprint;record.texture=createGradeLutTexture(record);
-  const id=`grade-lut-${nextGradeLutId++}`;gradeLutRegistry.set(id,record);activeGradeLutId=id;return id;
+  const id=`grade-lut-${nextGradeLutId++}`;gradeLutRegistry.set(id,record);activeGradeLutId=id;window.filmLabLookRegistryChanged?.();return id;
 }
 function clearGradeLut(){
   if(!activeGradeLutId)return;
@@ -3448,6 +3496,18 @@ function normalizeGradeSnapshot(input,{portable=true,legacyVignette=undefined}={
     lutId=registerGradeLut(input.lut.name||'Preset LUT',{size,data,domainMin:new Float32Array(domainMin),domainMax:new Float32Array(domainMax)});
   }else if(!portable&&input.lutId&&gradeLutRegistry.has(input.lutId))lutId=input.lutId;
   return {version:GRADE_SNAPSHOT_VERSION,values,curves,wheels,bwEnabled:!!input.bwEnabled,lutId};
+}
+// The video look picker lists and imports the same LUT registry the Grade tab fills, so a .cube
+// imported in either place is available in both.
+function gradeLutNames(){
+  return [...gradeLutRegistry.entries()].map(([id,record])=>({id,name:record.name,size:record.size}));
+}
+function importGradeLutText(name,text){
+  if(!colorGrading?.parseCubeLut)throw new Error('The .cube LUT parser is unavailable.');
+  const parsed=colorGrading.parseCubeLut(String(text||''));
+  const id=registerGradeLut(name||'Imported LUT',parsed);
+  syncGradeLutControls();updateGradeIndicators();
+  return id;
 }
 function readGradeLutFile(file){
   if(!file)return;
@@ -4233,6 +4293,7 @@ in vec2 v_texCoord;
 uniform sampler2D u_image;
 uniform sampler3D u_lut;
 uniform int u_lutEnabled;
+uniform float u_lutAmount;
 uniform int u_bwEnabled;
 uniform vec3 u_lutDomainMin;
 uniform vec3 u_lutDomainMax;
@@ -4262,7 +4323,8 @@ vec3 gradedBase(vec2 uv){
   if(u_lutEnabled!=0){
     vec3 domainSize=max(u_lutDomainMax-u_lutDomainMin,vec3(0.00001));
     vec3 coordinate=clamp((color-u_lutDomainMin)/domainSize,0.0,1.0);
-    color=texture(u_lut,coordinate).rgb;
+    // The look strength is a real mix, so 0% is exactly the ungraded pixel.
+    color=mix(color,texture(u_lut,coordinate).rgb,clamp(u_lutAmount,0.0,1.0));
   }
   if(u_bwEnabled!=0){
     vec3 mixWeights=max(u_bwMix,vec3(0.0));
@@ -5236,6 +5298,7 @@ function render(timeMs){
         gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_3D,lut?.texture||gradeNeutralLutTexture);
         gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_lut'),1);
         gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_lutEnabled'),lut?1:0);
+        gl.uniform1f(gl.getUniformLocation(progGradeFinish,'u_lutAmount'),lut?Math.max(0,Math.min(1,Number(window.filmLabLookAmount ?? 1)||0)):1);
         gl.uniform3f(gl.getUniformLocation(progGradeFinish,'u_lutDomainMin'),...(lut?.domainMin||[0,0,0]));
         gl.uniform3f(gl.getUniformLocation(progGradeFinish,'u_lutDomainMax'),...(lut?.domainMax||[1,1,1]));
         gl.uniform1i(gl.getUniformLocation(progGradeFinish,'u_bwEnabled'),gradeBlackWhiteEnabled?1:0);
@@ -8632,6 +8695,7 @@ async function handleVideoFile(file){
     // The multi-track timeline belongs to the media, not to the previews: it is wired and shown
     // first. The filmstrip and the waveform are decoration, so a helper that throws or stalls is
     // only reported as a warning -- it must never keep the timeline (or playback) off the screen.
+    window.dispatchEvent(new CustomEvent('film-lab-video-loaded',{detail:{file,duration:dur}}));
     window.filmLabTimeline?.setVideo(dur,videoTrim.start,videoTrim.end);
     window.multiTimeline?.adoptFirstVideo(file,videoEl,videoObjectUrl,dur,videoTrim);
     const previews=Promise.all([renderVideoFilmstrip(token),renderAudioWaveform(file,token)])
@@ -10764,12 +10828,45 @@ function seekVideo(t){
     videoEl.currentTime=t;
   });
 }
+// The delivery presets the export panel is showing right now, with the frame quality and encoder
+// settings the model derives from them.
+function filmLabDeliveryPlan(){
+  const model=window.FilmAudio;
+  const raw={resolution:$('videoResolution')?.value,fps:Number($('videoFps')?.value)||30,bitrate:$('videoBitrate')?.value};
+  const settings=model?model.normalizeDelivery(raw):{resolution:'original',shortEdge:null,fps:24,bitrate:'standard',mbps:8,jpegQuality:0.95,crf:'20'};
+  const legacy=$('videoQuality')?.value||'medium';
+  return {...settings,quality:legacy};
+}
+function estimatedExportSize(duration){
+  const model=window.FilmAudio, plan=filmLabDeliveryPlan();
+  if(!model) return {mb:0,label:'—'};
+  const size=model.estimatedFileSize({duration,mbps:plan.mbps,audio:$('keepVideoAudio')?.checked!==false});
+  return {...size,label:model.sizeLabel(size)};
+}
+// Whether the loaded ffmpeg build knows a filter, asked before the stabiliser runs. The stock
+// @ffmpeg/core build ships deshake but not libvidstab, and it exposes no filter list at all, so an
+// engine that cannot be probed answers "no": the export falls back to deshake instead of failing
+// halfway through a stabilisation pass.
+function ffmpegFilterAvailable(name){
+  const probe=String(name||'').toLowerCase();
+  if(!probe||!ffmpegInstance) return false;
+  for(const source of [ffmpegInstance, ffmpegInstance.ffmpeg]){
+    try{
+      const list=typeof source?.getFilters==='function'?source.getFilters():null;
+      if(typeof list==='string') return list.includes(probe);
+      if(Array.isArray(list)) return list.some(entry=>String(entry).toLowerCase().includes(probe));
+    }catch(error){ return false; }
+  }
+  return false;
+}
 function videoOutputSize(options,position,resolution){
   const ratio=social.cropRatio(options,true)||(canvas.width/canvas.height), crop=social.cropRect(canvas.width,canvas.height,ratio,position);
   let width=Math.max(1,Math.round(crop.width)), height=Math.max(1,Math.round(crop.height));
-  if(resolution!=='original'){
-    const target=Number(resolution), scale=target/Math.min(width,height);
-    width=Math.max(2,Math.round(width*scale)); height=Math.max(2,Math.round(height*scale));
+  if(resolution!=='original' && Number.isFinite(Number(resolution)) && Number(resolution)>0){
+    // Scale the unrounded crop: rounding a 607.5 px crop edge before scaling used to deliver a
+    // 2160x3838 "4K vertical" instead of the exact 2160x3840.
+    const target=Number(resolution), scale=target/Math.min(crop.width,crop.height);
+    width=Math.max(2,Math.round(crop.width*scale)); height=Math.max(2,Math.round(crop.height*scale));
   }
   if(width%2) width++; if(height%2) height++;
   return {width,height};
@@ -10794,18 +10891,24 @@ async function processVideo(multiClipPlan=null){
   const trim=social.trimRange(videoEl.duration,videoTrim.start,videoTrim.end);
   const proposedPlan=multiClipPlan||window.filmLabTimeline?.getExportPlan?.();
   const editPlan=proposedPlan?.segments?.length?proposedPlan:{segments:[{start:trim.start,end:trim.end,transition:'none'}],duration:trim.end-trim.start,transitionSeconds:.5};
-  const dur=editPlan.duration, fps=24, total=Math.max(1,Math.ceil(dur*fps));
-  const container=$('videoContainer').value, quality=$('videoQuality').value;
-  const audioRequested=$('keepVideoAudio').checked&&!!videoSourceFile;
+  const dur=editPlan.duration;
+  // The delivery presets own the frame rate, the frame quality and the encoder settings; the old
+  // quality ladder stays as the fallback when the presets are not on screen.
+  const delivery=filmLabDeliveryPlan(), fps=delivery.fps, total=Math.max(1,Math.ceil(dur*fps));
+  const audioRequested=($('keepVideoAudio').checked||!!(window.filmLabAudio?.takes||[]).length)&&!!videoSourceFile;
   const audioContinuous=editPlan.segments.every((segment,index,list)=>index===list.length-1||(segment.transition==='none'&&Math.abs(segment.end-list[index+1].start)<0.001));
   const mainSegments=editPlan.segments.filter(segment=>!segment.gap);
   const keepAudio=audioRequested&&(editPlan.multiClip?mainSegments.length===1&&mainSegments[0].start===0&&mainSegments[0].source===videoObjectUrl:audioContinuous), options={...exportOptions,comparison:false}, position={...videoCrop};
+  const estimated=estimatedExportSize(dur);
   const outputSize=videoOutputSize(options,position,$('videoResolution').value);
   const rangeTitle=`${dur.toFixed(1)}s edited`;
   const view=beginExport(`Exporting ${rangeTitle} · ${container.toUpperCase()}`), files=new Set(), segments=[];
   progressWrap.classList.add('loading'); progressText.textContent='Loading video engine…';
   // Two-second sections bound raw-frame memory, even for 60s full-HD clips with heavy grain.
   const CHUNK_FRAMES=48;
+  const audioModel=window.FilmAudio, audioPlan=audioModel?audioModel.normalizeAudio(window.filmLabAudio?.settings||{})
+    :null, takePlan=audioModel?audioModel.normalizeVoiceTakes((window.filmLabAudio?.takes||[]).map(take=>({...take}))):[];
+  const stabilization=audioModel?audioModel.normalizeStabilization(window.filmLabStabilization||{}):{enabled:false,strength:0.5};
   let ff=null, useWebCodecs=videoRotation===0&&typeof window.VideoFrame==='function', mountedSource=false, sourceDir=false, audioSource='source-video';
   const writeFile=async(n,d)=>{ files.add(n); if(ff.writeFile) await ff.writeFile(n,d); else ff.FS('writeFile',n,d); };
   const readFile=async(n)=>ff.readFile?ff.readFile(n):ff.FS('readFile',n);
@@ -10866,6 +10969,13 @@ async function processVideo(multiClipPlan=null){
         const multiFramePlan=editPlan.multiClip?window.multiTimeline?.mapOutputTime?.(outputTime,editPlan):null;
         const mapped=multiFramePlan||framePlan||{sourceTime:trim.start+outputTime,blackAlpha:0};
         const currentSegment=editPlan.multiClip?editPlan.segments[mapped.clipIndex]:editPlan.segments.find(segment=>mapped.sourceTime>=segment.start-.001&&mapped.sourceTime<=segment.end+.001);
+        // A look can ride on one clip or on the whole timeline, so which LUT the grade pass wears is
+        // decided per frame from the clip this frame belongs to.
+        if(window.filmLabApplyGradeLook){
+          const frameClipId=editPlan.multiClip?(currentSegment?.clipId||window.multiTimeline?.clips?.[mapped.clipIndex]?.id)
+            :window.TL?.selectedClip?.id||window.multiTimeline?.clips?.[0]?.id||'main';
+          if(frameClipId) window.filmLabApplyGradeLook(frameClipId);
+        }
         let output;
         if(mapped.gap||mapped.blackFrame||!currentSegment){
           output=document.createElement('canvas'); output.width=outputSize.width; output.height=outputSize.height;
@@ -10889,7 +10999,7 @@ async function processVideo(multiClipPlan=null){
         const transitionOverlayAlpha=mapped.overlayAlpha??mapped.blackAlpha??0;
         if(transitionOverlayAlpha>0) output=composeTimelineFrame(output,null,0,transitionOverlayAlpha,'dissolve',mapped.overlayColor||'#000');
         if(editPlan.multiClip && window.multiTimeline?.renderOverlays) output=await window.multiTimeline.renderOverlays(output,outputTime,editPlan);
-        const blob=await canvasBlob(output,'image/jpeg',0.98);
+        const blob=await canvasBlob(output,'image/jpeg',delivery.jpegQuality);
         checkExportCancelled(); await writeFile(`frame_${String(j).padStart(4,'0')}.jpg`,new Uint8Array(await blob.arrayBuffer()));
         const pct=Math.round((i+1)/total*90); progressFill.style.width=pct+'%'; progressPct.textContent=pct+'%';
         const segmentIndex=editPlan.multiClip&&!mapped.gap?editPlan.segments.filter((segment,index)=>index<=mapped.clipIndex&&!segment.gap).length:0;
@@ -10903,7 +11013,7 @@ async function processVideo(multiClipPlan=null){
       progressText.textContent=`Encoding… ${progressPct.textContent}`;
       const segment=`part_${String(part).padStart(4,'0')}.${container}`;
       files.add(segment);
-      await exec(social.videoArgs({fps,duration:count/fps,container,quality,audio:false,output:segment}));
+      await exec(social.videoArgs({fps,duration:count/fps,container,quality,crf:delivery.crf,bitrate:delivery.mbps,audio:false,output:segment}));
       encodingVideo=false; checkExportCancelled(); segments.push(segment);
       for(let j=0;j<count;j++) await deleteFile(`frame_${String(j).padStart(4,'0')}.jpg`);
     }
@@ -10911,12 +11021,45 @@ async function processVideo(multiClipPlan=null){
     checkExportCancelled(); encodingVideo=true; encoderProgressBase=90; encoderProgressSpan=8;
     progressText.textContent=`Encoding… ${progressPct.textContent}`;
     const outputName='output.'+container; files.add(outputName);
-    await exec(social.muxVideoArgs({start:editPlan.multiClip?(mainSegments[0]?.trimStart??0):(editPlan.segments[0]?.start??trim.start),duration:dur,container,audio:keepAudio,source:audioSource}));
+    const takeNames=[];
+    for(const [index,take] of takePlan.entries()){
+      if(!take.blob) continue;
+      const name=`take_${index}.webm`; files.add(name);
+      await writeFile(name,new Uint8Array(await take.blob.arrayBuffer()));
+      takeNames.push(name);
+    }
+    // Takes are recorded against the timeline, so they shift with the range the export covers.
+    const exportStart=editPlan.multiClip?(mainSegments[0]?.trimStart??0):(editPlan.segments[0]?.start??trim.start);
+    const placedTakes=takePlan.map(take=>({...take,start:Math.max(0,take.start-exportStart)}));
+    const graph=keepAudio&&audioModel?audioModel.audioGraph(audioPlan,placedTakes,{duration:dur,hasSource:true}):null;
+    if(keepAudio) progressText.textContent=`Mixing audio${takeNames.length?` · ${takeNames.length} voice take${takeNames.length===1?'':'s'}`:''}…`;
+    await exec(social.muxVideoArgs({start:exportStart,duration:dur,container,audio:keepAudio,source:audioSource,
+      extraInputs:graph?takeNames:[],audioGraph:graph?.args?.length?graph.args:null}));
+    let finalName=outputName;
+    if(stabilization.enabled){
+      // One extra pass over the finished file: the picture is re-encoded with the stabiliser, the
+      // audio is copied through untouched.
+      const filter=audioModel.stabilizationFilter(stabilization,{available:ffmpegFilterAvailable('vidstab')?'vidstab':'deshake'});
+      const stableName=`stable.${container}`; files.add(stableName);
+      progressText.textContent=`Stabilising · ${Math.round(stabilization.strength*100)}%…`; progressPct.textContent='96%'; progressFill.style.width='96%';
+      try{
+        await exec(audioModel.stabilizeArgs({input:outputName,output:stableName,container,quality:delivery.quality,filter}));
+        finalName=stableName;
+      }catch(error){
+        // A build without the stabiliser must not lose the export: report it and ship the original.
+        console.warn('Stabilisation was skipped',error);
+        $('videoExportStatus').textContent='Stabilisation is unavailable in this video engine; the export was finished without it.';
+      }
+    }
     encodingVideo=false; checkExportCancelled(); progressFill.style.width='100%'; progressPct.textContent='100%'; progressText.textContent='Download ready'; $('progressTitle').textContent='Download ready';
-    const data=await readFile(outputName), out=new Blob([data],{type:container==='mp4'?'video/mp4':'video/webm'});
+    const data=await readFile(finalName), out=new Blob([data],{type:container==='mp4'?'video/mp4':'video/webm'});
     const filename=`${social.safeFilename(videoSourceFile?.name||'reel')}-${dur.toFixed(1)}s.${container}`;
     downloadBlob(out,filename);
-    $('videoExportStatus').textContent=`Download ready · ${dur.toFixed(1)}s ${container.toUpperCase()} · ${outputSize.width} × ${outputSize.height}.${audioRequested&&!keepAudio?' Original audio is omitted for gaps, transitions, or multiple source clips.':''} Download started automatically.`;
+    $('videoExportStatus').textContent=`Download ready · ${dur.toFixed(1)}s ${container.toUpperCase()} · ${outputSize.width} × ${outputSize.height} · ${fps} fps · about ${estimated.label}.`
+      +`${audioPlan&&(audioPlan.normalize||audioPlan.denoise||audioPlan.fadeIn||audioPlan.fadeOut||audioPlan.keyframes.length)?' Audio edits baked in.':''}`
+      +`${takePlan.length?` ${takePlan.length} voice take${takePlan.length===1?'':'s'} mixed.`:''}`
+      +`${stabilization.enabled?' Stabilised.':''}`
+      +`${audioRequested&&!keepAudio?' Original audio is omitted for gaps, transitions, or multiple source clips.':''} Download started automatically.`;
     showToast('Download ready — saving video',2600);
   }catch(error){
     if(cancelRequested || error.name==='AbortError') showToast('Video export cancelled');
@@ -11367,6 +11510,551 @@ document.addEventListener('keydown',event=>{
   if(target instanceof HTMLElement&&target.closest('input,textarea,select,[contenteditable="true"]')) return;
   if(event.key==='Escape'){ window.multiTimeline.clearKeyframeSelection?.(); syncVideoFxPanel(); }
 });
+
+// === FILM LAB DELIVERY WIRING =================================================================
+// Audio lane (waveform, fades, volume keyframes, normalise, denoise, voice takes), a look / LUT
+// scope, auto-reframe aspect presets with a draggable focus point, stabilisation, and the delivery
+// presets. Every edit lands in window.filmLabAudio / filmLabFraming / filmLabDelivery, which the
+// export reads, so the preview and the download always describe the same thing.
+(() => {
+  const model = window.FilmAudio;
+  if (!model) return;
+  const byId = id => document.getElementById(id);
+  const setStatus = (id, text) => { const node = byId(id); if (node) node.textContent = text; };
+
+  const audio = {settings: model.normalizeAudio({}), takes: [], recording: null, recorder: null, chunks: [], buffer: null, decoded: null};
+  const framing = model.normalizeFraming({});
+  const delivery = model.normalizeDelivery({fps: Number(byId('videoFps')?.value) || 30});
+  const look = {clip: new Map(), timeline: null, picked: null};
+  window.filmLabAudio = audio;
+  window.filmLabFraming = framing;
+  window.filmLabDelivery = delivery;
+  window.filmLabLook = look;
+
+  /* -- waveform ------------------------------------------------------------------------------ */
+  function drawWaveform(levels) {
+    const canvasNode = byId('audioWaveCanvas');
+    if (!canvasNode) return;
+    const ctx = canvasNode.getContext('2d');
+    const width = canvasNode.width, height = canvasNode.height;
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#101014';
+    ctx.fillRect(0, 0, width, height);
+    const count = Math.max(1, levels ? levels.length : 0);
+    ctx.strokeStyle = 'rgba(255,255,255,.18)';
+    ctx.beginPath(); ctx.moveTo(0, height / 2); ctx.lineTo(width, height / 2); ctx.stroke();
+    if (!levels) { canvasNode.dataset.empty = 'true'; return; }
+    canvasNode.dataset.empty = 'false';
+    ctx.fillStyle = '#e8e8ea';
+    for (let x = 0; x < width; x += 1) {
+      const value = Math.abs(levels[Math.min(count - 1, Math.floor(x / width * count))] || 0);
+      const bar = Math.max(1, value * (height - 6));
+      ctx.fillRect(x, (height - bar) / 2, 1, bar);
+    }
+    // Volume automation rides on top of the waveform, so the curve reads against the sound.
+    const keys = audio.settings.keyframes;
+    if (keys.length > 1 && audio.duration > 0) {
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.beginPath();
+      keys.forEach((key, index) => {
+        const x = Math.min(width - 1, key.time / audio.duration * width);
+        const y = height - Math.min(1, key.value / 2) * height;
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    }
+    // Fade handles: the shaded ends show what the export will fade.
+    const span = Math.max(0.001, audio.duration || 1);
+    ctx.fillStyle = 'rgba(125,211,252,.22)';
+    const fadeIn = Math.min(width, audio.settings.fadeIn / span * width);
+    const fadeOut = Math.min(width, audio.settings.fadeOut / span * width);
+    if (fadeIn > 0) ctx.fillRect(0, 0, fadeIn, height);
+    if (fadeOut > 0) ctx.fillRect(width - fadeOut, 0, fadeOut, height);
+  }
+  async function analyseWaveform(file) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const canvasNode = byId('audioWaveCanvas');
+    if (!file || !AudioCtx || !canvasNode) { drawWaveform(null); setStatus('audioWaveStatus', 'This browser cannot draw a waveform.'); return; }
+    try {
+      const buffer = await file.arrayBuffer();
+      const context = new AudioCtx();
+      const decoded = await context.decodeAudioData(buffer.slice(0));
+      context.close?.();
+      const channel = decoded.getChannelData(0);
+      const samples = canvasNode.width;
+      const levels = new Array(samples).fill(0);
+      const step = Math.max(1, Math.floor(channel.length / samples));
+      for (let index = 0; index < samples; index += 1) {
+        let peak = 0;
+        const start = index * step;
+        for (let offset = 0; offset < step; offset += 8) { const value = Math.abs(channel[start + offset] || 0); if (value > peak) peak = value; }
+        levels[index] = peak;
+      }
+      audio.decoded = {levels, duration: decoded.duration};
+      audio.duration = decoded.duration;
+      drawWaveform(levels);
+      setStatus('audioWaveStatus', `Waveform ready · ${decoded.duration.toFixed(1)}s · ${decoded.numberOfChannels === 1 ? 'mono' : 'stereo'}.`);
+    } catch (error) {
+      audio.decoded = null;
+      drawWaveform(null);
+      setStatus('audioWaveStatus', 'This clip carries no decodable audio track.');
+    }
+  }
+  window.filmLabAnalyseWaveform = analyseWaveform;
+  window.filmLabDrawWaveform = () => drawWaveform(audio.decoded?.levels || null);
+
+  /* -- audio controls ------------------------------------------------------------------------ */
+  function audioDuration() {
+    return Math.max(0.05, audio.decoded?.duration || Number(window.videoEl?.duration) || Number(window.TL?.duration) || 0);
+  }
+  function renderAudioList() {
+    const list = byId('audioKeyframeList');
+    if (!list) return;
+    list.replaceChildren();
+    for (const key of audio.settings.keyframes) {
+      const item = document.createElement('li');
+      item.className = 'fxListItem';
+      const text = document.createElement('button');
+      text.type = 'button'; text.className = 'fxListText';
+      text.textContent = `${key.time.toFixed(2)}s · ${Math.round(key.value * 100)}%`;
+      text.addEventListener('click', () => { window.TL.playhead = key.time; });
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'fxListText fxFixed'; remove.style.flex = '0 0 auto'; remove.textContent = '✕';
+      remove.setAttribute('aria-label', `Remove the volume keyframe at ${key.time.toFixed(2)} seconds`);
+      remove.addEventListener('click', () => {
+        audio.settings.keyframes = audio.settings.keyframes.filter(entry => entry !== key);
+        syncAudio(); setStatus('audioStatus', 'Volume keyframe removed.');
+      });
+      item.append(text, remove);
+      list.appendChild(item);
+    }
+  }
+  function syncAudio() {
+    const settings = audio.settings;
+    const gain = byId('sliderAudioGain'), fadeIn = byId('sliderAudioFadeIn'), fadeOut = byId('sliderAudioFadeOut');
+    if (gain) gain.value = String(Math.round(settings.gain * 100));
+    if (fadeIn) fadeIn.value = String(settings.fadeIn);
+    if (fadeOut) fadeOut.value = String(settings.fadeOut);
+    const gainOut = byId('valAudioGain'), fadeInOut = byId('valAudioFadeIn'), fadeOutOut = byId('valAudioFadeOut');
+    if (gainOut) gainOut.textContent = `${Math.round(settings.gain * 100)}%`;
+    if (fadeInOut) fadeInOut.textContent = `${settings.fadeIn.toFixed(1)}s`;
+    if (fadeOutOut) fadeOutOut.textContent = `${settings.fadeOut.toFixed(1)}s`;
+    const normalize = byId('audioNormalizeBtn'), denoise = byId('audioDenoiseBtn'), denoiseRow = byId('audioDenoiseRow');
+    normalize?.setAttribute('aria-pressed', String(settings.normalize));
+    normalize?.classList.toggle('active', settings.normalize);
+    denoise?.setAttribute('aria-pressed', String(settings.denoise));
+    denoise?.classList.toggle('active', settings.denoise);
+    if (denoiseRow) denoiseRow.hidden = !settings.denoise;
+    const amount = byId('sliderAudioDenoise'), amountOut = byId('valAudioDenoise');
+    if (amount) amount.value = String(Math.round(settings.denoiseAmount));
+    if (amountOut) amountOut.textContent = `${Math.round(settings.denoiseAmount)} dB`;
+    renderAudioList();
+    drawWaveform(audio.decoded?.levels || null);
+    if (typeof syncDeliveryEstimate === 'function') syncDeliveryEstimate();
+  }
+  function applyAudio(patch, message) {
+    audio.settings = model.normalizeAudio({...audio.settings, ...patch});
+    syncAudio();
+    if (message) setStatus('audioStatus', message);
+  }
+  byId('sliderAudioGain')?.addEventListener('input', () => applyAudio({gain: Number(byId('sliderAudioGain').value) / 100}));
+  byId('sliderAudioFadeIn')?.addEventListener('input', () => applyAudio({fadeIn: Number(byId('sliderAudioFadeIn').value)}));
+  byId('sliderAudioFadeOut')?.addEventListener('input', () => applyAudio({fadeOut: Number(byId('sliderAudioFadeOut').value)}));
+  byId('sliderAudioDenoise')?.addEventListener('input', () => applyAudio({denoiseAmount: Number(byId('sliderAudioDenoise').value)}));
+  byId('audioNormalizeBtn')?.addEventListener('click', () => applyAudio({normalize: !audio.settings.normalize},
+    audio.settings.normalize ? 'Loudness normalisation is off.' : 'Loudness normalisation is on (EBU R128, -16 LUFS).'));
+  byId('audioDenoiseBtn')?.addEventListener('click', () => applyAudio({denoise: !audio.settings.denoise},
+    audio.settings.denoise ? `Noise reduction is on (afftdn, ${Math.round(audio.settings.denoiseAmount)} dB floor).` : 'Noise reduction is off.'));
+  // A volume keyframe records the current gain at the playhead, exactly like a transform keyframe.
+  byId('audioKeyframeBtn')?.addEventListener('click', () => {
+    const time = Math.max(0, Number(window.TL?.playhead) || 0);
+    const rounded = Number(time.toFixed(3));
+    const existing = audio.settings.keyframes.filter(key => Math.abs(key.time - rounded) > 0.02);
+    audio.settings.keyframes = model.normalizeVolumeKeyframes([...existing, {time: rounded, value: audio.settings.gain}]);
+    syncAudio();
+    setStatus('audioStatus', `Volume keyframe at ${rounded.toFixed(2)}s · ${Math.round(audio.settings.gain * 100)}%.`);
+  });
+  byId('audioKeyframeClearBtn')?.addEventListener('click', () => applyAudio({keyframes: []}, 'Card volume keyframes cleared.'));
+
+  /* -- voice takes --------------------------------------------------------------------------- */
+  function renderTakeList() {
+    const list = byId('audioTakeList');
+    if (!list) return;
+    list.replaceChildren();
+    for (const take of audio.takes) {
+      const item = document.createElement('li');
+      item.className = 'fxListItem';
+      const text = document.createElement('button');
+      text.type = 'button'; text.className = 'fxListText';
+      text.textContent = `${take.name} · ${take.start.toFixed(2)}s → ${(take.start + take.duration).toFixed(2)}s`;
+      text.addEventListener('click', () => { window.TL.playhead = take.start; });
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'fxListText fxFixed'; remove.style.flex = '0 0 auto'; remove.textContent = '✕';
+      remove.setAttribute('aria-label', `Remove ${take.name}`);
+      remove.addEventListener('click', () => {
+        if (take.url) URL.revokeObjectURL(take.url);
+        audio.takes = model.normalizeVoiceTakes(audio.takes.filter(entry => entry.id !== take.id));
+        renderTakeList(); setStatus('audioStatus', `${take.name} removed from the mix.`);
+      });
+      item.append(text, remove);
+      list.appendChild(item);
+    }
+  }
+  function stopRecording() {
+    const recorder = audio.recorder;
+    if (!recorder) return;
+    try { recorder.stop(); } catch (error) { /* already stopped */ }
+    audio.recorder = null;
+    if (byId('audioRecordBtn')) byId('audioRecordBtn').disabled = false;
+    if (byId('audioRecordStopBtn')) byId('audioRecordStopBtn').disabled = true;
+  }
+  byId('audioRecordBtn')?.addEventListener('click', async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder !== 'function') {
+      setStatus('audioStatus', 'This browser cannot record audio.'); return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const type = ['audio/webm;codecs=opus', 'audio/webm', ''].find(candidate => !candidate || MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(stream, type ? {mimeType: type} : undefined);
+      const start = Math.max(0, Number(window.TL?.playhead) || 0);
+      audio.chunks = [];
+      recorder.ondataavailable = event => { if (event.data.size) audio.chunks.push(event.data); };
+      recorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop());
+        const blob = new Blob(audio.chunks, {type: recorder.mimeType || 'audio/webm'});
+        if (!blob.size) { setStatus('audioStatus', 'The recording was empty.'); return; }
+        const take = model.normalizeVoiceTake({name: `Voice take ${audio.takes.length + 1}`, start, duration: Math.max(0.2, (performance.now() - audio.recording.startedAt) / 1000), blob, url: URL.createObjectURL(blob)});
+        audio.takes = model.normalizeVoiceTakes([...audio.takes, {...take, blob, url: URL.createObjectURL(blob)}]);
+        renderTakeList();
+        setStatus('audioStatus', `${take.name} recorded (${take.duration.toFixed(1)}s at ${take.start.toFixed(2)}s) and mixed into the export.`);
+      };
+      audio.recording = {startedAt: performance.now(), start};
+      audio.recorder = recorder;
+      recorder.start();
+      if (byId('audioRecordBtn')) byId('audioRecordBtn').disabled = true;
+      if (byId('audioRecordStopBtn')) byId('audioRecordStopBtn').disabled = false;
+      setStatus('audioStatus', 'Recording — speak now, then press Stop.');
+    } catch (error) {
+      setStatus('audioStatus', `Microphone unavailable: ${error.message}`);
+    }
+  });
+  byId('audioRecordStopBtn')?.addEventListener('click', stopRecording);
+
+  /* -- look / LUT ---------------------------------------------------------------------------- */
+  function fillLookSelect() {
+    const select = byId('lookSelect');
+    if (!select) return;
+    const previous = select.value;
+    select.replaceChildren();
+    const none = document.createElement('option');
+    none.value = ''; none.textContent = 'No look';
+    select.appendChild(none);
+    const names = typeof gradeLutNames === 'function' ? gradeLutNames() : [];
+    for (const entry of names) {
+      const option = document.createElement('option');
+      option.value = entry.id; option.textContent = entry.name;
+      select.appendChild(option);
+    }
+    if (previous && [...select.options].some(option => option.value === previous)) select.value = previous;
+  }
+  window.filmLabFillLookSelect = fillLookSelect;
+  // Every registration path (imports, presets, the Grade tab) refreshes the look picker.
+  window.filmLabLookRegistryChanged = () => fillLookSelect();
+  function lookScope() {
+    const pressed = document.querySelector('[data-look-scope][aria-pressed="true"]');
+    return pressed?.dataset.lookScope === 'timeline' ? 'timeline' : 'clip';
+  }
+  function currentLookOwner() {
+    return lookScope() === 'timeline' ? look.timeline : (look.clip.get(selectedClipId()) || null);
+  }
+  function selectedClipId() {
+    return window.TL?.selectedClip?.id || window.multiTimeline?.clips?.[0]?.id || 'main';
+  }
+  // A look is a registry LUT plus a strength; the grade pass reads both, and the clip the preview
+  // is on gets its own look before the timeline-wide one. Anything not in the registry (a look the
+  // tests inject) simply leaves the grade alone.
+  function gradeLookState(clipId) {
+    const resolved = model.resolveLook({timeline: look.timeline, clip: look.clip.get(clipId) || null});
+    const known = !!(resolved && resolved.id && gradeLutRegistry.has(resolved.id));
+    return {id: known ? resolved.id : null, amount: known ? (resolved.intensity ?? 1) : 1};
+  }
+  function applyGradeLook(clipId) {
+    const state = gradeLookState(clipId);
+    const changed = activeGradeLutId !== state.id || Number(window.filmLabLookAmount ?? 1) !== state.amount;
+    activeGradeLutId = state.id;
+    window.filmLabLookAmount = state.amount;
+    if (changed) { invalidateGradePreview(); if (!exportBusy) scheduleGradeRender(); }
+    return state;
+  }
+  window.filmLabApplyGradeLook = applyGradeLook;
+  window.filmLabGradeLookState = gradeLookState;
+  function applyLook(patch, message) {
+    const owner = currentLookOwner() || model.normalizeLook({scope: lookScope()});
+    const next = model.normalizeLook({...owner, ...patch, scope: lookScope()});
+    if (!next.id) {
+      if (lookScope() === 'timeline') look.timeline = null; else look.clip.delete(selectedClipId());
+    } else if (lookScope() === 'timeline') look.timeline = next; else look.clip.set(selectedClipId(), next);
+    applyGradeLook(selectedClipId());
+    const select = byId('lookSelect');
+    if (select && select.value !== (next.id || '')) select.value = next.id || '';
+    const strength = byId('sliderLookIntensity'), strengthOut = byId('valLookIntensity');
+    if (strength) strength.value = String(Math.round((next.intensity ?? 1) * 100));
+    if (strengthOut) strengthOut.textContent = `${Math.round((next.intensity ?? 1) * 100)}%`;
+    invalidateGradePreview(); scheduleGradeRender();
+    if (message) setStatus('lookStatus', message);
+  }
+  window.filmLabApplyLook = applyLook;
+  window.filmLabLookForClip = clipId => model.resolveLook({timeline: look.timeline, clip: look.clip.get(clipId) || null});
+  document.querySelectorAll('[data-look-scope]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-look-scope]').forEach(other => {
+      const active = other === button;
+      other.classList.toggle('active', active);
+      other.setAttribute('aria-pressed', String(active));
+    });
+    const owner = currentLookOwner();
+    applyLook({}, owner ? `Editing the ${button.textContent.trim().toLowerCase()} look.` : `Choose a look for the ${button.textContent.trim().toLowerCase()}.`);
+  }));
+  byId('lookSelect')?.addEventListener('change', () => {
+    const id = byId('lookSelect').value;
+    const entry = (typeof gradeLutNames === 'function' ? gradeLutNames() : []).find(item => item.id === id);
+    applyLook(id ? {id, name: entry?.name || id} : {id: null}, id ? `Look ${entry?.name || id} applied to ${lookScope() === 'timeline' ? 'the whole timeline' : 'this clip'}.` : 'Look removed.');
+  });
+  byId('sliderLookIntensity')?.addEventListener('input', () => applyLook({intensity: Number(byId('sliderLookIntensity').value) / 100}));
+  byId('lookClearBtn')?.addEventListener('click', () => {
+    if (byId('lookSelect')) byId('lookSelect').value = '';
+    applyLook({id: null}, 'No look on this clip or timeline.');
+  });
+  byId('lookImportBtn')?.addEventListener('click', () => byId('lookLutFile')?.click());
+  byId('lookLutFile')?.addEventListener('change', async () => {
+    const file = byId('lookLutFile').files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const id = typeof importGradeLutText === 'function' ? importGradeLutText(file.name, text) : null;
+      fillLookSelect();
+      if (id) applyLook({id, name: file.name}, `${file.name} imported and applied to ${lookScope() === 'timeline' ? 'the whole timeline' : 'this clip'}.`);
+      else setStatus('lookStatus', 'That .cube file could not be read.');
+    } catch (error) {
+      setStatus('lookStatus', `LUT import failed: ${error.message}`);
+    }
+  });
+
+  /* -- framing: aspect presets, focus point, auto-reframe ------------------------------------ */
+  function focusHandle() { return byId('focusHandle'); }
+  function positionFocusHandle() {
+    const handle = focusHandle();
+    if (!handle || !hasContent) return;
+    const box = canvas.getBoundingClientRect(), wrap = canvasWrap.getBoundingClientRect();
+    handle.hidden = false;
+    handle.style.left = `${box.left - wrap.left + box.width * framing.focus.x}px`;
+    handle.style.top = `${box.top - wrap.top + box.height * framing.focus.y}px`;
+    handle.setAttribute('aria-label', `Focus point ${Math.round(framing.focus.x * 100)} percent across, ${Math.round(framing.focus.y * 100)} percent down`);
+  }
+  window.filmLabPositionFocusHandle = positionFocusHandle;
+  // The crop the export, the overlay and the sidebar's own crop row all read is
+  // exportOptions.format, so the aspect preset writes that instead of a private ratio.
+  const FORMAT_FOR_ASPECT = {'9:16': 'story', '1:1': 'square', '4:5': 'portrait', '16:9': 'wide', original: 'original'};
+  const ASPECT_FOR_FORMAT = {story: '9:16', square: '1:1', portrait: '4:5', wide: '16:9'};
+  function syncFraming(message) {
+    // Re-normalise first: the ratio, the crop box and the export geometry all follow from the
+    // aspect preset, and the record has to stay coherent after a pill is clicked.
+    Object.assign(framing, model.normalizeFraming({aspect: framing.aspect, focus: framing.focus, auto: framing.auto}));
+    videoCrop = {x: framing.focus.x, y: framing.focus.y};
+    exportOptions = {...exportOptions, format: FORMAT_FOR_ASPECT[framing.aspect] || 'original', comparison: false};
+    cropEditing = !!framing.ratio;
+    if (typeof updateSocialUI === 'function') updateSocialUI();
+    document.querySelectorAll('[data-aspect]').forEach(button => {
+      const active = button.dataset.aspect === framing.aspect;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const auto = byId('autoReframeBtn');
+    auto?.setAttribute('aria-pressed', String(framing.auto));
+    auto?.classList.toggle('active', framing.auto);
+    positionFocusHandle();
+    try { updateCropOverlay(); } catch (error) { /* the overlay only exists for a ratio crop */ }
+    if (typeof syncDeliveryEstimate === 'function') syncDeliveryEstimate();
+    if (message) setStatus('framingStatus', message);
+  }
+  window.filmLabSyncFraming = syncFraming;
+  document.querySelectorAll('[data-format]').forEach(button => button.addEventListener('click', () => {
+    const aspect = ASPECT_FOR_FORMAT[button.dataset.format];
+    if (!aspect) return;
+    framing.aspect = aspect; framing.auto = false;
+    syncFraming(`${button.textContent.trim()} crop — drag the focus dot to choose what stays in frame.`);
+  }));
+  byId('videoFrameFormat')?.addEventListener('change', event => {
+    const aspect = ASPECT_FOR_FORMAT[event.target.value];
+    if (!aspect) return;
+    framing.aspect = aspect; framing.auto = false;
+    syncFraming();
+  });
+  // Dragging the crop frame in the preview is the other way to aim the shot; the focus dot
+  // follows it so the two controls can never disagree.
+  byId('cropFrame')?.addEventListener('pointermove', () => {
+    if (typeof getCropPosition !== 'function') return;
+    const position = getCropPosition();
+    if (!position) return;
+    framing.focus = model.normalizeFocusPoint(position);
+    positionFocusHandle();
+  });
+  document.querySelectorAll('[data-aspect]').forEach(button => button.addEventListener('click', () => {
+    framing.aspect = button.dataset.aspect;
+    framing.auto = false;
+    syncFraming(framing.aspect === 'original'
+      ? 'Aspect preset cleared; the export keeps the source shape.'
+      : `${button.textContent.trim()} crop — drag the focus dot to choose what stays in frame.`);
+  }));
+  byId('focusResetBtn')?.addEventListener('click', () => {
+    framing.focus = {x: 0.5, y: 0.5};
+    syncFraming('Focus point centred.');
+  });
+  (() => {
+    const handle = focusHandle();
+    if (!handle) return;
+    let drag = null;
+    handle.addEventListener('pointerdown', event => {
+      drag = {id: event.pointerId};
+      try { handle.setPointerCapture(event.pointerId); } catch (error) { /* synthetic pointer */ }
+      event.preventDefault(); event.stopPropagation();
+    });
+    handle.addEventListener('pointermove', event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      const box = canvas.getBoundingClientRect();
+      if (!box.width) return;
+      framing.focus = model.normalizeFocusPoint({
+        x: (event.clientX - box.left) / box.width,
+        y: (event.clientY - box.top) / box.height,
+      });
+      framing.auto = false;
+      syncFraming(`Focus point ${Math.round(framing.focus.x * 100)}% across, ${Math.round(framing.focus.y * 100)}% down.`);
+    });
+    const end = event => {
+      if (!drag || event.pointerId !== drag.id) return;
+      drag = null;
+      try { handle.releasePointerCapture(event.pointerId); } catch (error) { /* already released */ }
+    };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  })();
+  // Auto-reframe: sample a few frames locally, score them for saliency, and aim the crop at the
+  // busiest region. No model download, no network, and it never blocks the UI for long.
+  async function autoReframe() {
+    const source = videoObjectUrl || window.filmLabTimelineBridge?.activeSource;
+    if (!source) { setStatus('framingStatus', 'Load a clip before auto-reframing.'); return null; }
+    const video = document.createElement('video');
+    video.muted = true; video.playsInline = true; video.preload = 'auto'; video.src = source;
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('The clip did not load in time')), 8000);
+      video.addEventListener('loadeddata', () => { clearTimeout(timer); resolve(); }, {once: true});
+      video.addEventListener('error', () => { clearTimeout(timer); reject(new Error('The clip could not be read')); }, {once: true});
+      video.load();
+    }).catch(error => { setStatus('framingStatus', `Auto-reframe skipped: ${error.message}.`); return null; });
+    const duration = Math.max(0.1, video.duration || audioDuration());
+    const scratch = document.createElement('canvas');
+    scratch.width = 160; scratch.height = Math.max(1, Math.round(160 * (video.videoHeight || 9) / (video.videoWidth || 16)));
+    const ctx = scratch.getContext('2d', {willReadFrequently: true});
+    let weight = 0, x = 0, y = 0, samples = 0;
+    for (let index = 1; index <= 5; index += 1) {
+      video.currentTime = Math.min(duration - 0.05, duration * index / 6);
+      await new Promise(resolve => video.addEventListener('seeked', resolve, {once: true}));
+      ctx.drawImage(video, 0, 0, scratch.width, scratch.height);
+      const focus = model.reframeFocus(model.saliencyMap(ctx.getImageData(0, 0, scratch.width, scratch.height).data, scratch.width, scratch.height));
+      if (focus.weight > 0) { weight += focus.weight; x += focus.x * focus.weight; y += focus.y * focus.weight; samples += 1; }
+    }
+    video.removeAttribute('src'); video.load();
+    if (!samples) { setStatus('framingStatus', 'Auto-reframe found nothing to focus on.'); return null; }
+    framing.focus = model.normalizeFocusPoint({x: x / weight, y: y / weight});
+    framing.auto = true;
+    syncFraming(`Auto-reframe focused on the busiest part of ${samples} sampled frames.`);
+    return framing.focus;
+  }
+  window.filmLabAutoReframe = autoReframe;
+  byId('autoReframeBtn')?.addEventListener('click', () => { autoReframe(); });
+
+  /* -- stabilisation + delivery presets ------------------------------------------------------- */
+  function syncStabilization(message) {
+    const enabled = byId('stabilizeEnabled')?.checked === true;
+    const strength = Number(byId('sliderStabilize')?.value || 50) / 100;
+    window.filmLabStabilization = model.normalizeStabilization({enabled, strength});
+    const row = byId('stabilizeRow');
+    if (row) row.hidden = !enabled;
+    const out = byId('valStabilize');
+    if (out) out.textContent = `${Math.round(window.filmLabStabilization.strength * 100)}%`;
+    if (message) setStatus('stabilizeStatus', message);
+  }
+  window.filmLabSyncStabilization = syncStabilization;
+  byId('stabilizeEnabled')?.addEventListener('change', () => syncStabilization(byId('stabilizeEnabled').checked
+    ? 'Stabilisation will run as a second pass over the finished file.'
+    : 'Stabilisation off.'));
+  byId('sliderStabilize')?.addEventListener('input', () => syncStabilization());
+
+  function currentDelivery() {
+    return model.normalizeDelivery({
+      resolution: byId('videoResolution')?.value,
+      fps: Number(byId('videoFps')?.value),
+      bitrate: byId('videoBitrate')?.value,
+    });
+  }
+  function exportFrameSize() {
+    // The size the exporter is about to ask for; falls back to the model's geometry when the
+    // preview is not on screen yet.
+    try{
+      if (typeof videoOutputSize === 'function' && canvas?.width && typeof getCropPosition === 'function') {
+        const exact = videoOutputSize(exportOptions, getCropPosition(), byId('videoResolution')?.value);
+        if (exact?.width && exact?.height) return exact;
+      }
+    } catch (error) { /* the model below still answers */ }
+    return null;
+  }
+  function syncDeliveryEstimate() {
+    const settings = currentDelivery();
+    Object.assign(delivery, settings);
+    const duration = Math.max(0, (window.TL?.duration || audioDuration() || 0));
+    const size = model.estimatedFileSize({duration, mbps: settings.mbps, audio: byId('keepVideoAudio')?.checked !== false || audio.takes.length > 0});
+    const geometry = {...model.deliveryGeometry({
+      width: canvas?.width || 1080, height: canvas?.height || 1920,
+      framing, delivery: settings,
+    }), ...(exportFrameSize() || {})};
+    const node = byId('videoDeliveryEstimate');
+    if (node) node.textContent = `Estimated size: ${model.sizeLabel(size)} · ${geometry.width} × ${geometry.height} · ${settings.fps} fps · ${settings.mbps} Mbps.`;
+    return {settings, size, geometry};
+  }
+  window.filmLabSyncDeliveryEstimate = syncDeliveryEstimate;
+  ['videoResolution', 'videoFps', 'videoBitrate'].forEach(id => byId(id)?.addEventListener('change', () => {
+    const {settings, geometry} = syncDeliveryEstimate();
+    setStatus('videoDeliveryEstimate', `Estimated size: ${model.sizeLabel(model.estimatedFileSize({duration: Math.max(0, window.TL?.duration || 0), mbps: settings.mbps}))} · ${geometry.width} × ${geometry.height} · ${settings.fps} fps · ${settings.mbps} Mbps.`);
+  }));
+  byId('keepVideoAudio')?.addEventListener('change', syncDeliveryEstimate);
+
+  /* -- lifecycle ----------------------------------------------------------------------------- */
+  window.addEventListener('film-lab-video-loaded', event => {
+    if (event.detail?.file) analyseWaveform(event.detail.file);
+    syncFraming(); syncAudio(); syncStabilization(); syncDeliveryEstimate(); fillLookSelect(); renderTakeList();
+  });
+  window.addEventListener('film-lab-clip-selected', event => {
+    const clip = (window.multiTimeline?.clips || []).find(entry => entry.id === event.detail?.id);
+    if (clip) {
+      const previous = clip.transform?.position;
+      if (previous && typeof previous.x === 'number') framing.focus = model.normalizeFocusPoint({x: 0.5 + previous.x, y: 0.5 + previous.y});
+    }
+    const owner = look.clip.get(event.detail?.id);
+    if (byId('lookSelect')) byId('lookSelect').value = owner?.id || look.timeline?.id || '';
+    // The preview shows the selected clip, so it wears that clip's look.
+    applyGradeLook(event.detail?.id || selectedClipId());
+    positionFocusHandle();
+  });
+  window.addEventListener('resize', () => { positionFocusHandle(); });
+  syncFraming(); syncAudio(); syncStabilization(); fillLookSelect(); renderTakeList();
+  if (videoSourceFile) analyseWaveform(videoSourceFile);
+  // The exporter, the estimate and the tests all read the delivery plan through these, so what the
+  // panel shows and what the encoder is asked for can never drift apart.
+  window.filmLabExportPlan = () => filmLabDeliveryPlan();
+  window.filmLabExportFrame = () => exportFrameSize();
+  window.filmLabEstimatedExportSize = duration => estimatedExportSize(duration);
+  window.filmLabFilterAvailable = name => ffmpegFilterAvailable(name);
+  window.filmLabDeliveryReady = true;
+})();
 
 // -- shared state sync ------------------------------------------------------------------------
 window.addEventListener('film-lab-layer-selected',event=>{

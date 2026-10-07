@@ -328,6 +328,8 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
     'sw.js',
     'social-tools.js',
     'color-grading.js',
+    'video-tools.js',
+    'audio-tools.js',
     'timeline-module.js',
     'multi-timeline.js',
     'background-blur-worker.js',

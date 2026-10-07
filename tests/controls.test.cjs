@@ -370,7 +370,7 @@ test('video processing retains a 60s cap, WebCodecs fallback and frame progress'
   assert.match(script, /trim\.start\+outputTime/);
   assert.match(script, /@ffmpeg\/ffmpeg@0\.12\.10\/dist\/umd\/ffmpeg\.js/);
   assert.match(script, /vendor\/ffmpeg\/ffmpeg\.js/);
-  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,audio:false,output:segment\}\)/);
+  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,crf:delivery\.crf,bitrate:delivery\.mbps,audio:false,output:segment\}\)/);
   assert.match(script, /const range='trimmed';[\s\S]*?const trim=social\.trimRange\(videoEl\.duration,videoTrim\.start,videoTrim\.end\)/);
   assert.match(script, /videoOutputSize\(options,position,\$\('videoResolution'\)\.value\)/);
   assert.match(script, /exportRange|videoExportRange/);

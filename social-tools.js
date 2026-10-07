@@ -425,8 +425,10 @@
     ev.setUint32(12, centralSize, true); ev.setUint32(16, offset, true);
     return new Blob([...parts, ...central, end], {type: 'application/zip'});
   }
-  function videoArgs({fps = 24, start = 0, duration, container = 'mp4', quality = 'medium', audio = true, codec, source = 'source-video', output}) {
-    const profile = ({low:{crf:'28',webm:'1.5M'},medium:{crf:'20',webm:'4M'},high:{crf:'16',webm:'8M'}})[quality] || {crf:'20',webm:'4M'};
+  function videoArgs({fps = 24, start = 0, duration, container = 'mp4', quality = 'medium', audio = true, codec, source = 'source-video', output, crf, bitrate}) {
+    const base = ({low:{crf:'28',webm:'1.5M'},medium:{crf:'20',webm:'4M'},high:{crf:'16',webm:'8M'}})[quality] || {crf:'20',webm:'4M'};
+    // The delivery presets pick their own CRF or bitrate; anything not supplied keeps the old ladder.
+    const profile = {crf: crf !== undefined ? String(crf) : base.crf, webm: bitrate ? `${bitrate}M` : base.webm};
     const args = ['-y', '-framerate', String(fps), '-i', 'frame_%04d.jpg'];
     if (audio) args.push('-ss', String(start), '-t', String(duration), '-i', source, '-map', '0:v:0', '-map', '1:a:0?');
     else args.push('-an');
@@ -442,14 +444,18 @@
     }
     return args;
   }
-  function muxVideoArgs({start = 0, duration, container = 'mp4', audio = true, source = 'source-video'}) {
+  function muxVideoArgs({start = 0, duration, container = 'mp4', audio = true, source = 'source-video', extraInputs = [], audioGraph = null, output}) {
     const args = ['-y', '-f', 'concat', '-safe', '0', '-i', 'segments.txt'];
-    if (audio) args.push('-ss', String(start), '-t', String(duration), '-i', source, '-map', '0:v:0', '-map', '1:a:0?');
-    else args.push('-an');
+    if (audio) args.push('-ss', String(start), '-t', String(duration), '-i', source);
+    // Voice takes and any other local audio ride in as further inputs; the graph maps the mix.
+    if (audio) for (const input of extraInputs) args.push('-i', input);
+    if (audio && !audioGraph) args.push('-map', '0:v:0', '-map', '1:a:0?');
+    if (!audio) args.push('-an');
     args.push('-t', String(duration), '-c:v', 'copy');
+    if (audio && audioGraph) args.push(...audioGraph);
     if (audio) args.push('-c:a', container === 'webm' ? 'libopus' : 'aac', '-b:a', '128k');
     if (container === 'mp4') args.push('-movflags', '+faststart');
-    args.push('output.' + container);
+    args.push(output || ('output.' + container));
     return args;
   }
   return {FORMATS, COMPARISONS, CROP_RATIO_PRESETS, EXPORT_TYPES, EXPORT_TYPE_LABELS, EXPORT_PRESETS, KEYSTONE_LIMIT, STRAIGHTEN_LIMIT, DEFAULT_EXPORT, DEFAULT_DITHER, MAX_PHOTOS, SETTINGS_VERSION, VIGNETTE_ID, clamp, normalizeExport, normalizeDitherSettings, outputSize, cropRatio, cropRect, moveCrop, cropRatioPreset, exportPreset, exportMimeType, exportExtension, exportQualityApplies, exportFormatFor, keystoneAmount, keystoneFillScale, keystoneMapPoint, keystoneInversePoint, flipPoint, geometryOverlayMatrix, normalizeGeometry, geometryIsNeutral, normalizeLensBlur, lensBlurRadius, normalizeHealStrokes, healRingSamples, healPatchOffsets, clampStraighten, straightenFillScale, normalizeFullSettings, trimRange, autoTrim, timeLabel, sanitizeSettings, encodeSettings, decodeSettings, safeFilename, crc32, createZip, videoArgs, muxVideoArgs};

@@ -452,7 +452,7 @@ test('the timeline and the editor wire every round-8 control without removing ex
   // The service worker ships the new module.
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   assert.match(sw, /'video-tools\.js'/);
-  assert.match(sw, /const CACHE = 'filmlab-v16';/);
+  assert.match(sw, /const CACHE = 'filmlab-v17';/);
   // Nothing was renamed away.
   for (const id of ['mtl-play-pause', 'mtl-zoom-slider', 'mtl-main-track', 'mtl-text-track', 'mtl-audio-track', 'videoExportPanel', 'videoCaptionPanel']) {
     assert.match(html, new RegExp(`id="${id}"`));

@@ -507,7 +507,7 @@ test('video export UI exposes only trimmed output, requested sizes, formats and 
   assert.match(html, /Download ready/);
   assert.match(script, /const range='trimmed';[\s\S]*?social\.trimRange\(videoEl\.duration,videoTrim\.start,videoTrim\.end\)/);
   assert.match(script, /function videoOutputSize\(options,position,resolution\)/);
-  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,audio:false,output:segment\}\)/);
+  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,crf:delivery\.crf,bitrate:delivery\.mbps,audio:false,output:segment\}\)/);
   assert.match(script, /ff\.on\('progress'/);
   assert.match(script, /setInterval\(updateExportEta,1000\)/);
   assert.match(script, /progressText\.textContent=`Encoding… \$\{pct\}%`/);
