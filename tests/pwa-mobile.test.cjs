@@ -41,7 +41,7 @@ test('the service worker precaches only the app shell and leaves model and encod
   assert.match(serviceWorker, /const PRECACHE = \[/);
   assert.match(serviceWorker, /social-tools\.js/);
   assert.match(serviceWorker, /color-grading\.js/);
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v15'/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v16'/);
   assert.match(serviceWorker, /timeline-module\.js/);
   assert.match(serviceWorker, /multi-timeline\.js/);
   assert.match(serviceWorker, /background-blur-worker\.js/);

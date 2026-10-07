@@ -252,9 +252,29 @@ test('text, caption and sticker layers carry their own timing, style and animati
   const pop = FilmVideo.textAnimationState('pop', 0.1);
   assert.ok(pop.scale < 1 && pop.alpha > 0.4, 'pop grows into place');
   assert.ok(FilmVideo.textAnimationState('pop', 0.5).scale > 1, 'pop overshoots past its final size');
-  assert.equal(FilmVideo.textAnimationState('typewriter', 0.5).characters, 575);
+  // Typewriter types at a steady pace, so the same progress reveals more of a longer layer.
   assert.equal(FilmVideo.textAnimationState('typewriter', 0).characters, 0);
+  assert.equal(FilmVideo.textAnimationState('typewriter', 0.5, 2).characters, 18);
+  assert.ok(FilmVideo.textAnimationState('typewriter', 0.25, 8).characters > FilmVideo.textAnimationState('typewriter', 0.25, 2).characters, 'a longer layer keeps typing');
+  assert.ok(FilmVideo.TYPING_CHARACTERS_PER_SECOND >= 8, 'the typing pace is a readable one');
   assert.equal(FilmVideo.textAnimationState('none', 0.1).alpha, 1);
+  // A fresh title has to land inside the frame: the transform is normalised to the frame, so
+  // anything outside -0.5..0.5 paints off the canvas and the title would look missing.
+  const defaultTitle = FilmVideo.normalizeTextLayer({text: 'Title'}).transform;
+  assert.equal(defaultTitle.x, 0);
+  assert.ok(defaultTitle.y > -0.5 && defaultTitle.y < 0.5, `a new title is inside the frame (y=${defaultTitle.y})`);
+  const drawCalls = [];
+  const stub = new Proxy({}, {
+    get: (target, prop) => prop === 'measureText' ? (text => ({width: String(text).length * 6})) : (...args) => { drawCalls.push([prop, ...args]); },
+    set: () => true,
+  });
+  FilmVideo.drawScene(stub, {width: 480, height: 270, time: 0.4, layers: [{...FilmVideo.normalizeTextLayer({text: 'ON FRAME', start: 0, end: 1})}]});
+  const paintedAt = (() => {
+    let x = null, y = null;
+    for (const call of drawCalls) if (call[0] === 'translate') { x = call[1]; y = call[2]; }
+    return y === null ? null : y;
+  })();
+  assert.ok(paintedAt !== null && paintedAt > 0 && paintedAt < 270, `the shared renderer draws a fresh title on the frame (y=${paintedAt})`);
   // Captions are sorted lines with real start / end times, and only one is on screen at a time.
   const captions = FilmVideo.normalizeCaptions([{text: 'second', start: 3, end: 5}, {text: 'first', start: 0, end: 2}]);
   assert.deepEqual(captions.map(line => line.text), ['first', 'second']);
@@ -432,7 +452,7 @@ test('the timeline and the editor wire every round-8 control without removing ex
   // The service worker ships the new module.
   const sw = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
   assert.match(sw, /'video-tools\.js'/);
-  assert.match(sw, /const CACHE = 'filmlab-v15';/);
+  assert.match(sw, /const CACHE = 'filmlab-v16';/);
   // Nothing was renamed away.
   for (const id of ['mtl-play-pause', 'mtl-zoom-slider', 'mtl-main-track', 'mtl-text-track', 'mtl-audio-track', 'videoExportPanel', 'videoCaptionPanel']) {
     assert.match(html, new RegExp(`id="${id}"`));
@@ -1166,7 +1186,248 @@ test('keyframes, speed, text, stickers, blends and the chroma key survive previe
     assert.equal(picked.picking, 'false', 'picking a colour leaves the eyedropper disarmed');
     assert.match(picked.status, /^Key colour picked: #/, `the pick is reported: ${picked.status}`);
 
-    // --- 12. A phone keeps the panel usable ------------------------------------------------
+    // --- 12. The timeline diamond keyframes all four properties, with easing ----------------
+    // The clip is selected the way a user selects it: a click on the timeline itself.
+    const mainClipId = await page.evaluate(() => window.multiTimeline.clips.find(entry => entry.track === 'main').id);
+    const mainClipBox = await page.locator(`.mtl-clip[data-clip-id="${mainClipId}"]`).first().boundingBox();
+    assert.ok(mainClipBox && mainClipBox.width > 4, 'the main clip is on the timeline and can be clicked');
+    await page.mouse.click(mainClipBox.x + mainClipBox.width / 2, mainClipBox.y + mainClipBox.height / 2);
+    await page.waitForTimeout(300);
+    const timelineKeyframe = await page.evaluate(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const clip = window.multiTimeline.clips.find(entry => entry.track === 'main');
+      const selected = window.TL.selectedClip?.id === clip.id;
+      window.multiTimeline.updateClip(clip.id, {keyframes: {position: [], scale: [], rotation: [], opacity: []}, opacity: 0.7});
+      window.TL.playhead = clip.start + Math.min(0.6, window.multiTimeline.clipOutputDuration(clip) * 0.4);
+      await wait(400);
+      const button = document.getElementById('mtl-keyframe-btn');
+      const label = button?.getAttribute('aria-label') || '';
+      button?.click();
+      await wait(500);
+      const keyed = window.multiTimeline.clips.find(entry => entry.id === clip.id).keyframes;
+      const times = ['position', 'scale', 'rotation', 'opacity'].map(property => ({property, keys: (keyed[property] || []).map(key => ({time: key.time, value: key.value}))}));
+      const diamonds = document.querySelectorAll('.mtl-keyframe-marker');
+      const first = diamonds[0];
+      first?.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+      await wait(300);
+      const selection = window.multiTimeline.selectedKeyframe;
+      const pill = document.querySelector('.mtl-keyframe-easing');
+      const easingOptions = pill ? [...pill.options].map(option => option.value) : [];
+      if (pill) { pill.value = 'ease-out'; pill.dispatchEvent(new Event('change', {bubbles: true})); }
+      await wait(300);
+      const eased = window.multiTimeline.clips.find(entry => entry.id === clip.id).keyframes;
+      const applied = Object.fromEntries(['position', 'scale', 'rotation', 'opacity'].map(property => [property, (eased[property] || []).map(key => key.easing)]));
+      button?.click();
+      await wait(400);
+      const cleared = window.multiTimeline.clips.find(entry => entry.id === clip.id).keyframes;
+      return {
+        selected, label, diamonds: diamonds.length, times, selection: selection ? {time: selection.time, easing: selection.easing} : null,
+        easingOptions, applied,
+        cleared: Object.fromEntries(['position', 'scale', 'rotation', 'opacity'].map(property => [property, (cleared[property] || []).length])),
+      };
+    });
+    assert.equal(timelineKeyframe.selected, true, 'clicking the clip on the timeline selects it');
+    assert.match(timelineKeyframe.label, /position, scale, rotation and opacity/, 'the timeline diamond names every property it keys');
+    for (const entry of timelineKeyframe.times) {
+      assert.equal(entry.keys.length, 1, `the timeline diamond keyed ${entry.property} (${JSON.stringify(entry.keys)})`);
+    }
+    assert.equal(new Set(timelineKeyframe.times.map(entry => entry.keys[0].time)).size, 1, 'all four properties are keyed at the same moment');
+    assert.equal(timelineKeyframe.times.find(entry => entry.property === 'opacity').keys[0].value, 0.7, 'the opacity key records the clip value at the playhead');
+    assert.ok(timelineKeyframe.diamonds >= 1, 'the keyed moment shows a diamond on the timeline');
+    assert.equal(timelineKeyframe.selection === null, false, 'clicking the diamond selects the keyed moment');
+    assert.deepEqual(timelineKeyframe.easingOptions, ['linear', 'hold', 'ease-in', 'ease-out', 'ease-in-out'], 'the diamond offers the full easing list');
+    for (const property of ['position', 'scale', 'rotation', 'opacity']) {
+      assert.deepEqual(timelineKeyframe.applied[property], ['ease-out'], `the easing pill rewrites ${property}`);
+    }
+    assert.deepEqual(timelineKeyframe.cleared, {position: 0, scale: 0, rotation: 0, opacity: 0}, 'the diamond toggles the whole moment back off');
+
+    // --- 13. Speed runs 0.1x to 8x, the ramp presets reshape the clip, freeze and reverse ------
+    const speed = await page.evaluate(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const clipId = window.multiTimeline.clips.find(entry => entry.track === 'main').id;
+      const read = () => window.multiTimeline.clips.find(entry => entry.id === clipId);
+      window.multiTimeline.updateClip(clipId, {speed: {rate: 1, ramp: 'none', freeze: false, reverse: false}});
+      await wait(300);
+      const base = window.multiTimeline.clipOutputDuration(read());
+      const slider = document.getElementById('sliderClipSpeed');
+      const bounds = {min: Number(slider.min), max: Number(slider.max), step: Number(slider.step)};
+      const setRate = async rate => { slider.value = String(rate); slider.dispatchEvent(new Event('input', {bubbles: true})); await wait(400); return window.multiTimeline.clipOutputDuration(read()); };
+      const slow = await setRate(0.1);
+      const slowRate = read().speed.rate;
+      const fast = await setRate(8);
+      const fastRate = read().speed.rate;
+      const readout = document.getElementById('valClipSpeed')?.textContent || '';
+      const back = await setRate(1);
+      const ramps = [...document.querySelectorAll('[data-speed-ramp]')].map(button => button.dataset.speedRamp);
+      const durations = {};
+      for (const ramp of ramps) {
+        document.querySelector(`[data-speed-ramp="${ramp}"]`).click();
+        await wait(400);
+        durations[ramp] = window.multiTimeline.clipOutputDuration(read());
+      }
+      document.querySelector('[data-speed-ramp="none"]').click();
+      await wait(300);
+      const pressed = [...document.querySelectorAll('[data-speed-ramp]')].filter(button => button.getAttribute('aria-pressed') === 'true').map(button => button.dataset.speedRamp);
+      const speedLabel = document.getElementById('speedStatus')?.textContent || '';
+      document.getElementById('mtl-freeze-btn').click();
+      await wait(400);
+      const frozen = {...read().speed};
+      const frozenDuration = window.multiTimeline.clipOutputDuration(read());
+      document.getElementById('mtl-freeze-btn').click();
+      await wait(300);
+      document.getElementById('mtl-reverse-btn').click();
+      await wait(400);
+      const reversed = {...read().speed};
+      document.getElementById('mtl-reverse-btn').click();
+      await wait(300);
+      const after = {...read().speed};
+      return {bounds, base, slow, slowRate, fast, fastRate, readout, back, ramps, durations, pressed, speedLabel, frozen, frozenDuration, reversed, after};
+    });
+    assert.deepEqual(speed.bounds, {min: 0.1, max: 8, step: 0.1}, 'the speed control covers 0.1x to 8x');
+    assert.equal(speed.slowRate, 0.1, 'the slowest step is 0.1x');
+    assert.equal(speed.fastRate, 8, 'the fastest step is 8x');
+    assert.ok(Math.abs(speed.slow - speed.base * 10) < 0.06, `0.1x stretches the clip tenfold (${speed.base} -> ${speed.slow})`);
+    assert.ok(Math.abs(speed.fast - speed.base / 8) < 0.06, `8x shortens the clip eightfold (${speed.base} -> ${speed.fast})`);
+    assert.match(speed.readout, /8x/, 'the speed readout follows the slider');
+    assert.deepEqual(speed.ramps, ['none', 'montage', 'hero', 'bullet'], 'the ramp list offers constant, montage, hero and bullet');
+    for (const ramp of ['montage', 'hero', 'bullet']) {
+      assert.ok(Math.abs(speed.durations[ramp] - speed.durations.none) > 0.05, `the ${ramp} ramp reshapes the clip (${speed.durations.none} -> ${speed.durations[ramp]})`);
+    }
+    assert.equal(new Set([speed.durations.montage, speed.durations.hero, speed.durations.bullet]).size, 3, 'each ramp curve is a different shape');
+    assert.deepEqual(speed.pressed, ['none'], 'the active ramp preset is marked as pressed');
+    assert.match(speed.speedLabel, /Constant ramp · 1x/, `the speed readout names the ramp: ${speed.speedLabel}`);
+    assert.equal(speed.frozen.freeze, true, 'the timeline freeze button freezes the clip');
+    assert.ok(Math.abs(speed.frozenDuration - speed.base) < 0.06, `a frozen clip keeps its own length (${speed.frozenDuration})`);
+    assert.equal(speed.reversed.reverse, true, 'the timeline reverse button reverses the clip');
+    assert.deepEqual(speed.after, {rate: 1, reverse: false, freeze: false, ramp: 'none'}, 'the toggles return the clip to normal playback');
+
+    // --- 14. An overlay clip on V2 carries its blend, opacity and chroma key into the export ---
+    const v2Id = await page.evaluate(async () => {
+      const main = window.multiTimeline.clips.find(entry => entry.track === 'main');
+      const v2 = window.multiTimeline.addClip(main.mediaId, 'video-2', 0);
+      window.multiTimeline.updateClip(v2.id, {blend: 'normal', opacity: 1, chroma: {enabled: false}});
+      window.multiTimeline.pause(); window.TL.playing = false; window.TL.playhead = 0.6;
+      return v2.id;
+    });
+    await page.waitForTimeout(1200);
+    const v2Box = await page.locator(`.mtl-clip[data-clip-id="${v2Id}"]`).first().boundingBox();
+    assert.ok(v2Box && v2Box.width > 4, 'the overlay clip is on the V2 lane and can be clicked');
+    await page.mouse.click(v2Box.x + v2Box.width / 2, v2Box.y + v2Box.height / 2);
+    await page.waitForTimeout(300);
+    const overlay = await page.evaluate(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const v2 = window.multiTimeline.clips.find(entry => entry.track === 'video-2');
+      const selected = window.TL.selectedClip?.id === v2.id;
+      const paint = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 480; canvas.height = 270;
+        const ctx = canvas.getContext('2d', {willReadFrequently: true});
+        ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await window.multiTimeline.renderOverlays(canvas, 0.6, window.multiTimeline.getExportPlan(window.multiTimeline.clips));
+        const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+        let green = 0, luminance = 0;
+        for (let index = 0; index < data.length; index += 4) {
+          luminance += data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
+          if (data[index + 1] > 120 && data[index] < 110 && data[index + 2] < 110) green += 1;
+        }
+        return {green, luminance: Math.round(luminance / (data.length / 4) * 100) / 100};
+      };
+      // The overlay shares the main clip's media, so at normal blend and full opacity it paints the
+      // same frame the base already shows: the states that prove it reaches the export are a blend
+      // the base cannot produce, and the overlay being switched off.
+      const visible = await paint();
+      const blend = document.getElementById('layerBlendSelect');
+      blend.value = 'screen'; blend.dispatchEvent(new Event('change', {bubbles: true}));
+      const opacity = document.getElementById('sliderLayerOpacity');
+      opacity.value = '40'; opacity.dispatchEvent(new Event('input', {bubbles: true}));
+      await wait(700);
+      const screened = await paint();
+      const applied = window.multiTimeline.clips.find(entry => entry.id === v2.id);
+      const manifest = (window.multiTimeline.getExportManifest().clips || []).find(entry => entry.track === 'video-2');
+      window.multiTimeline.updateClip(v2.id, {blend: 'multiply', opacity: 1});
+      await wait(700);
+      const multiplied = await paint();
+      window.multiTimeline.updateClip(v2.id, {blend: 'normal', opacity: 0});
+      await wait(700);
+      const hidden = await paint();
+      window.multiTimeline.updateClip(v2.id, {opacity: 1, blend: 'normal', chroma: {enabled: true, color: '#00ff00', tolerance: 30, softness: 18, spill: 45}});
+      await wait(1400);
+      const keyed = await paint();
+      const chromaStatus = document.getElementById('chromaStatus')?.textContent || '';
+      window.multiTimeline.updateClip(v2.id, {chroma: {enabled: false}, opacity: 0});
+      await wait(500);
+      return {selected, visible, screened, multiplied, hidden, keyed, chromaStatus,
+        clip: {blend: applied.blend, opacity: applied.opacity}, manifest: manifest ? {track: manifest.track, blend: manifest.blend, opacity: manifest.opacity} : null};
+    });
+    assert.equal(overlay.selected, true, 'clicking the V2 clip selects the overlay it blends');
+    assert.equal(overlay.clip.blend, 'screen', 'the blend control writes to the V2 overlay clip');
+    assert.equal(overlay.clip.opacity, 0.4, 'the opacity control writes to the V2 overlay clip');
+    assert.deepEqual(overlay.manifest, {track: 'video-2', blend: 'screen', opacity: 0.4}, 'the export manifest carries the overlay blend and opacity');
+    assert.ok(Math.abs(overlay.multiplied.luminance - overlay.hidden.luminance) > 2, `the V2 overlay reshapes the exported frame (${overlay.hidden.luminance} hidden vs ${overlay.multiplied.luminance} at multiply)`);
+    assert.ok(Math.abs(overlay.visible.luminance - overlay.screened.luminance) > 1, `the blend and opacity reach the export (${overlay.visible.luminance} normal vs ${overlay.screened.luminance} screen at 40%)`);
+    assert.match(overlay.chromaStatus, /WebGL/, `the chroma key reports its WebGL path: ${overlay.chromaStatus}`);
+    assert.ok(overlay.keyed.green < overlay.visible.green * 0.6, `keying the overlay removes its green from the exported frame (${overlay.visible.green} -> ${overlay.keyed.green})`);
+
+    // --- 15. Text, captions and stickers keep their style and timing in the export -------------
+    const styled = await page.evaluate(async () => {
+      const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const main = window.multiTimeline.clips.find(entry => entry.track === 'main');
+      const plan = window.multiTimeline.getExportPlan(window.multiTimeline.clips);
+      const span = Math.min(plan.duration, window.multiTimeline.clipOutputDuration(main));
+      window.multiTimeline.layers.slice().forEach(layer => window.multiTimeline.removeLayer(layer.id));
+      window.multiTimeline.captions.slice().forEach(caption => window.multiTimeline.removeCaption(caption.id));
+      const text = 'TYPEWRITER REVEAL LINE ONE TWO THREE FOUR FIVE';
+      const layer = window.multiTimeline.addLayer({kind: 'text', text, start: 0, end: span, style: {font: 'serif', size: 58, color: '#ff00ff', stroke: '#000000', strokeWidth: 4, background: '#112233', backgroundOpacity: 0.5, align: 'left', animation: 'typewriter'}});
+      // Inside the frame: the transform is normalised, so -0.5..0.5 is the visible band.
+      const sticker = window.multiTimeline.addLayer({kind: 'sticker', sticker: 'star', start: 0, end: span, transform: {x: -0.28, y: 0.22, scale: 0.32}});
+      const caption = window.multiTimeline.addCaption({text: 'caption window', start: 0.1, end: span * 0.55});
+      await window.FilmVideo.preloadStickerImages();
+      await wait(600);
+      const render = async time => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 480; canvas.height = 270;
+        const ctx = canvas.getContext('2d', {willReadFrequently: true});
+        ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        await window.multiTimeline.renderOverlays(canvas, time, window.multiTimeline.getExportPlan(window.multiTimeline.clips));
+        return {data: ctx.getImageData(0, 0, canvas.width, canvas.height).data, width: canvas.width, height: canvas.height};
+      };
+      const magenta = frame => { let count = 0; for (let i = 0; i < frame.data.length; i += 4) if (frame.data[i] > 150 && frame.data[i + 2] > 150 && frame.data[i + 1] < 110) count += 1; return count; };
+      // The caption sits in the bottom band of the frame: white text on a dark box.
+      const captionBand = frame => {
+        let count = 0;
+        const start = Math.floor(frame.height * 0.75) * frame.width;
+        for (let index = start; index < frame.width * frame.height; index += 1) {
+          const offset = index * 4;
+          if (frame.data[offset] > 200 && frame.data[offset + 1] > 200 && frame.data[offset + 2] > 200) count += 1;
+        }
+        return count;
+      };
+      const difference = (a, b) => { let total = 0; for (let index = 0; index < a.data.length; index += 4) if (Math.abs(a.data[index] - b.data[index]) > 16) total += 1; return total; };
+      const early = await render(span * 0.1);
+      const late = await render(span * 0.62);
+      const inCaption = await render(span * 0.3);
+      const outCaption = await render(span * 0.8);
+      window.multiTimeline.removeLayer(sticker.id);
+      await wait(400);
+      const withoutSticker = await render(span * 0.62);
+      const layersAfter = window.multiTimeline.layers.length;
+      const captionsAfter = window.multiTimeline.captions.length;
+      return {early: magenta(early), late: magenta(late), inCaption: captionBand(inCaption), outCaption: captionBand(outCaption),
+        stickerDiff: difference(late, withoutSticker), layersAfter, captionsAfter,
+        caption: caption ? {start: caption.start, end: caption.end} : null, style: layer?.style, stickerKind: sticker?.kind};
+    });
+    assert.equal(styled.style.animation, 'typewriter', 'the animation preset is stored on the text layer');
+    assert.equal(styled.style.font, 'serif', 'the font choice is stored on the text layer');
+    assert.equal(styled.style.background, '#112233', 'the background colour is stored on the text layer');
+    assert.equal(styled.style.strokeWidth, 4, 'the stroke width is stored on the text layer');
+    assert.ok(styled.late > styled.early * 1.5, `the typewriter types the line out as it plays (${styled.early} -> ${styled.late} text pixels)`);
+    assert.equal(styled.stickerKind, 'sticker', 'the built-in sticker becomes a sticker layer');
+    assert.ok(styled.stickerDiff > 100, `the sticker reaches the exported frame (${styled.stickerDiff} pixels changed)`);
+    assert.ok(styled.caption && styled.caption.end > styled.caption.start, 'a manual caption keeps its start and end time');
+    assert.ok(styled.inCaption - styled.outCaption > 40, `the caption only paints inside its window (${styled.inCaption} vs ${styled.outCaption} caption pixels)`);
+    assert.ok(styled.layersAfter >= 1 && styled.captionsAfter >= 1, `the title and the caption line are both still on the scene (${styled.layersAfter} layers, ${styled.captionsAfter} captions)`);
+
+    // --- 16. A phone keeps the panel usable ------------------------------------------------
     const phone = await context.newPage();
     await phone.setViewportSize({width: 390, height: 844});
     await phone.goto(`http://127.0.0.1:${PORT}/index.html`, {waitUntil: 'domcontentloaded'});

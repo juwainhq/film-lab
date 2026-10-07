@@ -1030,7 +1030,8 @@
     node.parentElement.appendChild(ghost);
     node.classList.add('mtl-dragging');
     activePointer = { id: event.pointerId, clip, edge, node, ghost, startX: event.clientX, startY: event.clientY, initialStart: clip.start, initialTrack: clip.track, initialTrimStart: clip.trimStart, initialTrimEnd: clip.trimEnd, historySaved: false, generatedTrack: null };
-    node.setPointerCapture(event.pointerId);
+    // A pointer that is already gone (or a synthesized event) must not abort the drag setup.
+    try { node.setPointerCapture(event.pointerId); } catch (error) {}
     node.addEventListener('pointermove', onClipPointerMove);
     node.addEventListener('pointerup', onClipPointerEnd, { once: true });
     node.addEventListener('pointercancel', onClipPointerEnd, { once: true });

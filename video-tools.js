@@ -296,20 +296,28 @@
       style: normalizeTextStyle(source.style || fallback.style),
       transform: {
         x: round(clamp(finite(source.transform?.x, 0), -2, 2), 4),
-        y: round(clamp(finite(source.transform?.y, 0.55), -2, 2), 4),
+        // Normalised to the frame, so the visible range is -0.5..0.5. The default parks a new title
+        // in the lower third: a value outside that band paints off the canvas, which made a fresh
+        // title invisible until it was dragged.
+        y: round(clamp(finite(source.transform?.y, 0.3), -2, 2), 4),
       },
       opacity: normalizeOpacity(source.opacity, 1),
       blend: normalizeBlend(source.blend),
     };
   }
-  // The animation state at a layer's own progress (0 at its start, 1 at its end).
-  function textAnimationState(animation, progress) {
+  // Typewriter text types at a steady pace rather than snapping in: a layer that lasts longer
+  // reveals more of its characters, and a long caption takes longer to finish than a short title.
+  const TYPING_CHARACTERS_PER_SECOND = 18;
+  // The animation state at a layer's own progress (0 at its start, 1 at its end). The optional
+  // duration is what makes the typewriter time based instead of progress based.
+  function textAnimationState(animation, progress, duration = 3) {
     const t = clamp(progress, 0, 1);
+    const seconds = t * Math.max(0.05, finite(duration, 3));
     const inWindow = Math.min(1, t / 0.22), outWindow = Math.min(1, (1 - t) / 0.18);
     switch (String(animation || 'none')) {
       case 'fade': return {alpha: Math.min(inWindow, outWindow), scale: 1, characters: Infinity};
       case 'pop': return {alpha: Math.min(1, inWindow * 1.6), scale: 0.7 + 0.35 * inWindow + 0.02 * Math.sin(Math.PI * Math.min(1, inWindow)), characters: Infinity};
-      case 'typewriter': return {alpha: 1, scale: 1, characters: Math.ceil(t * 1.15 * 1000)};
+      case 'typewriter': return {alpha: 1, scale: 1, characters: Math.ceil(seconds * TYPING_CHARACTERS_PER_SECOND)};
       default: return {alpha: 1, scale: 1, characters: Infinity};
     }
   }
@@ -557,7 +565,8 @@ void main(){
     const unit = height / REFERENCE_HEIGHT;
     const style = layer.style || {};
     const font = TEXT_FONTS.find((entry) => entry.id === style.font) || TEXT_FONTS[0];
-    const animation = textAnimationState(style.animation, layerProgress(layer, time));
+    const span = Math.max(0.05, finite(layer.end, 0) - finite(layer.start, 0));
+    const animation = textAnimationState(style.animation, layerProgress(layer, time), span);
     const size = Math.max(4, finite(style.size, 72) * unit);
     const state = {alpha: animation.alpha * normalizeOpacity(layer.opacity, 1), scale: animation.scale, characters: animation.characters};
     if (state.alpha <= 0.002) return;
@@ -724,7 +733,7 @@ void main(){
     defaultPropertyValue, normalizePropertyValue, normalizeKeyframes, hasKeyframes, keyframeTimes,
     sampleProperty, sampleKeyframes, keyframeAt, toggleKeyframe, setKeyframeEasing, moveKeyframe, removeKeyframesAt,
     SPEED_MIN, SPEED_MAX, SPEED_RAMPS, normalizeSpeed, rampRate, sourceOffsetForLocal, clipOutputDuration,
-    TEXT_FONTS, TEXT_ANIMATIONS, TEXT_ALIGNS, normalizeTextStyle, normalizeTextLayer, textAnimationState,
+    TEXT_FONTS, TEXT_ANIMATIONS, TEXT_ALIGNS, TYPING_CHARACTERS_PER_SECOND, normalizeTextStyle, normalizeTextLayer, textAnimationState,
     normalizeCaption, normalizeCaptions, captionAt, CAPTION_STYLE, parseSubtitleStamp, parseSubtitles, splitCaption, mergeCaptions,
     STICKERS, stickerById, stickerDataUrl, normalizeStickerLayer, normalizeLayer, layerProgress,
     CHROMA_DEFAULT, normalizeChromaKey, normalizeHex, hexToRgb, rgbToHex, chromaUniforms, chromaKeyPixels,

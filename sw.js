@@ -4,7 +4,7 @@
 // Cache-first, so the shell is only re-fetched when this name changes.
 // Bump the version whenever index.html or any precached file changes, otherwise
 // returning visitors keep seeing the copy they cached on their first visit.
-const CACHE = 'filmlab-v15';
+const CACHE = 'filmlab-v16';
 const APP_SCOPE = self.registration.scope;
 const PRECACHE = [
   './',
