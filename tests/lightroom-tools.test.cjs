@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
+const {spawnSync} = require('node:child_process');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = Number(process.env.FILM_LAB_LIGHTROOM_PORT || 8974);
@@ -314,6 +315,23 @@ const GREY_CARD = {x: 0.09, y: 0.36, w: 0.26, h: 0.28};
 const LEFT_BAND = {x: 0.02, y: 0.1, w: 0.2, h: 0.8};
 const RIGHT_BAND = {x: 0.78, y: 0.1, w: 0.2, h: 0.8};
 const corner = (x, y) => ({x, y, w: 0.08, h: 0.08});
+
+test('the grain period detector stays quiet on noise and fires on a known repeat', () => {
+  // scripts/verify-film-grain.cjs measures the composite-shader grain in a real browser; the number
+  // it leans on is the largest upward step in the autocorrelation after the grain blob (a tile,
+  // grid or streak shows up as a second lobe there). Its own --self-test runs that detector against
+  // synthetic fields with known answers, so the measurement cannot quietly become meaningless.
+  const run = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'verify-film-grain.cjs'), '--self-test'], {encoding: 'utf8'});
+  assert.equal(run.status, 0, run.stdout + run.stderr);
+  const line = name => run.stdout.split('\n').find(row => row.includes(name)) || '';
+  const rise = name => Number((line(name).match(/biggestRise ([0-9.]+)/) || [])[1]);
+  assert.match(line('white noise'), /^PASS/, 'white noise must not read as periodic');
+  assert.match(line('soft blobs'), /^PASS/, 'a soft random field must not read as periodic');
+  assert.match(line('8 px tile'), /^PASS/, 'a known 8 px repeat must be caught');
+  assert.ok(rise('white noise') < 0.05, `white noise scored ${rise('white noise')}`);
+  assert.ok(rise('soft blobs') < 0.05, `soft blobs scored ${rise('soft blobs')}`);
+  assert.ok(rise('8 px tile') > 0.3, `the 8 px tile must fire, scored ${rise('8 px tile')}`);
+});
 
 test('the eyedropper, Auto WB, Auto tone and the draggable split drive real pixels', {timeout: 420000}, async t => {
   if (!available) {

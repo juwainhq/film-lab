@@ -14,13 +14,16 @@
     "android:add": "npm run web:stage && cap add android",
     "android:sync": "npm run web:stage && cap sync android",
     "android:open": "cap open android",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "verify:grain": "node scripts/verify-film-grain.cjs"
   },
   "build": {
     "appId": "com.filmlab.app",
     "productName": "Film Lab",
     "publish": null,
-    "directories": { "output": "dist-electron" },
+    "directories": {
+      "output": "dist-electron"
+    },
     "files": [
       "**/*",
       "!node_modules/**",
@@ -31,9 +34,19 @@
       "!scripts/**",
       "!.github/**"
     ],
-    "win": { "target": "nsis", "icon": "icons/icon-512.png" },
-    "mac": { "target": "dmg", "icon": "icons/icon-512.png" },
-    "linux": { "target": "AppImage", "icon": "icons/icon-512.png", "category": "Graphics" }
+    "win": {
+      "target": "nsis",
+      "icon": "icons/icon-512.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icons/icon-512.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "icons/icon-512.png",
+      "category": "Graphics"
+    }
   },
   "dependencies": {
     "@capacitor/core": "^5.0.0",
