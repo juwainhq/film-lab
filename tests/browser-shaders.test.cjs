@@ -283,6 +283,154 @@ test('the grading shaders compile in a real Chromium and the look cards keep the
   }
 });
 
+/* A flat grey plate: the film grain's own pattern is the only thing on it, so a tile, a grid or a
+   vertical band is impossible to miss in the autocorrelation below. */
+function greyFixture() {
+  const target = path.join(os.tmpdir(), 'filmlab-browser-test-grey.png');
+  if (fs.existsSync(target) && fs.statSync(target).size > 500) return target;
+  const zlib = require('node:zlib');
+  const width = 512, height = 512, raw = Buffer.alloc((width * 3 + 1) * height);
+  for (let y = 0; y < height; y++) {
+    const row = y * (width * 3 + 1);
+    raw[row] = 0;
+    for (let x = 0; x < width; x++) { raw[row + 1 + x * 3] = 128; raw[row + 2 + x * 3] = 128; raw[row + 3 + x * 3] = 128; }
+  }
+  const chunk = (type, body) => {
+    const length = Buffer.alloc(4); length.writeUInt32BE(body.length);
+    const crcTable = [];
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c >>> 0; }
+    let crc = 0xffffffff;
+    for (const byte of Buffer.concat([Buffer.from(type), body])) crc = crcTable[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+    const crcBuffer = Buffer.alloc(4); crcBuffer.writeUInt32BE((crc ^ 0xffffffff) >>> 0);
+    return Buffer.concat([length, Buffer.from(type), body, crcBuffer]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
+  header[8] = 8; header[9] = 2; header[10] = 0; header[11] = 0; header[12] = 0;
+  fs.writeFileSync(target, Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0)),
+  ]));
+  return target;
+}
+
+test('film grain is soft, random and untiled on a flat plate', {timeout: 240000}, async t => {
+  if (!available) {
+    t.skip('Playwright and/or a Chromium build are not available in this environment');
+    return;
+  }
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  // Comments explain the old shader, so the source checks look only at executable text.
+  const shaderCode = html.replace(/\/\*[\s\S]*?\*\//g, '');
+  // The old float hash lost precision at large coordinates and repeated; the integer one cannot.
+  assert.doesNotMatch(shaderCode, /fract\(p\*vec2\(123\.34,345\.45\)/, 'the old float grain hash is back');
+  assert.doesNotMatch(shaderCode, /grainValueNoise/, 'the lattice value noise is back');
+  assert.match(shaderCode, /uint grainHash\(uint value\)/, 'the grain needs the integer hash');
+  assert.match(shaderCode, /grainFields\(/, 'the grain needs the jittered-cell sampler');
+  const server = await startStaticServer();
+  const browser = await playwright.chromium.launch({
+    executablePath: chromiumPath,
+    args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+    env: {...process.env, LD_LIBRARY_PATH: CHROME_LIBS},
+  });
+  try {
+    const context = await browser.newContext({viewport: {width: 1440, height: 900}});
+    await context.route('https://fonts.googleapis.com/**', route => route.fulfill({body: '', contentType: 'text/css'}));
+    await context.route('https://fonts.gstatic.com/**', route => route.fulfill({body: '', contentType: 'font/woff2'}));
+    const page = await context.newPage();
+    await page.goto(`http://127.0.0.1:${PORT}/index.html`, {waitUntil: 'domcontentloaded'});
+    await page.waitForFunction(() => document.getElementById('presetSelect')?.options.length > 1, null, {timeout: 30000});
+    await page.setInputFiles('#photoPickerInput', greyFixture());
+    await page.waitForFunction(() => {
+      const canvas = document.getElementById('glCanvas');
+      return document.body.dataset.mode === 'photo' && canvas && canvas.width > 300;
+    }, null, {timeout: 60000});
+    await page.waitForTimeout(1200);
+    await page.evaluate(() => {
+      for (const [id, value] of Object.entries({sliderGrain: 80, sliderGrainSize: 0, sliderGrainRough: 50, sliderGrainColor: 35, sliderGrainLuma: 50, sliderGrainSoft: 20})) {
+        const slider = document.getElementById(id);
+        slider.value = String(value);
+        slider.dispatchEvent(new Event('input', {bubbles: true}));
+      }
+    });
+    await page.waitForTimeout(900);
+
+    /* Mean, shape and autocorrelation, read straight off the rendered canvas. */
+    const read = () => page.evaluate(() => {
+      const canvas = document.getElementById('glCanvas');
+      const scratch = document.createElement('canvas');
+      scratch.width = canvas.width; scratch.height = canvas.height;
+      const context = scratch.getContext('2d');
+      context.drawImage(canvas, 0, 0);
+      const {data} = context.getImageData(0, 0, scratch.width, scratch.height);
+      const luma = new Float64Array(scratch.width * scratch.height);
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) luma[p] = (data[i] + data[i + 1] + data[i + 2]) / 3;
+      return {width: scratch.width, height: scratch.height, luma: Array.from(luma)};
+    });
+    const frame = await read();
+    const {width, height, luma} = frame;
+    const border = 24;
+    let sum = 0, count = 0;
+    for (let y = border; y < height - border; y++) for (let x = border; x < width - border; x++) { sum += luma[y * width + x]; count++; }
+    const mean = sum / count;
+    let m2 = 0, m4 = 0;
+    for (let y = border; y < height - border; y++) for (let x = border; x < width - border; x++) { const d = luma[y * width + x] - mean; m2 += d * d; m4 += d * d * d * d; }
+    m2 /= count; m4 /= count;
+    const sigma = Math.sqrt(m2), kurtosis = m4 / (m2 * m2);
+    assert.ok(Math.abs(mean - 128) < 1.5, `grain shifted the exposure by ${(mean - 128).toFixed(2)} levels`);
+    assert.ok(sigma > 4, `amount 80 produced no visible grain (sigma ${sigma.toFixed(2)})`);
+
+    /* Autocorrelation on the centre window: the axis profiles must decay and stay decayed, which is
+       exactly what the tiled value noise failed (it read 0.98 at lag 16). */
+    const size = Math.min(140, width - 2 * border, height - 2 * border);
+    const ox = Math.round((width - size) / 2), oy = Math.round((height - size) / 2);
+    let windowMean = 0;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) windowMean += luma[(oy + y) * width + ox + x];
+    windowMean /= size * size;
+    const centred = new Float64Array(size * size);
+    let variance = 0;
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      const value = luma[(oy + y) * width + ox + x] - windowMean;
+      centred[y * size + x] = value; variance += value * value;
+    }
+    variance /= size * size;
+    const correlate = (dx, dy) => {
+      let total = 0, n = 0;
+      for (let y = 0; y < size; y++) {
+        const sy = y + dy; if (sy < 0 || sy >= size) continue;
+        for (let x = 0; x < size; x++) { const sx = x + dx; if (sx < 0 || sx >= size) continue; total += centred[y * size + x] * centred[sy * size + sx]; n++; }
+      }
+      return variance ? (total / n) / variance : 0;
+    };
+    const axisX = [], axisY = [];
+    for (let lag = 0; lag <= 40; lag++) { axisX.push(correlate(lag, 0)); axisY.push(correlate(0, lag)); }
+    assert.ok(axisX[0] > 0.7 && axisY[0] > 0.7, 'the grain has no local structure at all');
+    // A grain about two pixels wide is correlated over its own size and then forgets: past lag 6
+    // the profile must stay flat. The tiled value noise this replaces read 0.66-0.98 out there.
+    const axisPeriod = Math.max(...axisX.slice(6).map(Math.abs), ...axisY.slice(6).map(Math.abs));
+    assert.ok(axisPeriod < 0.3, `the grain repeats along an axis (max |correlation| ${axisPeriod.toFixed(3)} past lag 6)`);
+    let radialPeriod = 0;
+    for (let radius = 6; radius <= 40; radius++) {
+      const steps = Math.max(8, Math.round(radius * 6));
+      for (let step = 0; step < steps; step++) {
+        const angle = step / steps * Math.PI * 2;
+        radialPeriod = Math.max(radialPeriod, Math.abs(correlate(Math.round(Math.cos(angle) * radius), Math.round(Math.sin(angle) * radius))));
+      }
+    }
+    assert.ok(radialPeriod < 0.35, `the grain has a repeating period (max |correlation| ${radialPeriod.toFixed(3)} at radius 6-40)`);
+    assert.ok(kurtosis > 2.4 && kurtosis < 6, `the grain histogram is not bell shaped (kurtosis ${kurtosis.toFixed(2)})`);
+
+    /* A photo's grain is one stable field: reading it again without touching anything is identical. */
+    const second = await read();
+    const identical = second.luma.slice(0, 2000).every((value, index) => value === frame.luma[index]);
+    assert.ok(identical, 'the photo grain changed while nothing was touched');
+    assert.doesNotMatch(shaderCode, /u_grainStrength\*0\.0/, 'the grain amplitude was zeroed out');
+  } finally {
+    await browser.close();
+    server.close();
+  }
+});
+
 test('a grading shader that will not compile shows the visible fallback notice', {timeout: 180000}, async t => {
   if (!available) {
     t.skip('Playwright and/or a Chromium build are not available in this environment');

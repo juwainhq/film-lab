@@ -149,7 +149,9 @@ test('negative effects are rendered as subtraction, inverse grain, blur, or brig
   assert.match(script, /sign\(u_bloomStrength\)\*bloomFinal/);
   assert.match(script, /hall\.rgb \* u_hallationStrength/);
   assert.match(script, /if\(abs\(u_grainStrength\)>0\.001\)/);
-  assert.match(script, /float intensity=u_grainStrength\*0\.22/);
+  // Grain is signed: a negative Amount subtracts the same field instead of adding it.
+  assert.match(script, /float amplitude=u_grainStrength\*0\.18\*tone\*envelope/);
+  assert.match(script, /col=clamp\(col\+grain\*amplitude,0\.0,1\.0\)/);
   assert.match(script, /if\(u_strength<0\.0\)\{[\s\S]*?mix\(center\.rgb, blur\.rgb, amount\)/);
   assert.match(script, /dot\(uv2,uv2\)\*u_vignStrength/);
   assert.match(script, /Math\.abs\(params\.bloom\)/);

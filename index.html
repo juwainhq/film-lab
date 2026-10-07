@@ -4546,6 +4546,7 @@ void main(){
 }`;
 const fsComposite=`#version 300 es
 precision highp float;
+precision highp int;
 in vec2 v_texCoord;
 uniform sampler2D u_base; uniform sampler2D u_bloom; uniform sampler2D u_hallation;
 uniform sampler2D u_lensBlur; uniform sampler2D u_lensMask; uniform float u_lensEnabled; uniform float u_lensStrength; uniform float u_lensFeather; uniform float u_lensMaskInvert; uniform vec2 u_lensMaskTexel;
@@ -4596,17 +4597,66 @@ float sampleLensMask(vec2 uv){
     +texture(u_lensMask,clamp(clamped+vec2(-f.x,f.y),vec2(0.0),vec2(1.0))).r+texture(u_lensMask,clamp(clamped+vec2(f.x,f.y),vec2(0.0),vec2(1.0))).r)*0.075;
   return blurred;
 }
-float grainHash(vec2 p,float seed){
-  p=fract(p*vec2(123.34,345.45)+vec2(seed*0.013,seed*0.071));
-  p+=dot(p,p+34.345);
-  return fract(p.x*p.y);
+/* Film grain, Lightroom style. White noise from a 32-bit integer hash (Melissa O'Neill's PCG
+   finaliser), read through a small Gaussian kernel over a jittered cell grid: every cell owns one
+   random value and one random centre offset, so grain is round and soft, and no lattice, axis or
+   tile can show. The old float hash (fract(p*vec2(123.34,345.45))) lost precision as the pixel
+   coordinates grew and repeated in bands, and its bilinear value-noise lattice added grid-aligned
+   structure. Integer maths here never loses precision, whatever the image size. */
+uint grainHash(uint value){
+  value=value*747796405u+2891336453u;
+  uint word=((value>>((value>>28u)+4u))^value)*277803737u;
+  return (word>>22u)^word;
 }
-float grainValueNoise(vec2 p,float seed){
-  vec2 cell=floor(p), local=fract(p);
-  local=local*local*(3.0-2.0*local);
-  float a=grainHash(cell,seed), b=grainHash(cell+vec2(1.0,0.0),seed);
-  float c=grainHash(cell+vec2(0.0,1.0),seed), d=grainHash(cell+vec2(1.0,1.0),seed);
-  return mix(mix(a,b,local.x),mix(c,d,local.x),local.y)*2.0-1.0;
+uvec2 grainCellKey(vec2 index){
+  // The bias keeps the integer grid positive, so two different cells never hash to one key.
+  return uvec2(ivec2(index)+ivec2(65536));
+}
+float grainUniform(uvec2 key,uint seed,uint salt){
+  return float(grainHash(key.x*1973u^key.y*9277u^seed^salt))*(1.0/2147483648.0)-1.0;
+}
+/* One Gaussian pass over the nine jittered cells around the pixel. Returns the monochrome field
+   and, when colour grain is on, two decorrelated fields for the chroma offset, so colour costs
+   two extra hashes per cell instead of a second blur. */
+vec3 grainFields(vec2 point,float sigma,uint seed,bool chroma){
+  vec2 cell=floor(point);
+  vec3 total=vec3(0.0); float weight=0.0;
+  for(int j=-1;j<=1;j++){
+    for(int i=-1;i<=1;i++){
+      vec2 index=cell+vec2(float(i),float(j));
+      uvec2 key=grainCellKey(index);
+      uint word=grainHash(key.x*1973u^key.y*9277u^seed);
+      // Two independent uniforms out of the one word jitter the cell centre inside its own square.
+      vec2 centre=index+vec2(float(word&0xffffu),float((word>>16u)&0xffffu))*(1.0/65535.0);
+      vec2 delta=point-centre;
+      float influence=exp(-dot(delta,delta)/(2.0*sigma*sigma));
+      total.x+=influence*grainUniform(key,seed,0x2u);
+      if(chroma){
+        total.y+=influence*grainUniform(key,seed,0x3u);
+        total.z+=influence*grainUniform(key,seed,0x5u);
+      }
+      weight+=influence;
+    }
+  }
+  return total/max(weight,1.0e-5);
+}
+/* The rough clumping layer only needs to be broad and low-frequency, so it reads a cross of five
+   jittered cells: enough to break the lattice, cheap enough to run beside the grain itself. */
+float grainClump(vec2 point,float sigma,uint seed){
+  vec2 cell=floor(point);
+  vec2 taps[5]=vec2[5](vec2(0.0,0.0),vec2(1.0,0.0),vec2(-1.0,0.0),vec2(0.0,1.0),vec2(0.0,-1.0));
+  float total=0.0,weight=0.0;
+  for(int t=0;t<5;t++){
+    vec2 index=cell+taps[t];
+    uvec2 key=grainCellKey(index);
+    uint word=grainHash(key.x*1973u^key.y*9277u^seed);
+    vec2 centre=index+vec2(float(word&0xffffu),float((word>>16u)&0xffffu))*(1.0/65535.0);
+    vec2 delta=point-centre;
+    float influence=exp(-dot(delta,delta)/(2.0*sigma*sigma));
+    total+=influence*grainUniform(key,seed,0x7u);
+    weight+=influence;
+  }
+  return total/max(weight,1.0e-5);
 }
 float sampleKeepMask(vec2 uv){
   float value=texture(u_maskBackground,clamp(uv,vec2(0.0),vec2(1.0))).r;
@@ -4788,40 +4838,37 @@ void main(){
 
   // Signed Amount inverts the same film-like pattern when negative.
   if(abs(u_grainStrength)>0.001){
-    float size=max(u_grainSize,0.2);
-    vec2 grainCoord=(v_texCoord*u_resolution)/size;
+    // Grain size is a cell size in output pixels, so the preview (at whatever zoom) and the
+    // full-resolution export agree; the slider walks smoothly from fine to coarse.
+    float cellPixels=1.0+clamp(u_grainSize-0.2,0.0,1.3)*6.2;
+    float sigma=mix(0.55,0.9,clamp(u_grainSoft,0.0,1.0));
     float roughness=clamp(u_grainRough,0.0,1.0);
-    float softness=clamp(u_grainSoft,0.0,1.0);
-    // Quantize time into frame keys. Hashing a new seed per frame avoids a drifting/static pattern.
-    // Speed changes the seed stride; the photo path supplies time and speed as zero.
-    float frameIndex=floor(u_time*240.0);
-    float frameSeed=u_grainSeed+frameIndex*(71.731+u_grainSpeed*13.0);
-
-    // Layer fine, medium, and coarse value-noise octaves; shared coarse structure forms gentle halide-like clumps.
-    float fine=grainValueNoise(grainCoord,frameSeed+3.17);
-    float medium=grainValueNoise(grainCoord*0.5+vec2(13.7,31.9),frameSeed+29.41);
-    float coarse=grainValueNoise(grainCoord*0.25+vec2(47.2,7.3),frameSeed+67.83);
-    float fineWeight=mix(0.62,0.48,softness);
-    float mediumWeight=mix(0.27,0.34,softness);
-    float coarseWeight=1.0-fineWeight-mediumWeight;
-    float grainBase=fine*fineWeight+medium*mediumWeight+coarse*coarseWeight;
-    float clumpEnvelope=mix(1.0,0.78+coarse*0.44,roughness);
-    float monoGrain=grainBase*clumpEnvelope;
-
-    // Color emulsions decorrelate their channel noise; blue carries slightly stronger grain.
-    float redGrain=mix(grainBase,grainValueNoise(grainCoord,frameSeed+109.7),0.68)*clumpEnvelope;
-    float greenGrain=mix(grainBase,grainValueNoise(grainCoord,frameSeed+233.9),0.68)*clumpEnvelope;
-    float blueGrain=mix(grainBase,grainValueNoise(grainCoord,frameSeed+419.3),0.68)*clumpEnvelope;
-    vec3 monochrome=vec3(monoGrain);
-    vec3 chromatic=vec3(redGrain*0.88,greenGrain,blueGrain*1.28);
-    vec3 grainNoise=mix(monochrome,chromatic,clamp(u_grainColor,0.0,1.0));
-
-    // Film grain is most visible in midtones and falls away toward both tonal extremes.
+    bool chroma=clamp(u_grainColor,0.0,1.0)>0.005;
+    // Video: the pattern is a new random field on every frame at the neutral Speed, and turning
+    // Speed down holds it for longer so the grain drifts instead of crawling. The step rate is in
+    // wall-clock seconds, so a 60 fps export keeps the same grain speed as the 24 fps preview. A
+    // photo supplies time and Speed as zero, so its grain is a stable field that never moves while
+    // other sliders do.
+    float grainSteps=max(3.0,26.0*clamp(u_grainSpeed,0.0,3.5)/(1.155));
+    float frameIndex=max(floor(u_time*grainSteps),0.0);
+    uint frameSeed=uint(max(u_grainSeed,0.0))+uint(frameIndex)*2654435761u;
+    vec2 grainPoint=(v_texCoord*u_resolution)/cellPixels;
+    vec3 fields=grainFields(grainPoint,sigma,frameSeed,chroma);
+    // Roughness blends in a lower-frequency layer that varies how the grains clump together.
+    float clump=grainClump(grainPoint*0.34,sigma,frameSeed^0x68bc21ebu);
+    float envelope=mix(1.0,0.62+0.76*clump,roughness);
+    // Film grain is strongest in the midtones and fades smoothly into the deep shadows and the
+    // highlights; Luma Influence sets how strongly that follows the picture's own brightness.
     float grainLuma=clamp(dot(col,vec3(0.2126,0.7152,0.0722)),0.0,1.0);
-    float lumaCurve=0.55+0.45*clamp(u_grainLuma,0.0,1.0);
-    float lumaMask=1.0-abs(grainLuma*2.0-1.0)*lumaCurve;
-    float intensity=u_grainStrength*0.22*lumaMask;
-    col+=grainNoise*intensity;
+    float midTone=clamp(4.0*grainLuma*(1.0-grainLuma),0.0,1.0);
+    float tone=mix(1.0,0.15+0.85*midTone,clamp(u_grainLuma,0.0,1.0));
+    // The colour offset is chroma-only (zero luminance), so it never shifts the brightness.
+    vec3 grain=vec3(fields.x);
+    if(chroma) grain+=(fields-vec3(dot(fields,vec3(0.2126,0.7152,0.0722))))*clamp(u_grainColor,0.0,1.0)*0.6;
+    // A soft additive in the perceptual space the composite already works in: symmetric, so the
+    // mean is untouched, and gentle enough that nothing clips or bands.
+    float amplitude=u_grainStrength*0.18*tone*envelope;
+    col=clamp(col+grain*amplitude,0.0,1.0);
   }
 
   // Lightroom convention: negative strength darkens the corners, positive lightens them.

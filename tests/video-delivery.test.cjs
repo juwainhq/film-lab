@@ -193,7 +193,7 @@ test('the editor wires every new control and the service worker ships the module
   assert.match(social, /function videoArgs\(\{fps = 24, start = 0, duration, container = 'mp4', quality = 'medium', audio = true, codec, source = 'source-video', output, crf, bitrate\}\)/);
   assert.match(social, /function muxVideoArgs\(\{start = 0, duration, container = 'mp4', audio = true, source = 'source-video', extraInputs = \[\], audioGraph = null, output\}\)/);
   // Cache bump + precache so the offline shells get the new module.
-  assert.match(sw, /const CACHE = 'filmlab-v19';/);
+  assert.match(sw, /const CACHE = 'filmlab-v20';/);
   assert.match(sw, /'audio-tools\.js'/);
 });
 

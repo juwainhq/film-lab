@@ -90,6 +90,6 @@ test('toggling re-fits the preview through the existing routine and never touche
 });
 
 test('the service worker cache was bumped for the carousel strip change', () => {
-  assert.match(serviceWorker, /const CACHE = 'filmlab-v19';/);
+  assert.match(serviceWorker, /const CACHE = 'filmlab-v20';/);
   assert.doesNotMatch(serviceWorker, /filmlab-v5/);
 });

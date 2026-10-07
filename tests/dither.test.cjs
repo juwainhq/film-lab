@@ -159,8 +159,11 @@ test('protect and erase brushes track image coordinates through zoom, including 
 test('still-photo grain remains frozen despite Speed; video grain can still animate', () => {
   assert.match(script, /'u_grainSpeed'\),isVideo \? params\.grainSpeed : 0/);
   assert.match(script, /'u_time'\),isVideo \? \(timeMs\?\?performance\.now\(\)\)\*0\.001 : 0/);
-  assert.match(composite, /float frameIndex=floor\(u_time\*240\.0\)/);
-  assert.match(composite, /float frameSeed=u_grainSeed\+frameIndex\*\(71\.731\+u_grainSpeed\*13\.0\)/);
+  // The pattern is reseeded from the frame index, whose step rate follows Speed; a photo supplies
+  // u_time 0 so its grain is one stable field.
+  assert.match(composite, /float grainSteps=max\(3\.0,26\.0\*clamp\(u_grainSpeed,0\.0,3\.5\)\/\(1\.155\)\)/);
+  assert.match(composite, /float frameIndex=max\(floor\(u_time\*grainSteps\),0\.0\)/);
+  assert.match(composite, /uint frameSeed=uint\(max\(u_grainSeed,0\.0\)\)\+uint\(frameIndex\)\*2654435761u/);
   assert.doesNotMatch(composite, /pixel\+vec2\(t\*7\.3,t\*5\.9\)/);
   assert.match(html, /id="grainSpeedRow" hidden[\s\S]*?<div class="subLabel">Speed<\/div>/);
   assert.ok(script.includes("$('grainSpeedRow').hidden=!isVideo || !hasContent"));
