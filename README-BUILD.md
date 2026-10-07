@@ -37,10 +37,14 @@ npm run electron
 ### Build for your platform
 
 ```sh
-npm run build:win    → dist-electron/Film Lab Setup.exe
-npm run build:mac    → dist-electron/Film Lab.dmg
-npm run build:linux  → dist-electron/Film Lab.AppImage
+npm run build:win    → dist-electron/Film Lab Setup <version>.exe
+npm run build:mac    → dist-electron/Film Lab-<version>-<arch>.dmg
+npm run build:linux  → dist-electron/Film Lab-<version>.AppImage
 ```
+
+`electron-builder` stamps the `version` from `package.json` into those names, so the current
+build is `Film Lab Setup 2.0.0.exe`. The rolling `latest-build` release republishes the same
+files under fixed names (see below) so download links do not change between versions.
 
 Each `build:*` script runs `electron-builder`, which writes its output to `dist-electron/`.
 Windows builds need to run on Windows (or Wine), macOS builds on macOS — use the
@@ -48,23 +52,27 @@ tag-driven workflow below to get all three at once.
 
 ### Ship a release from GitHub Actions
 
-`.github/workflows/build.yml` runs on every push to `main` and when you push a version tag:
+`.github/workflows/build.yml` runs on every push to `main` and to `arena/01a102e1-film-lab`, when
+you push a version tag, and on demand through **Actions → Build Desktop Apps → Run workflow**
+(`workflow_dispatch`):
 
 ```sh
-git tag v1.0.0
-git push origin v1.0.0
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 The workflow runs `windows-latest`, `macos-latest` and `ubuntu-latest` desktop builds in
 parallel alongside an `android` job that stages the web app, syncs Capacitor and runs
 `./android/gradlew assembleDebug -p android` to produce `film-lab-android` (`app-debug.apk`).
 Once all four builds finish, a final `release` job publishes a GitHub Release named
-`Film Lab <tag>` (for example `Film Lab v1.0.0`) on tag pushes — or creates/updates a
-rolling `latest-build` release on pushes to `main` — with the Windows `.exe`, macOS `.dmg`,
-Linux `.AppImage` and Android `.apk` attached as downloadable assets, so
-[the latest release](https://github.com/juwainhq/film-lab/releases/latest) always has the
-freshest downloads. The builds are unsigned, so Windows SmartScreen, macOS Gatekeeper and
-Android Play Protect will show an "unidentified developer" warning on first install.
+`Film Lab <tag>` (for example `Film Lab v2.0.0`) on tag pushes — or replaces the rolling
+`latest-build` release on pushes to `main` or the arena branch, and via `workflow_dispatch` —
+with the Windows `.exe`, macOS `.dmg`, Linux `.AppImage` and Android `.apk` attached as
+downloadable assets. Those rolling assets keep fixed names (`FilmLab-Setup.exe`, `FilmLab.dmg`,
+`FilmLab.AppImage`, `FilmLab.apk`), so the download links stay valid even though the app version
+changes; tagged releases keep electron-builder's version-stamped names. The builds are unsigned,
+so Windows SmartScreen, macOS Gatekeeper and Android Play Protect will show an "unidentified
+developer" warning on first install.
 
 ### Notes on how the packaged app loads the site
 

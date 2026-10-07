@@ -62,7 +62,25 @@ The additive multi-track editor starts with **V1 / V2**, **PHOTO 1 / PHOTO 2**, 
 
 A single **Text & Captions** layer can be styled with font, size, and color, dragged on the preview, shown or hidden for the clip, and positioned with simple timeline keyframes. Captions are composited into video output. Dropping another video onto the canvas replaces the current clip.
 
-Choose **Original / 1080p / 720p**, **MP4 / WebM**, and **Low / Medium / High** quality. Resolution, format, quality, and the current trim are visible in the Video Export workspace. Video exports preserve the source aspect ratio; Instagram crop and frame-format choices and still-image export buttons are photo-only. MP4 uses H.264 with AAC source audio when present; WebM uses VP8 with Opus. Keep source audio can be disabled in More video options. All applicable WebGL effects remain active in video export, while Dither/Halftone are unavailable in Video Mode. Preview zoom never affects output framing. Output is 24 fps, so trim boundaries resolve to frame precision. Output dimensions are padded to even values where needed for the codec.
+### Delivery presets
+
+Choose a **frame**: Original, 720p, 1080p, or 4K; **24 / 30 / 60 fps**; a **bitrate** of Economy (4 Mbps), Standard (8), High (16), or Max (28); **MP4 / WebM**; and **Low / Medium / High** frame quality. The panel shows the exact **output size, frame rate, bitrate, and an estimated file size** for the current edit, and the export progress dialog reports the same numbers while it encodes. The chosen frame rate drives the encoder, so trim boundaries resolve to that frame's precision. Output dimensions are padded to even values where needed for the codec, and a cropped or resized frame is scaled from the unrounded crop, so a 4K vertical Reel is exactly 2160 × 3840.
+
+### Aspect presets and auto-reframe
+
+**9:16, 1:1, 4:5, and 16:9** pills crop the exported Reel to a platform's shape, and a draggable **focus dot** chooses which part of the frame survives the crop — drag it on the preview, or use **Centre** to reset it. **Auto-reframe** analyses the current frame's saliency and puts the focus point on the busiest region. The pills and the sidebar's own crop row are the same setting in both directions, and the export uses exactly the frame the panel reports.
+
+### Stabilisation and looks
+
+Stabilisation is an optional **second pass over the finished file** with a strength slider: the editor asks the engine for `vidstab` when the build has it and falls back to `deshake` otherwise. Audio is copied through untouched, and if the engine cannot stabilise at all the export finishes normally and says so instead of failing.
+
+The **Look / LUT** panel applies any `.cube` LUT — the same registry the Grade tab fills — to **one clip or the whole timeline**, with a strength slider (0–100%). A clip's own look wins over the timeline look, and the export resolves the look per clip, so a look on one clip only touches that clip. The strength is mixed in the grading shader, so 0% is exactly the ungraded pixel. Import a LUT in either panel and both lists update.
+
+### Audio lane
+
+The Audio panel draws the clip's decoded **waveform** with the volume automation on top. Set **gain**, **fade in**, **fade out**, **volume keyframes** at the playhead, a one-click **Normalise** (`loudnorm`), and **background-noise reduction** (`afftdn`, 3–30 dB) with room / HVAC / street presets. **Record voice** captures a take with the microphone (MediaRecorder) and mixes it into the export under the source audio; recorded takes are listed with their timing and can be removed. Everything is local: no audio is uploaded. Recorded audio keeps the audio path alive even when **Keep source audio** is off.
+
+Video exports preserve the source aspect ratio unless an aspect preset is chosen. MP4 uses H.264 with AAC source audio when present; WebM uses VP8 with Opus. Skip source audio in More video options. All applicable WebGL effects remain active in video export, while Dither/Halftone are unavailable in Video Mode. Preview zoom never affects output framing.
 
 After a video upload succeeds, the app initializes one shared instance of the locally bundled [ffmpeg.wasm wrapper/worker](vendor/ffmpeg/README.md) and downloads the single-threaded core from a CDN in the background (**about 31 MB**, internet required). Nothing is initialized for photo-only sessions, and the progress dialog stays hidden until export begins. WebCodecs `VideoFrame` uploads are used where supported, with a video-element/canvas fallback. Two-second encoding sections bound raw-frame memory; for one continuous segment, source audio is read from the uploaded Blob through WORKERFS where available and joined at the selected offset. Original audio is omitted when timeline gaps or transitions make the edit non-contiguous. The shared progress dialog shows encoding percentage and an estimated time remaining; completed exports download automatically and the Video Export status reports completion. Temporary frames, sections, and worker files are cleaned up after success, failure, or cancellation. Longer, high-resolution clips with heavy effects can take several minutes on slower devices; Cancel export restores the preview.
 

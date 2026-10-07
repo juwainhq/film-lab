@@ -1,8 +1,11 @@
 name: Build Desktop Apps
 on:
   push:
-    branches: ['main']
+    # main publishes the rolling build; the arena branch does too, so a branch build can be
+    # installed straight from the release without merging the pull request.
+    branches: ['main', 'arena/01a102e1-film-lab']
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -76,6 +79,7 @@ jobs:
     needs: [build, android]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -99,27 +103,74 @@ jobs:
             artifacts/*/*.dmg
             artifacts/*/*.AppImage
             artifacts/*/*.apk
+
+      - name: Record the build identity
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
+        run: |
+          echo "SHORT_SHA=$(printf '%s' "$GITHUB_SHA" | cut -c1-7)" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$(date -u '+%Y-%m-%d %H:%M UTC')" >> "$GITHUB_ENV"
+          # The installers carry this version, so read it from package.json instead of hard-coding
+          # it: the release name and notes then follow a version bump on their own.
+          version=$(node -p 'require("./package.json").version' 2>/dev/null || true)
+          if [ -z "$version" ]; then
+            version=$(sed -n 's/^[[:space:]]*"version": "\([^"]*\)".*$/\1/p' package.json | head -n 1)
+          fi
+          if [ -z "$version" ]; then
+            echo "could not read the app version from package.json" >&2
+            exit 1
+          fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "app version: $version"
+      # electron-builder stamps the version into its file names (`Film Lab Setup 2.0.0.exe`), which
+      # would change every download link on a version bump. The rolling release therefore publishes
+      # fixed names: the links below stay valid across builds.
+      - name: Collect installers under stable names
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
+        run: |
+          mkdir -p release
+          shopt -s nullglob
+          # Echo each source name: electron-builder stamps the app version into it
+          # (`Film Lab Setup 2.0.0.exe`), which is the version the installed app reports.
+          for file in artifacts/*/*.exe; do echo "packaging $file -> FilmLab-Setup.exe"; cp "$file" release/FilmLab-Setup.exe; done
+          for file in artifacts/*/*.dmg; do echo "packaging $file -> FilmLab.dmg"; cp "$file" release/FilmLab.dmg; done
+          for file in artifacts/*/*.AppImage; do echo "packaging $file -> FilmLab.AppImage"; cp "$file" release/FilmLab.AppImage; done
+          for file in artifacts/*/*.apk; do echo "packaging $file -> FilmLab.apk"; cp "$file" release/FilmLab.apk; done
+          ls -l release
       - name: Reset rolling latest-build release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete latest-build --cleanup-tag --yes || true
+        run: |
+          # Pass --repo explicitly: `gh` otherwise resolves the repository by shelling out to git,
+          # which fails outright in a job without a checkout.
+          if gh release delete latest-build --cleanup-tag --yes --repo "$GITHUB_REPOSITORY"; then
+            echo "deleted the latest-build release and its tag"
+          else
+            # No release yet, or the release could not be deleted: clear the assets it does have
+            # so this run's upload cannot collide with a previous build's files.
+            echo "release delete did not go through; clearing its assets instead"
+            for asset in $(gh release view latest-build --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null); do
+              echo "removing stale asset: $asset"
+              gh release delete-asset latest-build "$asset" --yes --repo "$GITHUB_REPOSITORY"
+            done
+          fi
       - name: Publish rolling latest-build release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
         uses: softprops/action-gh-release@v1
         with:
-          name: latest-build
+          # The tag stays `latest-build` so the download links never change; the title carries the
+          # app version that was just built, read from package.json above.
+          name: latest-build v${{ env.APP_VERSION }}
           tag_name: latest-build
           target_commitish: ${{ github.sha }}
           body: |
-            Rolling Film Lab build from `main` for every platform:
+            Rolling **Film Lab v${{ env.APP_VERSION }}** build from `${{ github.ref_name }}` at commit `${{ env.SHORT_SHA }}` (built ${{ env.BUILD_DATE }}).
 
-            - **Windows:** download the `.exe` installer
-            - **Mac:** download the `.dmg` disk image
-            - **Linux:** download the `.AppImage`
-            - **Android:** download the `.apk` package
-          files: |
-            artifacts/*/*.exe
-            artifacts/*/*.dmg
-            artifacts/*/*.AppImage
-            artifacts/*/*.apk
+            The installers carry this version in their own names (for example `Film Lab Setup ${{ env.APP_VERSION }}.exe`),
+            but they are published here under fixed names, so these download links stay valid between versions:
+
+            - **Windows:** `FilmLab-Setup.exe`
+            - **Mac:** `FilmLab.dmg`
+            - **Linux:** `FilmLab.AppImage`
+            - **Android:** `FilmLab.apk`
+          files: release/*

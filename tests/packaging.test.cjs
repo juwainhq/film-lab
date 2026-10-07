@@ -11,6 +11,7 @@ const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const pkg = JSON.parse(read('package.json'));
+const packageLock = JSON.parse(read('package-lock.json'));
 const capacitorConfig = JSON.parse(read('capacitor.config.json'));
 const electronMain = read('electron', 'main.js');
 const workflow = read('.github', 'workflows', 'build.yml');
@@ -24,7 +25,9 @@ function tempDir(name) {
 
 test('package.json drives Electron and electron-builder for Windows, macOS and Linux', () => {
   assert.equal(pkg.name, 'film-lab');
-  assert.equal(pkg.version, '1.0.0');
+  assert.equal(pkg.version, '2.0.0');
+  assert.equal(packageLock.version, pkg.version);
+  assert.equal(packageLock.packages[''].version, pkg.version);
   assert.equal(pkg.description, 'Cinematic photo and video editor');
   assert.equal(pkg.main, 'electron/main.js');
   assert.ok(fs.existsSync(path.join(root, pkg.main)), 'the Electron entry point must exist');
@@ -324,6 +327,9 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
     'manifest.json',
     'sw.js',
     'social-tools.js',
+    'color-grading.js',
+    'video-tools.js',
+    'audio-tools.js',
     'timeline-module.js',
     'multi-timeline.js',
     'background-blur-worker.js',
@@ -332,6 +338,8 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
     'icons/icon-512.png',
     'vendor/heic2any.min.js',
     'vendor/mediapipe-selfie/selfie_segmentation.js',
+    'vendor/mediapipe-tasks/vision_bundle.js',
+    'vendor/mediapipe-tasks/wasm/vision_wasm_internal.wasm',
     'vendor/ffmpeg/ffmpeg.js'
   ]) {
     assert.ok(fs.existsSync(path.join(target, file)), `staged bundle is missing ${file}`);
@@ -352,9 +360,12 @@ test('the staging script produces a self-contained web bundle for Capacitor', ()
 
 /* --- CI ------------------------------------------------------------------------- */
 
-test('the workflow triggers on main and version tags, builds desktop + Android, and uploads artifacts', () => {
+test('the workflow triggers on main, the arena branch, version tags and manual dispatch, builds desktop + Android, and uploads artifacts', () => {
   assert.match(workflow, /^name: Build Desktop Apps$/m);
-  assert.match(workflow, /push:\s*\n\s*branches: \['main'\]\s*\n\s*tags: \['v\*'\]/);
+  // The arena branch builds and publishes on push too, so its installers can be used without
+  // merging the pull request; workflow_dispatch allows starting a build by hand.
+  assert.match(workflow, /push:[\s\S]*?branches: \['main', 'arena\/01a102e1-film-lab'\]\s*\n\s*tags: \['v\*'\]/);
+  assert.match(workflow, /^  workflow_dispatch:$/m);
   assert.match(workflow, /matrix:\s*\n\s*os: \[windows-latest, macos-latest, ubuntu-latest\]/);
   assert.match(workflow, /uses: actions\/checkout@v4/);
   assert.match(workflow, /uses: actions\/setup-node@v4/);
@@ -399,6 +410,12 @@ test('a final job publishes a GitHub Release with all desktop installers and the
   assert.match(workflow, /name: Film Lab \$\{\{ github\.ref_name \}\}/);
   assert.match(workflow, /tag_name: \$\{\{ github\.ref_name \}\}/);
   assert.match(workflow, /tag_name: latest-build/);
+
+  // The rolling release is replaced for both branches, not just main, and it is republished under
+  // fixed file names so the download links survive a version bump.
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main' \|\| github\.ref == 'refs\/heads\/arena\/01a102e1-film-lab'/);
+  assert.match(workflow, /release\/FilmLab-Setup\.exe/);
+  assert.match(workflow, /files: release\/\*/);
 
   // The release must attach the .exe, .dmg, .AppImage and .apk packages.
   for (const ext of ['exe', 'dmg', 'AppImage', 'apk']) {

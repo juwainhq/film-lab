@@ -6,7 +6,11 @@ const vm = require('node:vm');
 const social = require('../social-tools.js');
 const html = readFileSync(resolve(__dirname,'../index.html'),'utf8');
 const script = html.split('<script>')[1].split('</script>')[0];
-const ids = [...html.matchAll(/id="slider(\w+)"/g)].map(m=>m[1]);
+// `ids` mirrors every slider the app exposes outside the Color Grade tab: the 44 legacy effect
+// sliders plus the round-7 photo tools (perspective, heal, lens blur, film-look fine tuning). The
+// Color Grade sliders and the standalone Straighten control ride in the fuller snapshot payload
+// instead.
+const ids = [...html.matchAll(/id="slider(\w+)"/g)].map(m=>m[1]).filter(id=>!/^(?:Grade|Hsl|Straighten)/.test(id));
 const effects = ['color','bloom','hallation','grain','dither','sharpen'];
 const snapshot = () => ({version:1,values:Object.fromEntries(ids.map(id=>[id,0])),effects:Object.fromEntries(effects.map(id=>[id,true])),scope:'full',preset:'Café / রঙ',export:{format:'portrait',type:'jpeg',quality:94},dither:{algorithm:'halftone',downscale:4,colorMode:'custom',paletteSize:8,threshold:0.62,spread:1.4,angle:27,paletteShadow:'#221122',paletteHighlight:'#f0e0c0'}});
 
@@ -120,12 +124,39 @@ test('MP4 and WebM commands encode the rendered frames and trim the matching sou
   assert.deepEqual(low.slice(low.indexOf('-crf'),low.indexOf('-crf')+2),['-crf','28']);
   assert.deepEqual(high.slice(high.indexOf('-b:v'),high.indexOf('-b:v')+2),['-b:v','8M']);
 });
+test('older settings and look links migrate the vignette direction and the stronger white balance', () => {
+  // Version 2 is Lightroom's direction: negative darkens, positive lightens. Old payloads stored
+  // the opposite sign, so loading one has to negate the value. Version 3 rescales the stored
+  // Temperature because the white balance is 1.9x stronger (0.20 -> 0.38): 40 becomes 21.
+  const legacy=social.sanitizeSettings({version:1,values:{VignStrength:60,Exposure:12,Temperature:40}},ids,effects);
+  assert.equal(social.SETTINGS_VERSION,3);
+  assert.equal(legacy.version,3);
+  assert.equal(legacy.values.VignStrength,-60);
+  assert.equal(legacy.values.Exposure,12);
+  assert.equal(legacy.values.Temperature,21, 'an old temperature must render as it did before the slider got stronger');
+  const older=social.sanitizeSettings({version:2,values:{VignStrength:-60,Temperature:40}},ids,effects);
+  assert.equal(older.values.VignStrength,-60, 'version 2 values are never re-negated');
+  assert.equal(older.values.Temperature,21, 'version 2 still predates the stronger white balance');
+  const current=social.sanitizeSettings({version:3,values:{VignStrength:-60,Temperature:40}},ids,effects);
+  assert.equal(current.values.VignStrength,-60, 'version 3 is never re-negated');
+  assert.equal(current.values.Temperature,40, 'version 3 already stores the new scale, so it is never scaled twice');
+  const roundTrip=social.sanitizeSettings(social.sanitizeSettings({version:1,values:{VignStrength:-25}},ids,effects),ids,effects);
+  assert.equal(roundTrip.values.VignStrength,25);
+  assert.equal(roundTrip.values.Temperature,0);
+  assert.deepEqual(social.decodeSettings(social.encodeSettings(legacy),ids,effects),legacy);
+  assert.match(social.encodeSettings(legacy),/^#look=v3\./);
+});
+
 test('settings and look links round-trip all effect sliders, switches, scope, export options, and Unicode names', () => {
   const input=snapshot(); input.values.Dither=-78; input.values.HighlightTint=68; input.effects.grain=false; input.scope='background';
   const clean=social.sanitizeSettings(input,ids,effects), hash=social.encodeSettings(clean);
-  assert.match(hash,/^#look=v1\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
+  assert.match(hash,/^#look=v3\.[A-Za-z0-9_-]+$/); assert.deepEqual(social.decodeSettings(hash,ids,effects),clean);
   assert.equal(clean.values.HighlightTint,68); assert.equal(clean.effects.grain,false); assert.equal(clean.preset,'Café / রঙ');
-  assert.ok(!hash.includes(' ')); assert.equal(ids.length,44);
+  // 44 effect sliders + the 8 round-7 perspective / heal / lens / film-look controls + the 8
+  // round-8 video controls (clip speed, layer opacity, text size / stroke / box, chroma
+  // tolerance / softness / spill) + the 6 round-9 controls (source audio gain / fade in / fade
+  // out, noise floor, look strength, stabiliser strength).
+  assert.ok(!hash.includes(' ')); assert.equal(ids.length,66);
 });
 test('settings imports clamp signed values, ignore unknown keys, and reject malformed or oversized links', () => {
   const input=snapshot(); input.values.Exposure=400; input.values.Grain=-400; input.values.Hall=NaN;
@@ -133,7 +164,7 @@ test('settings imports clamp signed values, ignore unknown keys, and reject malf
   const clean=social.sanitizeSettings(input,ids,effects);
   assert.equal(clean.values.Exposure,100); assert.equal(clean.values.Grain,-100); assert.equal(clean.values.Hall,0); assert.equal(clean.values.Sharp,0); assert.equal(clean.values.unknown,undefined);
   assert.throws(()=>social.sanitizeSettings({version:1,values:{unknown:2}},ids,effects),/compatible/);
-  for (const hash of ['#look=v2.abc','#look=v1.not%valid','#look=v1.YQ','#look=v1.'+'a'.repeat(20000)]) assert.throws(()=>social.decodeSettings(hash,ids,effects));
+  for (const hash of ['#look=v4.abc','#look=v3.abc','#look=v2.abc','#look=v1.not%valid','#look=v1.YQ','#look=v1.'+'a'.repeat(20000)]) assert.throws(()=>social.decodeSettings(hash,ids,effects));
   assert.throws(()=>social.sanitizeSettings({version:1,values:[]},ids,effects));
 });
 test('copy/paste has a persistent browser fallback and shared links restore without uploading photos', () => {

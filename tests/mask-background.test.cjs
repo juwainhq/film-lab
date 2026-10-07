@@ -40,31 +40,53 @@ test('masking composes after the existing color grade and preserves alpha for tr
     assert.match(composite, new RegExp(`\\b${uniform}\\b`), uniform);
   }
   assert.match(composite, /if\(u_maskEnabled==1\)/);
-  assert.match(composite, /u_backgroundMode==1\)\{ outColor=vec4\(clamp\(col,0\.0,1\.0\),base\.a\*keepAlpha\); return; \}/);
-  assert.match(composite, /outColor=vec4\(mix\(background,clamp\(col,0\.0,1\.0\),keepAlpha\),1\.0\)/);
+  // Alpha still comes from the mask in transparent mode; the foreground colour is now
+  // routed through the edge-cleanup estimate before it is mixed with the background.
+  assert.match(composite, /u_backgroundMode==1\)\{ outColor=vec4\(foreground,base\.a\*keepAlpha\); return; \}/);
+  assert.match(composite, /outColor=vec4\(mix\(background,foreground,keepAlpha\),1\.0\)/);
+  assert.match(composite, /uniform sampler2D u_cutout; uniform float u_cleanupStrength;/);
+  assert.match(composite, /float band=1\.0-abs\(keepAlpha\*2\.0-1\.0\);/);
   assert.match(script, /const maskBgEnabled=appState\.mode==='photo' && !isVideo && !!maskBgActive/);
   assert.match(script, /if\(!needsTransparentMaskPng\(\)\|\|exportOptions\.type==='png'\)return false/);
   assert.match(script, /hasTransparentMask\?\'png\':exportOptions\.type/);
 });
 
-test('selfie multiclass segmentation runs locally in a lazy photo-only worker with an 8-second failure path', () => {
+test('selfie multiclass segmentation runs in its photo-only worker with separate model-load and inference timeouts', () => {
   const worker = readFileSync(resolve(__dirname, '../mask-segmentation-worker.js'), 'utf8');
+  const autoRemove = script.match(/async function autoRemoveMaskBackground\(\)[\s\S]*?\n\}/)[0];
+  const fastEngine = script.match(/function maskEngineRunFast\(redetect=false\)\{[\s\S]*?\n\}/)[0];
   assert.match(script, /script\.src='vendor\/mediapipe-selfie\/selfie_segmentation\.js'/); // preserve Dither's existing local model
   assert.match(script, /function loadMaskBgModelOnOpen\(\)[\s\S]*?activeSidebarTab!=='mask'/);
   assert.match(script, /new Worker\(new URL\('mask-segmentation-worker\.js',document\.baseURI\)\)/);
-  assert.match(script, /if\(!maskBgPhotoReady\(\)\|\|!photoForMask\|\|!maskBgCanvas\|\|maskBgProcessing\)return/);
-  assert.match(script, /},8000\)/);
+  assert.match(script, /function withTimeout\(promise,ms,message\)/);
+  assert.match(script, /function maskEngineRunFast\(redetect=false\)\{/);
+  assert.match(autoRemove, /maskEngineRunFast\(false\)/);
+  assert.match(fastEngine, /if\(!maskBgPhotoReady\(\)\) return;/);
+  assert.match(fastEngine, /withTimeout\(ensureMaskBgModel\(\),90000,/);
+  assert.match(fastEngine, /requestMaskBgWorker\('segment',\{image,width,height\}\),30000,/);
+  assert.match(fastEngine, /if\(error\?\.name==='TimeoutError'\) ?terminateMaskBgWorker\(error,'error'\)/);
+  assert.match(fastEngine, /const failure=`Auto-remove failed: \$\{maskLayerErrorMessage\(error\)\}\. Try Magic select or Paint \/ keep\.`/);
+  assert.match(fastEngine, /maskBgProcessing=false/);
+  assert.doesNotMatch(fastEngine, /8000|8 seconds/);
   assert.match(script, /setMaskBgAiStatus\('Analyzing image…',true,true\)/);
-  assert.match(script, /setMaskBgStatus\('Background removed — refine edges with the brush'\)/);
-  assert.match(script, /setMaskBgStatus\('Auto-remove failed — try painting the mask manually'\)/);
-  assert.match(worker, /message: 'Analyzing image…'/);
+  assert.match(script, /setMaskBgStatus\('Subject selected — refine edges with the brush or the Refine controls'\)/);
+  assert.match(worker, /report\('Analyzing image…'\)/);
   assert.match(html, /class="engineSpinner" aria-hidden="true"/);
-  assert.match(worker, /@mediapipe\/tasks-vision@latest\/wasm/);
+  assert.match(worker, /@mediapipe\/tasks-vision@1\.0\.1/);
+  assert.match(worker, /TASKS_VISION_CDN_WASM_URL = TASKS_VISION_CDN_BASE \+ 'wasm'/);
   assert.match(worker, /selfie_multiclass_256x256/);
   assert.match(worker, /ImageSegmenter\.createFromOptions/);
-  assert.match(worker, /modelAssetPath: SELFIE_MULTICLASS_MODEL_URL/);
+  assert.match(worker, /baseOptions: \{modelAssetPath\}/);
   assert.match(worker, /self\.postMessage\(\{type: 'result'/);
-  assert.doesNotMatch(script.match(/async function autoRemoveMaskBackground\(\)[\s\S]*?\n\}/)[0], /https?:\/\//);
+  assert.doesNotMatch(autoRemove, /https?:\/\//);
+});
+
+test('withTimeout rejects with a named timeout and clears its active timer', async () => {
+  const helper = script.match(/function withTimeout\(promise,ms,message\)\{[\s\S]*?\n\}/)[0];
+  const context = {maskBgAutoTimeout: null, setTimeout, clearTimeout};
+  const timed = runInNewContext(`${helper}; withTimeout(new Promise(resolve=>setTimeout(resolve,40)),1,'model timed out')`, context);
+  await assert.rejects(timed, error => error.name === 'TimeoutError' && error.message === 'model timed out');
+  assert.equal(context.maskBgAutoTimeout, null);
 });
 
 test('the 2x mask worker smooth-thresholds, erodes, blurs, downsamples, and returns an alpha-ready grayscale mask', () => {

@@ -7,6 +7,65 @@
   if (!root) return;
 
   const bridge = () => window.filmLabTimelineBridge || {};
+  // === CapCut-style video effects =============================================================
+  // Keyframes, speed ramps, text / caption / sticker layers, blend modes and chroma key all come
+  // from video-tools.js, which the preview and the export share. A missing module downgrades to
+  // plain behaviour instead of breaking the timeline.
+  const fx = window.FilmVideo || null;
+  // The inline editor script has its own clamp01(); an external file cannot see it, so this module
+  // keeps a local copy for the keyframe and ramp maths.
+  const clamp01 = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  const finiteNumber = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+  const normalizeKeyframes = (value) => (fx ? fx.normalizeKeyframes(value) : {});
+  const normalizeSpeed = (value) => (fx ? fx.normalizeSpeed(value) : {rate: 1, reverse: false, freeze: false, ramp: 'none'});
+  const normalizeBlend = (value) => (fx ? fx.normalizeBlend(value) : 'normal');
+  const normalizeOpacity = (value, fallback = 1) => (fx ? fx.normalizeOpacity(value, fallback) : fallback);
+  const normalizeChroma = (value) => (fx ? fx.normalizeChromaKey(value) : {enabled: false, color: '#00ff00', tolerance: 30, softness: 18, spill: 45});
+  const normalizeLayerInput = (value, fallback) => (fx ? fx.normalizeLayer(value, fallback) : null);
+  function ensureClipEffects(clip) {
+    if (!clip) return clip;
+    clip.keyframes = normalizeKeyframes(clip.keyframes);
+    clip.speed = normalizeSpeed(clip.speed);
+    clip.blend = normalizeBlend(clip.blend);
+    clip.opacity = normalizeOpacity(clip.opacity, 1);
+    clip.chroma = normalizeChroma(clip.chroma);
+    return clip;
+  }
+  // The sampled transform of a clip at a moment inside its own timeline span. A keyframed opacity
+  // multiplies the clip's base opacity, so the slider stays the ceiling.
+  function clipTransformAt(clip, timelineTime) {
+    if (!clip) return {position: {x: 0, y: 0}, scale: 1, rotation: 0, opacity: 1};
+    const local = Math.max(0, (timelineTime ?? clip.start) - clip.start);
+    const base = normalizeOpacity(clip.opacity, 1);
+    const sampled = fx ? fx.sampleKeyframes(clip.keyframes, local, {position: {x: 0, y: 0}, scale: 1, rotation: 0, opacity: base})
+      : {position: {x: 0, y: 0}, scale: 1, rotation: 0, opacity: base};
+    const sampledOpacity = sampled.opacity === undefined ? base : sampled.opacity;
+    return {...sampled, opacity: clamp01(Math.min(base, sampledOpacity))};
+  }
+  // True when a clip carries something the app's own renderer cannot show by itself: keyframes, a
+  // moved / scaled / rotated frame, a fade, a blend mode or a chroma key.
+  function hasClipEffects(clip, timelineTime) {
+    if (!clip || !fx) return false;
+    const transform = clipTransformAt(clip, timelineTime ?? clip.start);
+    const moved = Math.abs(transform.position.x) > 1e-4 || Math.abs(transform.position.y) > 1e-4;
+    const reshaped = Math.abs(transform.scale - 1) > 1e-4 || Math.abs(transform.rotation) > 1e-4;
+    return fx.hasKeyframes(normalizeKeyframes(clip.keyframes)) || moved || reshaped ||
+      transform.opacity < 0.999 || normalizeBlend(clip.blend) !== 'normal' || !!normalizeChroma(clip.chroma).enabled;
+  }
+  // A frame the app has already rendered (the graded main frame), wrapped as a scene layer so the
+  // shared renderer can apply the clip's keyframed transform, blend, opacity and chroma key to it.
+  // The preview and the export call this, which is what makes them match.
+  function clipFrameLayer(clip, timelineTime, frame) {
+    const transform = clipTransformAt(clip, timelineTime);
+    const chroma = normalizeChroma(clip.chroma);
+    const keyed = chroma.enabled && frame ? (bridge().chromaKeyFrame?.(frame, chroma) || frame) : frame;
+    return {
+      kind: 'media', clipId: clip.id, track: 'main', element: keyed, image: keyed, chroma,
+      blend: normalizeBlend(clip.blend),
+      opacity: transform.opacity,
+      transform: {x: transform.position.x, y: transform.position.y, scale: transform.scale, rotation: transform.rotation},
+    };
+  }
   const view = byId('mtl-scroll');
   const canvas = byId('mtl-canvas');
   const ruler = byId('mtl-ruler');
@@ -34,11 +93,13 @@
     activeMain: null, transportPlaying: false, inGap: false, pendingMain: null, switchToken: 0, switchingSource: false,
     lastTick: 0, raf: 0, undo: [], redo: [], initialized: false,
     firstMediaId: null, nextVideoTrack: 3, nextPhotoTrack: 3, lastOverlaySignature: '',
+    selectedKeyframe: null, selectedLayerId: null, handleBox: null, handleDrag: null,
   };
-  // Start with two video lanes, two photo lanes, and the locked source-audio lane.
+  // Start with two video lanes, two photo lanes, the text lane and the locked source-audio lane.
   state.tracks.push(
     { id: 'main', kind: 'video', label: 'V1' }, { id: 'video-2', kind: 'video', label: 'V2' },
     { id: 'photo-1', kind: 'photo', label: 'PHOTO 1' }, { id: 'photo-2', kind: 'photo', label: 'PHOTO 2' },
+    { id: 'text', kind: 'text', label: 'TEXT', editable: false },
     { id: 'audio', kind: 'audio', label: 'AUDIO', editable: false },
   );
   let boundVideoElement = null;
@@ -47,6 +108,7 @@
   let clipSequence = 1;
   let mediaSequence = 1;
   let overlayLayer = null;
+  let layerHandles = null;
   let transitionLayer = null;
   const transitionPreviewElements = new Map();
   const overlayTransitionCanvases = new Map();
@@ -73,6 +135,20 @@
     return layerA - layerB || state.tracks.indexOf(aTrack) - state.tracks.indexOf(bTrack) || a.start - b.start;
   });
   const clipDuration = (clip) => Math.max(MIN_CLIP_DURATION, clip.trimEnd - clip.trimStart);
+  // Speed / reverse / freeze change how long a clip occupies the timeline, and every consumer
+  // (gaps, collisions, transitions, the export plan) reads the length through clipOutputDuration.
+  const clipOutputDuration = (clip) => {
+    if (!fx) return clipDuration(clip);
+    const span = Math.max(MIN_CLIP_DURATION, clip.trimEnd - clip.trimStart);
+    const settings = normalizeSpeed(clip.speed);
+    if (settings.freeze) return clipDuration(clip);
+    return Math.max(MIN_CLIP_DURATION, fx.clipOutputDuration(span, settings));
+  };
+  const clipRate = (clip) => normalizeSpeed(clip?.speed).rate;
+  const clipNeedsManualDrive = (clip) => {
+    const settings = normalizeSpeed(clip?.speed);
+    return settings.freeze || settings.reverse || settings.ramp !== 'none';
+  };
   const trackRows = () => [...root.querySelectorAll('.mtl-track[data-track-id]')];
   const trackContent = (id) => root.querySelector(`.mtl-track[data-track-id="${CSS.escape(id)}"] .mtl-track-content`);
   const rememberTracks = () => state.tracks.map((track) => ({ ...track }));
@@ -129,7 +205,7 @@
     const valid = candidates.filter((candidate) => others.every((clip) => candidate + duration <= clip.start + 0.015 || candidate >= clipEnd(clip) - 0.015));
     return valid.sort((a, b) => Math.abs(a - desired) - Math.abs(b - desired))[0] ?? Math.max(0, ...others.map(clipEnd));
   }
-  const clipEnd = (clip) => clip.start + clipDuration(clip);
+  const clipEnd = (clip) => clip.start + clipOutputDuration(clip);
   const safeTime = (time) => Math.max(0, Number.isFinite(time) ? time : 0);
   const TRANSITION_TYPES = new Set(['none', 'dissolve', 'fade-to-black', 'fade-from-white', 'slide-left', 'wipe']);
   function canTransition(clip) {
@@ -248,6 +324,47 @@
     const activeLabel = state.tracks.find((track) => track.id === active?.track)?.label || active?.track?.toUpperCase();
     byId('mtl-selection-status').textContent = state.selected ? `${label} · ${formatTime(clipDuration(state.selected))}` : active ? `${activeLabel} PLAYING` : 'Select a clip';
   }
+  // The TEXT lane shows the text and sticker layers as blocks on the same time ruler.
+  function renderLayerLane() {
+    const lane = byId('mtl-text-track');
+    if (!lane) return;
+    lane.querySelectorAll('.mtl-layer-block').forEach((node) => node.remove());
+    for (const layer of normalizeLayers()) {
+      const block = document.createElement('button');
+      block.type = 'button';
+      block.className = `mtl-layer-block mtl-layer-${layer.kind}${state.selectedLayerId === layer.id ? ' mtl-selected' : ''}`;
+      block.dataset.layerId = layer.id;
+      block.style.left = `${Math.max(0, layer.start) * state.pixelsPerSecond}px`;
+      block.style.width = `${Math.max(26, (layer.end - layer.start) * state.pixelsPerSecond)}px`;
+      block.textContent = layer.kind === 'sticker' ? `✦ ${layer.sticker}` : layer.text.slice(0, 24) || 'Text';
+      block.title = `${block.textContent} · ${formatTime(layer.start)} → ${formatTime(layer.end)}`;
+      block.addEventListener('click', (event) => {
+        event.stopPropagation();
+        state.selectedLayerId = layer.id;
+        window.dispatchEvent(new CustomEvent('film-lab-layer-selected', {detail: {id: layer.id}}));
+        renderLayers();
+      });
+      lane.appendChild(block);
+    }
+    renderCaptionsLane();
+  }
+  function renderCaptionsLane() {
+    const lane = byId('mtl-text-track');
+    if (!lane) return;
+    lane.querySelectorAll('.mtl-caption-block').forEach((node) => node.remove());
+    for (const caption of (filmLabState.captions || [])) {
+      const block = document.createElement('button');
+      block.type = 'button';
+      block.className = 'mtl-layer-block mtl-caption-block';
+      block.dataset.captionId = caption.id;
+      block.style.left = `${Math.max(0, caption.start) * state.pixelsPerSecond}px`;
+      block.style.width = `${Math.max(24, (caption.end - caption.start) * state.pixelsPerSecond)}px`;
+      block.textContent = `CC ${caption.text.slice(0, 20)}`;
+      block.addEventListener('click', (event) => { event.stopPropagation(); window.dispatchEvent(new CustomEvent('film-lab-caption-selected', {detail: {id: caption.id}})); });
+      lane.appendChild(block);
+    }
+  }
+  function renderLayers() { renderLayerLane(); }
   function renderGaps() {
     root.querySelectorAll('.mtl-track-content .mtl-gap,.mtl-track-content .mtl-transition').forEach((node) => node.remove());
     const primary = mainClips();
@@ -310,6 +427,99 @@
       label.className = 'mtl-clip-name';
       label.textContent = media.name;
       node.appendChild(label);
+      if (state.selected?.id === clip.id) {
+        // Diamonds on the clip: click jumps to the key, drag moves it, double-click removes it and
+        // the selected key grows an easing pill (linear / hold / ease-in / ease-out / ease-in-out).
+        const selection = selectedKeyframe();
+        for (const time of (fx ? fx.keyframeTimes(clip.keyframes) : [])) {
+          if (time > clipOutputDuration(clip) + 1e-6) continue;
+          const marker = document.createElement('span');
+          marker.className = 'mtl-keyframe-marker';
+          marker.dataset.clipId = clip.id;
+          marker.dataset.keyframeTime = String(time);
+          marker.style.left = `${Math.max(2, time * state.pixelsPerSecond)}px`;
+          marker.title = `Keyframe ${formatTime(time)} — click to jump, drag to move, double-click to remove`;
+          marker.tabIndex = 0;
+          marker.setAttribute('role', 'button');
+          marker.setAttribute('aria-label', `Keyframe at ${formatTime(time)}`);
+          if (selection && selection.clipId === clip.id && Math.abs(selection.time - time) <= 0.5 / 24) {
+            marker.classList.add('mtl-keyframe-selected');
+            const pill = document.createElement('select');
+            pill.className = 'mtl-keyframe-easing';
+            pill.setAttribute('aria-label', 'Keyframe easing');
+            for (const easing of (fx ? fx.EASINGS : [])) {
+              const option = document.createElement('option');
+              option.value = easing;
+              option.textContent = fx.EASING_LABELS?.[easing] || easing;
+              pill.appendChild(option);
+            }
+            pill.value = keyframeEasingAt(clip, time);
+            pill.addEventListener('pointerdown', (event) => event.stopPropagation());
+            pill.addEventListener('click', (event) => event.stopPropagation());
+            pill.addEventListener('change', (event) => {
+              event.stopPropagation();
+              setKeyframeEasing(clip.id, time, pill.value);
+            });
+            marker.appendChild(pill);
+          }
+          const dragOffset = () => {
+            if (marker.dataset.dragStartX === undefined) return null;
+            const from = Number(marker.dataset.dragFrom);
+            const seconds = from + (Number(marker.dataset.lastX) - Number(marker.dataset.dragStartX)) / Math.max(1, state.pixelsPerSecond);
+            return {from, seconds: Math.max(0, Math.min(clipOutputDuration(clip), seconds))};
+          };
+          marker.addEventListener('pointerdown', (event) => {
+            if (event.target.closest('.mtl-keyframe-easing')) return;
+            event.stopPropagation();
+            // Pointer capture throws for an unknown pointer id, so a synthetic or already-lifted
+            // pointer can never break the drag.
+            try { marker.setPointerCapture?.(event.pointerId); } catch (error) {}
+            marker.dataset.dragStartX = String(event.clientX);
+            marker.dataset.lastX = String(event.clientX);
+            marker.dataset.dragFrom = String(time);
+            marker.dataset.dragged = '0';
+          });
+          marker.addEventListener('pointermove', (event) => {
+            if (marker.dataset.dragStartX === undefined) return;
+            event.stopPropagation();
+            marker.dataset.lastX = String(event.clientX);
+            const drag = dragOffset();
+            if (!drag) return;
+            marker.style.left = `${Math.max(2, drag.seconds * state.pixelsPerSecond)}px`;
+            if (Math.abs(drag.seconds - drag.from) > 0.5 / 24) marker.dataset.dragged = '1';
+          });
+          const finishDrag = (event) => {
+            if (marker.dataset.dragStartX === undefined) return;
+            const dragged = marker.dataset.dragged === '1';
+            const drag = dragOffset();
+            delete marker.dataset.dragStartX; delete marker.dataset.dragFrom; delete marker.dataset.dragged; delete marker.dataset.lastX;
+            if (!dragged || !drag) return;
+            event.stopPropagation();
+            moveKeyframeTo(clip.id, drag.from, drag.seconds);
+          };
+          marker.addEventListener('pointerup', (event) => finishDrag(event));
+          marker.addEventListener('pointercancel', () => {
+            delete marker.dataset.dragStartX; delete marker.dataset.dragFrom; delete marker.dataset.dragged; delete marker.dataset.lastX;
+          });
+          marker.addEventListener('click', (event) => {
+            if (event.target.closest('.mtl-keyframe-easing')) return;
+            event.stopPropagation();
+            selectKeyframe(clip.id, time);
+          });
+          marker.addEventListener('dblclick', (event) => {
+            event.stopPropagation();
+            const result = fx ? fx.removeKeyframesAt(clip.keyframes, time) : null;
+            if (!result?.removed) return;
+            clip.keyframes = result.keyframes;
+            clearKeyframeSelection();
+            render();
+            renderSelection();
+            renderOverlayPreview();
+            bridge().onEffectsChanged?.(clip, {action: 'removed', properties: ['selection']});
+          });
+          node.appendChild(marker);
+        }
+      }
       const left = document.createElement('button');
       left.type = 'button'; left.className = 'mtl-trim-handle mtl-trim-left'; left.setAttribute('aria-label', 'Trim clip start');
       const right = document.createElement('button');
@@ -329,6 +539,10 @@
   function renderSelection() {
     canvas.querySelectorAll('.mtl-clip').forEach((node) => node.classList.toggle('mtl-selected', node.dataset.clipId === state.selected?.id));
     updatePlayhead();
+    // The video-effects panel listens for this, so every selection path (click, keyboard, undo)
+    // keeps the sidebar in step with the timeline.
+    if (state.selectedKeyframe && state.selectedKeyframe.clipId !== state.selected?.id) state.selectedKeyframe = null;
+    window.dispatchEvent(new CustomEvent('film-lab-clip-selected', {detail: {id: state.selected?.id || null}}));
   }
   function renderAudio() {
     audioTrack.replaceChildren();
@@ -370,6 +584,7 @@
       if (content) renderTrackClips(track.id, content);
     }
     renderGaps();
+    renderLayers();
     renderAudio();
     emptyHint.hidden = state.clips.length > 0;
     updateHistoryButtons();
@@ -449,7 +664,7 @@
     scheduleMediaThumbnail(media, videoElement);
     const trim = bridge().trim || { start: 0, end: Math.min(duration, 60) };
     const end = Math.min(duration, Math.max(0.05, trim.end || duration));
-    const firstClip = { id: uid('clip'), mediaId: media.id, track: 'main', start: 0, trimStart: Math.max(0, trim.start || 0), trimEnd: end, transition: 'none', transitionOut: { type: 'none', duration: 0.5 } };
+    const firstClip = ensureClipEffects({ id: uid('clip'), mediaId: media.id, track: 'main', start: 0, trimStart: Math.max(0, trim.start || 0), trimEnd: end, transition: 'none', transitionOut: { type: 'none', duration: 0.5 } });
     state.clips.unshift(firstClip);
     filmLabState.clips = state.clips;
     state.selected = firstClip;
@@ -457,6 +672,13 @@
     state.initialized = true;
     state.timelineTime = firstClip.start;
     render();
+  }
+  // Video mode owns the timeline: opening it never depends on media being adopted, so a slow or
+  // failing preview helper cannot leave the workspace without its timeline.
+  function reveal() {
+    if (!root.hidden) return;
+    root.hidden = false;
+    try { render(); } catch (error) { console.warn('Timeline layout unavailable', error); }
   }
   function adoptFirstVideo(file, videoElement, src, duration, trim) {
     root.hidden = false;
@@ -474,6 +696,7 @@
     state.tracks.splice(0, state.tracks.length,
       { id: 'main', kind: 'video', label: 'V1' }, { id: 'video-2', kind: 'video', label: 'V2' },
       { id: 'photo-1', kind: 'photo', label: 'PHOTO 1' }, { id: 'photo-2', kind: 'photo', label: 'PHOTO 2' },
+      { id: 'text', kind: 'text', label: 'TEXT', editable: false },
       { id: 'audio', kind: 'audio', label: 'AUDIO', editable: false },
     );
     state.nextVideoTrack = 3; state.nextPhotoTrack = 3;
@@ -540,6 +763,123 @@
       return null;
     }
   }
+  // === Layers: text, stickers and captions ===================================================
+  // Project-level overlay layers with their own start / end, so a title can sit across a cut and a
+  // caption can land on a single spoken line. Both the preview canvas and the export draw them
+  // through the same FilmVideo.drawScene call.
+  const layers = Array.isArray(filmLabState.layers) ? filmLabState.layers : (filmLabState.layers = []);
+  let layerSequence = 1;
+  function normalizeLayers() {
+    const normalized = layers.map((layer) => normalizeLayerInput(layer)).filter(Boolean);
+    layers.splice(0, layers.length, ...normalized.sort((a, b) => a.start - b.start));
+    filmLabState.layers = layers;
+    return layers;
+  }
+  function addLayer(input) {
+    const fallback = {id: `${input?.kind === 'sticker' ? 'sticker' : 'text'}-${layerSequence++}`};
+    const layer = normalizeLayerInput(input, fallback);
+    if (!layer) return null;
+    if (!(layer.end > layer.start)) layer.end = layer.start + 2;
+    layers.push(layer);
+    normalizeLayers();
+    remember();
+    render();
+    return layer;
+  }
+  function updateLayer(id, patch) {
+    const index = layers.findIndex((layer) => layer.id === id);
+    if (index < 0) return null;
+    layers[index] = normalizeLayerInput({...layers[index], ...patch}, {id});
+    normalizeLayers();
+    renderLayers();
+    renderOverlayPreview();
+    return layers.find((layer) => layer.id === id);
+  }
+  function removeLayer(id) {
+    const index = layers.findIndex((layer) => layer.id === id);
+    if (index < 0) return false;
+    layers.splice(index, 1);
+    if (state.selectedLayerId === id) state.selectedLayerId = null;
+    remember();
+    render();
+    return true;
+  }
+  function layersAt(time) {
+    const at = Math.max(0, Number(time) || 0);
+    return normalizeLayers().filter((layer) => at >= layer.start - 1e-6 && at < layer.end - 1e-6);
+  }
+  function addCaption(input) {
+    const caption = fx ? fx.normalizeCaption(input) : null;
+    if (!caption) return null;
+    const existing = filmLabState.captions || (filmLabState.captions = []);
+    existing.push(caption);
+    filmLabState.captions = fx ? fx.normalizeCaptions(existing) : existing;
+    remember();
+    render();
+    renderLayers();
+    renderOverlayPreview();
+    return caption;
+  }
+  // The caption editor writes through here: retiming a line, splitting it at the playhead and
+  // merging it with its neighbour are all model edits, so the preview and the export follow.
+  function updateCaption(id, patch) {
+    const list = filmLabState.captions || [];
+    const index = list.findIndex((line) => line.id === id);
+    if (index < 0 || !fx) return null;
+    const next = fx.normalizeCaption({...list[index], ...patch}, {id});
+    filmLabState.captions = fx.normalizeCaptions(list.map((line, position) => (position === index ? next : line)));
+    remember();
+    render();
+    renderLayers();
+    renderOverlayPreview();
+    return next;
+  }
+  function splitCaption(id, at) {
+    const list = filmLabState.captions || [];
+    const line = list.find((entry) => entry.id === id);
+    if (!line || !fx) return null;
+    const parts = fx.splitCaption(line, at);
+    filmLabState.captions = fx.normalizeCaptions([...list.filter((entry) => entry.id !== id), ...parts]);
+    remember();
+    render();
+    renderLayers();
+    renderOverlayPreview();
+    return parts;
+  }
+  function mergeCaption(id, direction = 1) {
+    const sorted = (filmLabState.captions || []).slice().sort((a, b) => a.start - b.start);
+    const index = sorted.findIndex((line) => line.id === id);
+    const neighbour = index < 0 ? null : sorted[index + (direction > 0 ? 1 : -1)];
+    if (!neighbour || !fx) return null;
+    const merged = {...fx.mergeCaptions(sorted[index], neighbour), id: sorted[index].id};
+    filmLabState.captions = fx.normalizeCaptions([...sorted.filter((line) => line.id !== id && line.id !== neighbour.id), merged]);
+    remember();
+    render();
+    renderLayers();
+    renderOverlayPreview();
+    return merged;
+  }
+  // Local SRT / VTT import: the file never leaves the browser.
+  function importCaptions(text) {
+    if (!fx) return [];
+    const parsed = fx.parseSubtitles(text);
+    if (!parsed.length) return [];
+    filmLabState.captions = fx.normalizeCaptions([...(filmLabState.captions || []), ...parsed]).slice(0, 600);
+    remember();
+    render();
+    renderLayers();
+    renderOverlayPreview();
+    return parsed;
+  }
+  function removeCaption(id) {
+    const existing = filmLabState.captions || [];
+    const next = existing.filter((line) => line.id !== id);
+    if (next.length === existing.length) return false;
+    filmLabState.captions = next;
+    remember();
+    render();
+    return true;
+  }
   function resolveMainStart(desired, duration, excludedId = null) {
     const others = mainClips().filter((clip) => clip.id !== excludedId);
     const candidates = [safeTime(desired), 0, ...others.flatMap((clip) => [Math.max(0, clip.start - duration), clipEnd(clip)])];
@@ -554,7 +894,7 @@
     const desired = at === null ? (trackName === 'main' ? Math.max(0, ...mainClips().map(clipEnd)) : state.timelineTime) : safeTime(at);
     const start = snapFrame(resolveTrackStart(trackName, desired, duration));
     remember();
-    const clip = { id: uid('clip'), mediaId, track: trackName, start, trimStart: 0, trimEnd: duration, transition: 'none', transitionOut: { type: 'none', duration: 0.5 } };
+    const clip = ensureClipEffects({ id: uid('clip'), mediaId, track: trackName, start, trimStart: 0, trimEnd: duration, transition: 'none', transitionOut: { type: 'none', duration: 0.5 } });
     state.clips.push(clip);
     state.selected = clip;
     render();
@@ -690,7 +1030,8 @@
     node.parentElement.appendChild(ghost);
     node.classList.add('mtl-dragging');
     activePointer = { id: event.pointerId, clip, edge, node, ghost, startX: event.clientX, startY: event.clientY, initialStart: clip.start, initialTrack: clip.track, initialTrimStart: clip.trimStart, initialTrimEnd: clip.trimEnd, historySaved: false, generatedTrack: null };
-    node.setPointerCapture(event.pointerId);
+    // A pointer that is already gone (or a synthesized event) must not abort the drag setup.
+    try { node.setPointerCapture(event.pointerId); } catch (error) {}
     node.addEventListener('pointermove', onClipPointerMove);
     node.addEventListener('pointerup', onClipPointerEnd, { once: true });
     node.addEventListener('pointercancel', onClipPointerEnd, { once: true });
@@ -909,6 +1250,9 @@
       else if (action === 'play-pause') state.transportPlaying ? pause() : play();
       else if (action === 'step-back') seekTo(Math.max(0, state.timelineTime - 5), false);
       else if (action === 'step-forward') seekTo(Math.min(getProjectEnd(), state.timelineTime + 5), false);
+      else if (action === 'keyframe') toggleKeyframeAtPlayhead();
+      else if (action === 'freeze') toggleFreezeFrame();
+      else if (action === 'reverse') toggleReverse();
       else if (action === 'zoom-in' || action === 'zoom-out') {
         state.zoom = Math.max(25, Math.min(400, state.zoom + (action === 'zoom-in' ? 25 : -25)));
         state.pixelsPerSecond = 18 * state.zoom / 100; render();
@@ -927,6 +1271,63 @@
   });
   document.addEventListener('pointerdown', (event) => { if (!root.contains(event.target)) hideMenus(); });
 
+  // === Keyframe actions ======================================================================
+  // The diamond button keyframes (or unkeys) position, scale, rotation and opacity of the selected
+  // clip at the playhead, which is what a CapCut-style timeline expects from one tap.
+  function clipValuesAtPlayhead(clip) {
+    const transform = clipTransformAt(clip, state.timelineTime);
+    return {position: transform.position, scale: transform.scale, rotation: transform.rotation, opacity: Math.min(normalizeOpacity(clip.opacity, 1), transform.opacity)};
+  }
+  function toggleKeyframeAtPlayhead(properties = null) {
+    const clip = state.selected;
+    if (!clip) { window.dispatchEvent(new CustomEvent('film-lab-toast', {detail: 'Select a clip to keyframe'})); return null; }
+    ensureClipEffects(clip);
+    const list = (properties && properties.length ? properties : (fx ? fx.KEYFRAME_PROPERTIES : ['position']));
+    const values = clipValuesAtPlayhead(clip);
+    const local = Math.max(0, Math.min(clipOutputDuration(clip), state.timelineTime - clip.start));
+    let action = 'added';
+    remember();
+    for (const property of list) {
+      const result = fx.toggleKeyframe(clip.keyframes, property, local, values[property]);
+      clip.keyframes = result.keyframes;
+      if (result.action === 'removed') action = 'removed';
+    }
+    render();
+    renderOverlayPreview();
+    bridge().onEffectsChanged?.(clip, {action, properties: list});
+    return {clipId: clip.id, action, time: local, properties: list};
+  }
+  function toggleFreezeFrame() {
+    const clip = state.selected;
+    if (!clip) return null;
+    ensureClipEffects(clip);
+    remember();
+    clip.speed = normalizeSpeed({...clip.speed, freeze: !clip.speed.freeze});
+    if (clip.speed.freeze) {
+      const video = bridge().videoElement;
+      const frame = clipSourceTimeAt(clip, state.timelineTime);
+      clip.freezeTime = frame;
+      if (video) { try { video.pause(); video.currentTime = frame; } catch (error) {} }
+    }
+    render();
+    renderOverlayPreview();
+    bridge().onEffectsChanged?.(clip, {action: clip.speed.freeze ? 'freeze-on' : 'freeze-off'});
+    return clip.speed.freeze;
+  }
+  function toggleReverse() {
+    const clip = state.selected;
+    if (!clip) return null;
+    ensureClipEffects(clip);
+    remember();
+    clip.speed = normalizeSpeed({...clip.speed, reverse: !clip.speed.reverse});
+    const video = bridge().videoElement;
+    if (video && !video.paused) video.pause();
+    state.timelineTime = clip.start;
+    render();
+    renderOverlayPreview();
+    bridge().onEffectsChanged?.(clip, {action: clip.speed.reverse ? 'reverse-on' : 'reverse-off'});
+    return clip.speed.reverse;
+  }
   function getMainAt(time) {
     return mainClips().find((clip) => time >= clip.start - 0.0001 && time < clipEnd(clip) - 0.0001) || null;
   }
@@ -945,14 +1346,38 @@
       bridge().setTimelineTrim?.(clip.trimStart, clip.trimEnd);
       const video = bridge().videoElement;
       if (!video) return;
-      const sourceTime = clip.trimStart + (state.timelineTime - clip.start);
+      const sourceTime = clipSourceTimeAt(clip, state.timelineTime);
       if (Math.abs(video.currentTime - sourceTime) > 0.035) video.currentTime = sourceTime;
-      if (autoplay && state.transportPlaying && video.paused) bridge().play?.();
+      const rate = clipRate(clip);
+      if (Math.abs((video.playbackRate || 1) - rate) > 0.001) { try { video.playbackRate = Math.min(16, Math.max(0.0625, rate)); } catch (error) {} }
+      if (autoplay && state.transportPlaying && !clipNeedsManualDrive(clip) && video.paused) bridge().play?.();
     } catch (error) {
       if (switchToken === state.switchToken) { state.switchingSource = false; state.transportPlaying = false; updateTransportButton(); }
       console.warn('Could not switch timeline clip', error);
     }
     updatePlayhead(); renderOverlayPreview();
+  }
+  // Where inside the trimmed range a timeline moment sits, after speed, reverse and freeze.
+  function clipSourceTimeAt(clip, timelineTime) {
+    const local = Math.max(0, (timelineTime ?? clip.start) - clip.start);
+    const span = Math.max(MIN_CLIP_DURATION, clip.trimEnd - clip.trimStart);
+    const offset = fx ? fx.sourceOffsetForLocal(local, span, clip.speed) : local;
+    return Math.max(clip.trimStart, Math.min(clip.trimEnd - 0.001, clip.trimStart + offset));
+  }
+  // Reverse and freeze cannot be played by a media element, so those clips (and ramped clips) are
+  // driven by the timeline clock exactly like a gap, with the element kept paused and seeked.
+  function driveClipFromClock(clip, delta) {
+    const span = Math.max(MIN_CLIP_DURATION, clip.trimEnd - clip.trimStart);
+    const settings = normalizeSpeed(clip.speed);
+    const localRate = settings.freeze ? 0 : settings.rate * (fx ? fx.rampRate(settings.ramp, clamp01((state.timelineTime - clip.start) / Math.max(1e-4, clipOutputDuration(clip)))) : 1);
+    state.timelineTime = Math.min(clipEnd(clip), state.timelineTime + delta * Math.max(0, localRate));
+    const video = bridge().videoElement;
+    if (video && video.readyState >= 2) {
+      const sourceTime = clipSourceTimeAt(clip, state.timelineTime);
+      if (Math.abs(video.currentTime - sourceTime) > 0.05) { try { video.currentTime = sourceTime; } catch (error) {} }
+    }
+    if (localRate <= 0.0001 && span <= 0) return;
+    if (state.timelineTime >= clipEnd(clip) - 0.02) advanceFrom(clip);
   }
   function setGapAt(time, autoplay) {
     state.switchToken++; state.switchingSource = false;
@@ -968,6 +1393,9 @@
     const at = Math.max(0, Math.min(getProjectEnd(), time));
     state.timelineTime = at;
     const clip = getMainAt(at);
+    // Guard the element's clock until the seek this triggers has landed (see handleVideoTimeUpdate).
+    // A timed window self-heals, so a non-video target can never leave the clock stuck.
+    state.seekGuardUntil = performance.now() + 260;
     if (clip) switchToMain(clip, at, autoplay);
     else setGapAt(at, autoplay);
     updatePlayhead(); renderOverlayPreview();
@@ -1001,7 +1429,15 @@
     const video = bridge().videoElement;
     if (!video || bridge().exporting || !state.initialized || !state.activeMain) return;
     const clip = state.activeMain;
-    const time = clip.start + (video.currentTime - clip.trimStart);
+    // Reverse, freeze and ramped clips run on the timeline clock instead of the element's clock.
+    if (clipNeedsManualDrive(clip)) { state.lastTick = state.lastTick || performance.now(); ensureTick(); return; }
+    // A clip switch or a seek in flight means the element still reports its *old* position. Letting it
+    // own the clock here would drag the playhead backwards, which is how a keyframe ends up parked at
+    // the wrong moment while the user scrubs. The timed guard covers the gap before the browser even
+    // reports `seeking`.
+    if (state.switchingSource || video.seeking || performance.now() < (state.seekGuardUntil || 0)) return;
+    const rate = clipRate(clip);
+    const time = clip.start + (video.currentTime - clip.trimStart) / Math.max(0.0001, rate);
     state.timelineTime = Math.max(clip.start, Math.min(clipEnd(clip), time));
     if (video.currentTime >= clip.trimEnd - 0.025) advanceFrom(clip);
     updatePlayhead(); renderOverlayPreview();
@@ -1018,12 +1454,18 @@
         state.timelineTime = state.projectDuration;
         state.transportPlaying = false; state.inGap = false;
       }
+    } else if (state.transportPlaying && state.activeMain && clipNeedsManualDrive(state.activeMain)) {
+      const video = bridge().videoElement;
+      if (video && !video.paused) video.pause();
+      const delta = state.lastTick ? Math.max(0, Math.min(0.12, (now - state.lastTick) / 1000)) : 0;
+      state.lastTick = now;
+      driveClipFromClock(state.activeMain, delta);
     } else if (state.transportPlaying && state.activeMain) {
       const video = bridge().videoElement;
       if (!video || video.paused) state.transportPlaying = false;
       else {
         const clip = state.activeMain;
-        const sourceTime = clip.trimStart + (state.timelineTime - clip.start);
+        const sourceTime = clipSourceTimeAt(clip, state.timelineTime);
         if (Math.abs(video.currentTime - sourceTime) > 0.14 && video.readyState >= 2) video.currentTime = Math.max(clip.trimStart, Math.min(clip.trimEnd - 0.001, sourceTime));
         state.timelineTime = clip.start + (video.currentTime - clip.trimStart);
         if (video.currentTime >= clip.trimEnd - 0.025) advanceFrom(clip);
@@ -1260,7 +1702,21 @@
         }
       }
     }
-    overlayLayer.hidden = entries.length === 0 && !inGap;
+    // Sources stay mounted (they must keep decoding) but the pixels the user sees come from the
+    // shared scene renderer, which is also what the export calls.
+    let sceneCanvas = overlayLayer.querySelector('.mtl-scene-canvas');
+    if (!sceneCanvas) {
+      sceneCanvas = document.createElement('canvas');
+      sceneCanvas.className = 'mtl-scene-canvas';
+      sceneCanvas.setAttribute('aria-hidden', 'true');
+      overlayLayer.appendChild(sceneCanvas);
+    }
+    renderSceneCanvas(sceneCanvas, time);
+    renderLayerHandles(time);
+    // Text, sticker and caption layers live on this canvas, so it must be visible for them even when
+    // no V2+ clip is active. Nothing is shown while the project is untouched.
+    const sceneHasLayers = layersAt(time).length > 0 || !!(fx && fx.captionAt(filmLabState.captions || [], time));
+    overlayLayer.hidden = entries.length === 0 && !inGap && !sceneHasLayers && !byId('canvasWrap')?.classList.contains('mtl-scene-base');
     overlayLayer.style.backgroundColor = inGap ? '#000' : 'transparent';
     const stage = byId('canvasWrap'), base = byId('glCanvas');
     if (stage && base) {
@@ -1292,10 +1748,275 @@
     renderTransitionPreview();
   }
   let exportTransitionCanvas = null;
+  // === Scene = the single source of truth for both the preview and the export ================
+  // Every layer carries its transform (keyframed), blend mode, opacity and source, so the canvas
+  // the user watches and the frame ffmpeg receives are painted by the same code path.
+  function overlayTrackOrder() {
+    return state.tracks.filter((track) => track.id !== 'main' && (track.kind === 'video' || track.kind === 'photo'))
+      .sort((a, b) => {
+        const layerA = a.kind === 'photo' ? 1 : 0, layerB = b.kind === 'photo' ? 1 : 0;
+        return layerA - layerB || state.tracks.indexOf(a) - state.tracks.indexOf(b);
+      });
+  }
+  function mediaElementFor(media, clip) {
+    if (!media) return null;
+    const element = media.imageElement || media.overlayVideoElement || media.videoElement || null;
+    if (!element || !clip?.chroma?.enabled) return element;
+    // Chroma key runs in WebGL in the editor, which hands back a keyed canvas.
+    return bridge().chromaKeyFrame?.(element, clip.chroma) || element;
+  }
+  // The active overlay layers at one moment, in draw order, before any resolution is known.
+  function sceneAt(time, {sources = 'preview'} = {}) {
+    const at = Math.max(0, Number(time) || 0);
+    const layers = [];
+    const order = overlayTrackOrder();
+    for (const track of order) {
+      if (transitionAt(at, track.id)) continue; // transitions keep their own dedicated renderer
+      for (const clip of state.clips.filter((item) => item.track === track.id && at >= item.start - 1e-6 && at < clipEnd(item) - 1e-6)) {
+        const media = state.media.get(clip.mediaId);
+        const element = mediaElementFor(media, clip);
+        if (!element) continue;
+        const transform = clipTransformAt(clip, at);
+        layers.push({
+          kind: 'media', clipId: clip.id, track: track.id, source: media.src, element,
+          image: element instanceof HTMLCanvasElement || element instanceof HTMLImageElement || element instanceof HTMLVideoElement ? element : null,
+          visible: sources === 'export' ? true : true,
+          chroma: clip.chroma,
+          blend: clip.blend,
+          opacity: transform.opacity,
+          transform: {x: transform.position.x, y: transform.position.y, scale: transform.scale, rotation: transform.rotation},
+        });
+      }
+    }
+    for (const layer of layersAt(at)) {
+      if (layer.kind === 'sticker') layers.push({...layer, image: fx ? fx.stickerImage(layer.sticker) : null});
+      else layers.push(layer);
+    }
+    const captionSource = filmLabState.captions || [];
+    const caption = fx ? fx.captionAt(captionSource, at) : null;
+    if (caption) layers.push({kind: 'caption', line: caption});
+    return layers;
+  }
+  // The selected keyframe: one diamond per moment, shared by every property keyed at that time.
+  function selectedKeyframe() {
+    const selection = state.selectedKeyframe;
+    if (!selection) return null;
+    const clip = state.clips.find((item) => item.id === selection.clipId);
+    if (!clip) return null;
+    const times = fx ? fx.keyframeTimes(clip.keyframes) : [];
+    const time = times.find((candidate) => Math.abs(candidate - selection.time) <= 0.5 / 24);
+    return time === undefined ? null : {clipId: clip.id, time, clip};
+  }
+  const keyframeEasingAt = (clip, time) => {
+    if (!fx) return 'linear';
+    for (const property of fx.KEYFRAME_PROPERTIES) {
+      const key = fx.keyframeAt(clip.keyframes, property, time);
+      if (key) return key.easing;
+    }
+    return 'linear';
+  };
+  function selectKeyframe(clipId, time, {seek = true} = {}) {
+    const clip = state.clips.find((item) => item.id === clipId);
+    state.selectedKeyframe = clip ? {clipId, time} : null;
+    if (clip) {
+      state.selected = clip;
+      if (seek) seekTo(clip.start + time, false);
+      else { updatePlayhead(); renderOverlayPreview(); }
+    }
+    render();
+    renderSelection();
+    bridge().onEffectsChanged?.(clip || null, {action: 'keyframe-selected', time});
+    return state.selectedKeyframe;
+  }
+  function clearKeyframeSelection() {
+    if (!state.selectedKeyframe) return;
+    state.selectedKeyframe = null;
+    render();
+  }
+  function moveKeyframeTo(clipId, from, to) {
+    const clip = state.clips.find((item) => item.id === clipId);
+    if (!clip || !fx) return null;
+    const result = fx.moveKeyframe(clip.keyframes, from, Math.max(0, Math.min(clipOutputDuration(clip), to)));
+    if (!result.properties) return null;
+    clip.keyframes = result.keyframes;
+    state.selectedKeyframe = {clipId, time: result.time};
+    render();
+    renderSelection();
+    renderOverlayPreview();
+    repaintScene();
+    return result;
+  }
+  function setKeyframeEasing(clipId, time, easing) {
+    const clip = state.clips.find((item) => item.id === clipId);
+    if (!clip || !fx) return null;
+    const result = fx.setKeyframeEasing(clip.keyframes, time, easing);
+    clip.keyframes = result.keyframes;
+    render();
+    bridge().onEffectsChanged?.(clip, {action: 'keyframe-easing', easing: result.easing});
+    return result;
+  }
+  // The selected layer is shared with the sidebar; the timeline draws its drag handles in the
+  // preview so a sticker can be moved, resized and rotated where it actually sits.
+  function selectLayer(id) {
+    const layer = id ? layers.find((entry) => entry.id === id) : null;
+    state.selectedLayerId = layer ? layer.id : null;
+    renderLayers();
+    renderOverlayPreview();
+    window.dispatchEvent(new CustomEvent('film-lab-layer-selected', {detail: {id: state.selectedLayerId}}));
+    return layer;
+  }
+  function setupLayerHandles() {
+    const stage = byId('canvasWrap');
+    if (!stage || layerHandles) return;
+    layerHandles = document.createElement('div');
+    layerHandles.className = 'mtl-layer-handles';
+    layerHandles.hidden = true;
+    stage.appendChild(layerHandles);
+  }
+  // Mirrors drawStickerLayer(): a square of width * 0.22 * scale centred on the transformed origin.
+  function stickerHandleBox(layer, base) {
+    const size = Math.max(8, base.width * 0.22 * Math.max(0.02, finiteNumber(layer.transform?.scale, 0.28)));
+    return {size, centerX: base.left + (0.5 + finiteNumber(layer.transform?.x, 0)) * base.width,
+      centerY: base.top + (0.5 + finiteNumber(layer.transform?.y, -0.45)) * base.height,
+      rotation: finiteNumber(layer.transform?.rotation, 0)};
+  }
+  function renderLayerHandles(time) {
+    setupLayerHandles();
+    if (!layerHandles) return;
+    const selected = state.selectedLayerId ? layers.find((layer) => layer.id === state.selectedLayerId) : null;
+    const active = selected && time >= selected.start - 1e-6 && time < selected.end - 1e-6;
+    if (!active || !byId('glCanvas')) { layerHandles.hidden = true; layerHandles.replaceChildren(); state.handleBox = null; return; }
+    const stage = byId('canvasWrap'), base = byId('glCanvas');
+    const stageRect = stage.getBoundingClientRect(), baseRect = base.getBoundingClientRect();
+    const rect = {left: baseRect.left - stageRect.left, top: baseRect.top - stageRect.top, width: baseRect.width, height: baseRect.height};
+    const box = stickerHandleBox(selected, rect);
+    state.handleBox = {layerId: selected.id, ...box, rect};
+    let node = layerHandles.querySelector('.mtl-layer-handle-box');
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'mtl-layer-handle-box';
+      const body = document.createElement('div');
+      body.className = 'mtl-layer-handle-body';
+      const rotate = document.createElement('button');
+      rotate.type = 'button'; rotate.className = 'mtl-layer-handle-rotate'; rotate.setAttribute('aria-label', 'Rotate layer');
+      const resize = document.createElement('button');
+      resize.type = 'button'; resize.className = 'mtl-layer-handle-resize'; resize.setAttribute('aria-label', 'Resize layer');
+      node.append(body, rotate, resize);
+      node.addEventListener('pointerdown', onLayerHandleDown);
+      node.addEventListener('pointermove', onLayerHandleMove);
+      node.addEventListener('pointerup', onLayerHandleUp);
+      node.addEventListener('pointercancel', onLayerHandleUp);
+      layerHandles.appendChild(node);
+    }
+    layerHandles.hidden = false;
+    node.style.left = `${box.centerX}px`;
+    node.style.top = `${box.centerY}px`;
+    node.style.width = `${box.size}px`;
+    node.style.height = `${box.size}px`;
+    node.style.transform = `translate(-50%,-50%) rotate(${box.rotation}deg)`;
+    node.dataset.layerId = selected.id;
+  }
+  function onLayerHandleDown(event) {
+    const node = event.currentTarget;
+    const selected = state.selectedLayerId ? layers.find((layer) => layer.id === state.selectedLayerId) : null;
+    if (!selected || !state.handleBox) return;
+    event.preventDefault(); event.stopPropagation();
+    try { node.setPointerCapture?.(event.pointerId); } catch (error) {}
+    const tool = event.target.closest('.mtl-layer-handle-resize') ? 'scale'
+      : event.target.closest('.mtl-layer-handle-rotate') ? 'rotate' : 'move';
+    const box = state.handleBox;
+    state.handleDrag = {tool, id: selected.id, startX: event.clientX, startY: event.clientY,
+      start: {...selected.transform}, centerX: box.centerX, centerY: box.centerY,
+      distance: Math.max(6, Math.hypot(event.clientX - box.centerX, event.clientY - box.centerY)),
+      angle: Math.atan2(event.clientY - box.centerY, event.clientX - box.centerX)};
+    bridge().onEffectsChanged?.(selected, {action: 'layer-drag-start'});
+  }
+  function onLayerHandleMove(event) {
+    const drag = state.handleDrag;
+    if (!drag) return;
+    event.preventDefault(); event.stopPropagation();
+    const box = state.handleBox;
+    if (!box) return;
+    if (drag.tool === 'move') {
+      const x = drag.start.x + (event.clientX - drag.startX) / Math.max(1, box.rect.width);
+      const y = drag.start.y + (event.clientY - drag.startY) / Math.max(1, box.rect.height);
+      updateLayer(drag.id, {transform: {...drag.start, x, y}});
+      return;
+    }
+    if (drag.tool === 'scale') {
+      const distance = Math.hypot(event.clientX - box.centerX, event.clientY - box.centerY);
+      const scale = drag.start.scale * (distance / drag.distance);
+      updateLayer(drag.id, {transform: {...drag.start, scale}});
+      return;
+    }
+    const angle = Math.atan2(event.clientY - box.centerY, event.clientX - box.centerX);
+    const rotation = drag.start.rotation + (angle - drag.angle) * 180 / Math.PI;
+    updateLayer(drag.id, {transform: {...drag.start, rotation}});
+  }
+  function onLayerHandleUp(event) {
+    const drag = state.handleDrag;
+    if (!drag) return;
+    event.stopPropagation();
+    state.handleDrag = null;
+    const layer = layers.find((entry) => entry.id === drag.id) || null;
+    bridge().onEffectsChanged?.(layer, {action: 'layer-drag-end'});
+  }
+  // Painting the scene canvas on demand: an edit made in the effects panel must be visible straight
+  // away, without waiting for the transport to repaint the preview on its own.
+  function repaintScene() {
+    const canvas = overlayLayer?.querySelector('.mtl-scene-canvas');
+    if (canvas && fx) renderSceneCanvas(canvas, state.timelineTime);
+  }
+  // Preview painter: the DOM media elements stay mounted (so they keep decoding) but the visible
+  // pixels come from this canvas, which is the same renderer the export calls.
+  function renderSceneCanvas(canvas, time) {
+    const base = byId('glCanvas');
+    if (!canvas || !base || !fx) return;
+    const width = Math.max(1, base.width || 640), height = Math.max(1, base.height || 480);
+    if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const mainClip = getMainAt(time);
+    // When the main clip is transformed / faded / keyed, the frame the app just rendered into
+    // glCanvas becomes the base layer and the scene canvas takes over the visible pixels; the raw
+    // glCanvas is hidden so the frame is never drawn twice.
+    const baseLayer = mainClip && hasClipEffects(mainClip, time) ? clipFrameLayer(mainClip, time, base) : null;
+    const layers = baseLayer ? [baseLayer, ...sceneAt(time)] : sceneAt(time);
+    fx.drawScene(ctx, {width, height, time, layers, clear: true});
+    const stage = byId('canvasWrap');
+    if (stage) stage.classList.toggle('mtl-scene-base', !!baseLayer);
+    return baseLayer;
+  }
+  // The composed main frame the export loop has just produced becomes the base layer of the scene,
+  // so a keyframed / transformed / keyed main clip lands in the file exactly as previewed.
+  function applyMainClipEffects(outputCanvas, outputTime, plan) {
+    if (!fx || !outputCanvas || !plan?.segments) return;
+    const segment = plan.segments.find((item) => !item.gap && !item.blackFrame && outputTime >= item.start - 1e-6 && outputTime <= item.end + 1e-6);
+    const clip = segment?.clipId ? state.clips.find((item) => item.id === segment.clipId) : null;
+    if (!clip) return;
+    const local = Math.max(0, outputTime - segment.start);
+    if (!hasClipEffects(clip, clip.start + local)) return;
+    const width = outputCanvas.width, height = outputCanvas.height;
+    const ctx = outputCanvas.getContext('2d');
+    if (!ctx || !(width > 0 && height > 0)) return;
+    const frame = document.createElement('canvas');
+    frame.width = width; frame.height = height;
+    const frameCtx = frame.getContext('2d');
+    if (!frameCtx) return;
+    frameCtx.drawImage(outputCanvas, 0, 0);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    fx.drawScene(ctx, {width, height, time: local, layers: [clipFrameLayer(clip, clip.start + local, frame)], clear: true});
+  }
   async function renderOverlays(outputCanvas, time, plan = null) {
+    if (plan?.multiClip) applyMainClipEffects(outputCanvas, Math.max(0, Math.min(plan.duration, time)), plan);
     const overlayTime = plan?.toOriginalTime ? plan.toOriginalTime(time) : time;
     const active = getOverlaysAt(overlayTime);
-    if (!active.length && !state.tracks.some((track) => track.id !== 'main' && track.id !== 'audio' && transitionAt(overlayTime, track.id))) return outputCanvas;
+    // Text, stickers, captions and the overlay-clip transforms always have to be painted, even when
+    // the project is a single V1 clip: they are part of the exported frame.
+    const scene = fx ? sceneAt(overlayTime, {sources: 'export'}) : [];
+    if (!active.length && !scene.length && !state.tracks.some((track) => track.id !== 'main' && track.id !== 'audio' && transitionAt(overlayTime, track.id))) return outputCanvas;
     const ctx = outputCanvas.getContext('2d');
     if (!ctx) return outputCanvas;
     const trackOrder = state.tracks.filter((track) => track.id !== 'main' && (track.kind === 'video' || track.kind === 'photo')).sort((a, b) => {
@@ -1355,6 +2076,11 @@
         }
       }
     }
+    // Text, stickers, captions and the per-clip transforms / blends / chroma key ride on top of the
+    // media pass, painted by the very same renderer the preview uses.
+    if (fx && scene.length) {
+      fx.drawScene(ctx, {width: outputCanvas.width, height: outputCanvas.height, time: overlayTime, layers: scene, clear: false});
+    }
     return outputCanvas;
   }
 
@@ -1384,7 +2110,16 @@
     const incomingTransitionSeconds = previous
       ? Math.min(Math.max(0.1, Number(previous.transitionDuration ?? plan.transitionSeconds) || 0.5), clipLength, Math.max(0.05, previous.end - previous.start))
       : transitionSeconds;
-    const sourceTime = current.trimStart + local;
+    const clipForSegment = state.clips.find((clip) => clip.id === current.clipId) || null;
+    const clipSpan = Math.max(MIN_CLIP_DURATION, (current.trimEnd ?? 0) - (current.trimStart ?? 0));
+    const clipSpeed = current.speed || clipForSegment?.speed;
+    const sourceOffset = fx ? fx.sourceOffsetForLocal(local, clipSpan, clipSpeed) : local;
+    const sourceTime = current.trimStart + Math.min(clipSpan - 0.0001, Math.max(0, sourceOffset));
+    const effects = clipForSegment ? {
+      speed: normalizeSpeed(clipForSegment.speed), blend: normalizeBlend(clipForSegment.blend),
+      opacity: normalizeOpacity(clipForSegment.opacity, 1), chroma: normalizeChroma(clipForSegment.chroma),
+      keyframes: normalizeKeyframes(clipForSegment.keyframes),
+    } : null;
     let blackAlpha = 0, overlayAlpha = 0, overlayColor = '#000';
     if (current.transition === 'dissolve' && current.next && t >= current.end - transitionSeconds) {
       const amount = Math.max(0, Math.min(1, (t - (current.end - transitionSeconds)) / transitionSeconds));
@@ -1410,17 +2145,19 @@
       blackAlpha = 1 - (t - current.start) / incomingTransitionSeconds;
     }
     if (current.blackFrame || current.gap) blackAlpha = 1;
-    return { sourceTime, source: current.source, clipIndex: current.index, blackAlpha: Math.max(0, Math.min(1, blackAlpha)), overlayAlpha: Math.max(0, Math.min(1, overlayAlpha)), overlayColor, gap: false };
+    return { sourceTime, source: current.source, clipId: current.clipId, effects, clipIndex: current.index, blackAlpha: Math.max(0, Math.min(1, blackAlpha)), overlayAlpha: Math.max(0, Math.min(1, overlayAlpha)), overlayColor, gap: false };
   }
   function getExportManifest(clips = state.clips) {
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       baseTrack: 'main',
+      effects: {keyframes: true, speed: true, layers: true, blend: true, chromaKey: true},
       tracks: state.tracks.map((track) => ({ ...track })),
       clips: clips.map((clip) => {
         const media = state.media.get(clip.mediaId);
         const transition = transitionInfo(clip);
-        return { id: clip.id, mediaId: clip.mediaId, track: clip.track, start: clip.start, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clipDuration(clip), transition: transition.type, transitionDuration: transition.duration, type: media?.type || 'video', source: media?.src || null };
+        return { id: clip.id, mediaId: clip.mediaId, track: clip.track, start: clip.start, trimStart: clip.trimStart, trimEnd: clip.trimEnd, duration: clipDuration(clip), outputDuration: clipOutputDuration(clip), transition: transition.type, transitionDuration: transition.duration, type: media?.type || 'video', source: media?.src || null,
+          speed: normalizeSpeed(clip.speed), blend: normalizeBlend(clip.blend), opacity: normalizeOpacity(clip.opacity, 1), chroma: normalizeChroma(clip.chroma), keyframes: normalizeKeyframes(clip.keyframes) };
       }),
       composite: { base: 'main', overlays: state.tracks.filter((track) => track.id !== 'main' && track.id !== 'audio').map((track) => track.id) },
     };
@@ -1434,7 +2171,7 @@
     for (const clip of ordered) {
       const media = state.media.get(clip.mediaId);
       if (!media || media.type !== 'video') continue;
-      const duration = clipDuration(clip);
+      const duration = clipOutputDuration(clip);
       const originalGap = previousClip ? clip.start - clipEnd(previousClip) : clip.start;
       const adjacent = previousClip && originalGap <= 0.025;
       const transition = transitionInfo(previousClip);
@@ -1448,7 +2185,8 @@
         segments.push({ start: gapStart, end: start, originalStart: previousClip ? clipEnd(previousClip) : 0, gap: true, blackFrame: true, transition: 'none', index: segments.length });
       }
       const clipTransition = transitionInfo(clip);
-      const segment = { id: clip.id, clipId: clip.id, mediaId: clip.mediaId, source: media.src, start, end: start + duration, originalStart: clip.start, trimStart: clip.trimStart, trimEnd: clip.trimEnd, transition: clipTransition.type, transitionDuration: clipTransition.duration, index: segments.length };
+      const segment = { id: clip.id, clipId: clip.id, mediaId: clip.mediaId, source: media.src, start, end: start + duration, originalStart: clip.start, trimStart: clip.trimStart, trimEnd: clip.trimEnd, transition: clipTransition.type, transitionDuration: clipTransition.duration, index: segments.length,
+        speed: normalizeSpeed(clip.speed), blend: normalizeBlend(clip.blend), opacity: normalizeOpacity(clip.opacity, 1), chroma: normalizeChroma(clip.chroma), keyframes: normalizeKeyframes(clip.keyframes) };
       if (adjacent && previousSegment) previousSegment.next = segment;
       segments.push(segment);
       previousClip = clip; previousSegment = segment;
@@ -1507,6 +2245,60 @@
   function buildExportFrames(clips = state.clips) { return getExportPlan(clips); }
   window.multiTimeline = {
     adoptFirstVideo,
+    reveal,
+    keyframe: toggleKeyframeAtPlayhead,
+    get selectedKeyframe() {
+      const selection = selectedKeyframe();
+      return selection ? {clipId: selection.clipId, time: selection.time, easing: keyframeEasingAt(selection.clip, selection.time)} : null;
+    },
+    selectKeyframe,
+    clearKeyframeSelection,
+    moveKeyframe: moveKeyframeTo,
+    setKeyframeEasing,
+    toggleFreezeFrame,
+    toggleReverse,
+    get clipEffects() { return state.selected ? {blend: normalizeBlend(state.selected.blend), opacity: normalizeOpacity(state.selected.opacity, 1), speed: normalizeSpeed(state.selected.speed), chroma: normalizeChroma(state.selected.chroma), keyframes: normalizeKeyframes(state.selected.keyframes)} : null; },
+    updateClip(clipId, patch = {}) {
+      const clip = state.clips.find((item) => item.id === clipId) || state.selected;
+      if (!clip) return null;
+      ensureClipEffects(clip);
+      if (patch.speed) clip.speed = normalizeSpeed({...clip.speed, ...patch.speed});
+      if (patch.chroma) clip.chroma = normalizeChroma({...clip.chroma, ...patch.chroma});
+      if ('blend' in patch) clip.blend = normalizeBlend(patch.blend);
+      if ('opacity' in patch) clip.opacity = normalizeOpacity(patch.opacity, 1);
+      if (patch.keyframes) clip.keyframes = normalizeKeyframes({...clip.keyframes, ...patch.keyframes});
+      if (patch.start !== undefined) clip.start = Math.max(0, Number(patch.start) || 0);
+      if (patch.keyframeAt !== undefined && patch.property) {
+        const local = Math.max(0, Number(patch.keyframeAt) || 0);
+        const transform = clipTransformAt(clip, clip.start + local);
+        const values = {position: transform.position, scale: transform.scale, rotation: transform.rotation, opacity: transform.opacity};
+        clip.keyframes = fx.toggleKeyframe(clip.keyframes, patch.property, local, values[patch.property]).keyframes;
+      }
+      render();
+      renderOverlayPreview();
+      repaintScene();
+      return clip;
+    },
+    get layers() { return normalizeLayers().map((layer) => ({...layer})); },
+    get captions() { return (filmLabState.captions || []).map((line) => ({...line})); },
+    addLayer,
+    updateLayer,
+    removeLayer,
+    selectLayer,
+    get selectedLayerId() { return state.selectedLayerId; },
+    get layerHandleBox() { return state.handleBox ? {...state.handleBox} : null; },
+    addCaption,
+    updateCaption,
+    splitCaption,
+    mergeCaption,
+    importCaptions,
+    removeCaption,
+    layersAt,
+    sceneAt,
+    clipOutputDuration: (clip) => clipOutputDuration(clip),
+    clipSourceTimeAt,
+    stickerImages: () => (fx ? fx.STICKERS.map((sticker) => sticker.id) : []),
+    refreshLayers: () => { render(); renderOverlayPreview(); repaintScene(); },
     addMedia: addExternalMedia,
     addClip: addClipFromMedia,
     get clips() { return state.clips.map((clip) => ({ ...clip })); },

@@ -1,31 +1,218 @@
-/* Photo-only selfie segmentation worker. Inference stays in-browser; image bytes are never uploaded. */
-const TASKS_VISION_WASM_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm/';
-const SELFIE_MULTICLASS_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
-const TASKS_VISION_BUNDLE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.js';
-let segmenterPromise = null;
+/* Photo-only segmentation worker. Inference stays in-browser; image bytes are never uploaded.
+ *
+ * Engines:
+ *  - Fast (people): MediaPipe Tasks ImageSegmenter with the selfie multiclass model, which is
+ *    resolved relative to this worker (vendor/mediapipe-tasks/) before the pinned Google URL.
+ *    The remote model download is raced against FAST_REMOTE_MODEL_TIMEOUT_MS (8 s) and skipped
+ *    entirely when navigator.onLine is false, so a slow or absent network never keeps the user
+ *    waiting for the full model-load budget: the identical model is served from the vendored
+ *    ONNX export through onnxruntime-web instead and Fast keeps working offline.
+ *  - Pick object: MediaPipe Interactive Segmenter with a click keypoint (APIs are read from
+ *    vendor/mediapipe-tasks/vision.d.ts: the 1.0.1 build exposes both the keypoint-based
+ *    InteractiveSegmenterLegacy.segment(image, {keypoint}, callback) and the newer
+ *    InteractiveSegmenter.setImage/segment(strokes) stroke API).
+ *  - Refine: guided filter / smoothing for the mask stack, run here so the UI stays responsive.
+ */
+'use strict';
 
-async function getImageSegmenter() {
+const BASE = new URL('vendor/mediapipe-tasks/', self.location.href).href;
+const APP_BASE = new URL('./', self.location.href).href;
+const TASKS_VISION_CDN_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/';
+const TASKS_VISION_CDN_BUNDLE_URL = TASKS_VISION_CDN_BASE + 'vision_bundle.js';
+const TASKS_VISION_CDN_WASM_URL = TASKS_VISION_CDN_BASE + 'wasm';
+const LOCAL_SELFIE_MULTICLASS_MODEL_URL = BASE + 'selfie_multiclass_256x256.tflite';
+const REMOTE_SELFIE_MULTICLASS_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
+const LOCAL_MAGIC_TOUCH_MODEL_URL = BASE + 'models/interactive_segmentation_magic_touch.tflite';
+const REMOTE_MAGIC_TOUCH_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task';
+const LOCAL_ONNX_MODEL_URL = 'vendor/models/selfie_multiclass_256x256.onnx';
+const ORT_BASE = 'vendor/onnxruntime-web/';
+// A remote model download that has not produced a segmenter after this long is abandoned in
+// favour of the bundled ONNX export; the model-load budget for the local engines stays at 90 s.
+const FAST_REMOTE_MODEL_TIMEOUT_MS = 8000;
+let segmenterPromise = null;
+let onnxSessionPromise = null;
+let pickerPromise = null;
+let sourceRaster = null; // {rgba, width, height} of the photo currently being masked
+let fastBackend = 'auto'; // 'auto' | 'mediapipe' | 'onnx'
+
+function stackApi() {
+  if (!self.FilmMaskStack) importScripts('mask-stack.js');
+  return self.FilmMaskStack;
+}
+
+function importVisionBundle() {
+  try {
+    importScripts(BASE + 'vision_bundle.js');
+  } catch (localError) {
+    try {
+      importScripts(TASKS_VISION_CDN_BUNDLE_URL);
+    } catch (cdnError) {
+      throw new Error(`Could not load MediaPipe Vision bundle locally or from the pinned jsDelivr CDN. Local: ${localError?.message || localError}; CDN: ${cdnError?.message || cdnError}`);
+    }
+  }
+}
+
+function resolveVisionApi() {
+  // The bundle defines a global called Vision (capital V); the lowercase name and the
+  // worker scope itself are probed too so a future rename cannot break the engine.
+  const api = self.Vision || self.vision || self;
+  const candidates = [api, self.Vision, self.vision, self].filter(Boolean);
+  const FilesetResolver = candidates.map(candidate => candidate.FilesetResolver)
+    .find(value => typeof value?.forVisionTasks === 'function');
+  const ImageSegmenter = candidates.map(candidate => candidate.ImageSegmenter)
+    .find(value => typeof value?.createFromOptions === 'function');
+  const InteractiveSegmenterLegacy = candidates.map(candidate => candidate.InteractiveSegmenterLegacy)
+    .find(value => typeof value?.createFromOptions === 'function');
+  const InteractiveSegmenter = candidates.map(candidate => candidate.InteractiveSegmenter)
+    .find(value => typeof value?.createFromOptions === 'function');
+  const missing = [];
+  if (!FilesetResolver) missing.push('FilesetResolver.forVisionTasks');
+  if (!ImageSegmenter) missing.push('ImageSegmenter.createFromOptions');
+  if (missing.length) throw new Error(`MediaPipe Vision API is missing ${missing.join(' and ')}`);
+  return {FilesetResolver, ImageSegmenter, InteractiveSegmenterLegacy, InteractiveSegmenter};
+}
+
+async function hasLocalAsset(url) {
+  try {
+    const response = await fetch(url, {method: 'HEAD', cache: 'no-store'});
+    return response.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isDeviceOffline() {
+  try {
+    // WorkerNavigator.onLine is the same flag the page reads; false means "known to be offline".
+    return self.navigator && self.navigator.onLine === false;
+  } catch (_) {
+    return false;
+  }
+}
+
+function isRemoteAssetUrl(url) {
+  return /^https?:/i.test(url) && !url.startsWith(APP_BASE) && !url.startsWith(BASE);
+}
+
+function withFastModelTimeout(promise, label) {
+  // Every real worker host has timers; if one does not, the download simply waits as it used to.
+  if (typeof setTimeout !== 'function') return promise;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} did not finish within ${Math.round(FAST_REMOTE_MODEL_TIMEOUT_MS / 1000)} s, so the bundled model is used instead`));
+    }, FAST_REMOTE_MODEL_TIMEOUT_MS);
+    promise.then(value => { clearTimeout(timer); resolve(value); }, error => { clearTimeout(timer); reject(error); });
+  });
+}
+
+async function getVisionFileset() {
+  const {FilesetResolver} = resolveVisionApi();
+  const failures = [];
+  try {
+    return await FilesetResolver.forVisionTasks(BASE + 'wasm');
+  } catch (error) {
+    failures.push(`local WASM fileset: ${error?.message || error}`);
+  }
+  try {
+    return await FilesetResolver.forVisionTasks(TASKS_VISION_CDN_WASM_URL);
+  } catch (error) {
+    failures.push(`pinned jsDelivr WASM fileset: ${error?.message || error}`);
+  }
+  throw new Error(`MediaPipe WASM could not be initialized. ${failures.join('; ')}`);
+}
+
+async function modelPathCandidates(localUrl, remoteUrl) {
+  const local = await hasLocalAsset(localUrl);
+  // Offline: only a vendored file can be loaded, so the remote URL is not offered at all and the
+  // caller fails over immediately instead of waiting for a connection that will not come.
+  if (isDeviceOffline()) return local ? [localUrl] : [];
+  return local ? [localUrl, remoteUrl] : [remoteUrl, localUrl];
+}
+
+/** Fast engine, MediaPipe Tasks ImageSegmenter (selfie multiclass). */
+function getImageSegmenter() {
   if (!segmenterPromise) {
     segmenterPromise = (async () => {
-      if (!self.vision) importScripts(TASKS_VISION_BUNDLE_URL);
-      const api = self.vision || self;
-      const {FilesetResolver, ImageSegmenter} = api;
-      if (typeof FilesetResolver?.forVisionTasks !== 'function' || typeof ImageSegmenter?.createFromOptions !== 'function') {
-        throw new Error('MediaPipe ImageSegmenter is unavailable');
+      importVisionBundle();
+      const {ImageSegmenter} = resolveVisionApi();
+      const fileset = await getVisionFileset();
+      const failures = [];
+      const candidates = await modelPathCandidates(LOCAL_SELFIE_MULTICLASS_MODEL_URL, REMOTE_SELFIE_MULTICLASS_MODEL_URL);
+      if (!candidates.length) throw new Error(`The bundled model ${LOCAL_SELFIE_MULTICLASS_MODEL_URL} is missing and the device is offline`);
+      for (const modelAssetPath of candidates) {
+        try {
+          const attempt = ImageSegmenter.createFromOptions(fileset, {
+            baseOptions: {modelAssetPath},
+            runningMode: 'IMAGE',
+            outputCategoryMask: true,
+            outputConfidenceMasks: true
+          });
+          // Only the network download is on a short leash; the vendored file is read from disk.
+          return isRemoteAssetUrl(modelAssetPath) ? await withFastModelTimeout(attempt, `The remote selfie model (${modelAssetPath})`) : await attempt;
+        } catch (error) {
+          failures.push(`${modelAssetPath}: ${error?.message || error}`);
+        }
       }
-      const fileset = await FilesetResolver.forVisionTasks(TASKS_VISION_WASM_URL);
-      return ImageSegmenter.createFromOptions(fileset, {
-        baseOptions: {modelAssetPath: SELFIE_MULTICLASS_MODEL_URL},
-        runningMode: 'IMAGE',
-        outputCategoryMask: true,
-        outputConfidenceMasks: true
-      });
+      throw new Error(`MediaPipe ImageSegmenter could not be initialized. ${failures.join('; ') || 'No model asset was available.'}`);
     })().catch(error => {
       segmenterPromise = null;
       throw error;
     });
   }
   return segmenterPromise;
+}
+
+/** Offline Fast fallback: the same multiclass model as an ONNX export through ORT. */
+function getOnnxSession() {
+  if (!onnxSessionPromise) {
+    onnxSessionPromise = (async () => {
+      try {
+        importScripts(APP_BASE + ORT_BASE + 'ort.min.js');
+      } catch (error) {
+        throw new Error(`onnxruntime-web could not be loaded from ${ORT_BASE}: ${error?.message || error}`);
+      }
+      const ort = self.ort;
+      if (!ort?.InferenceSession) throw new Error('onnxruntime-web did not register an InferenceSession');
+      ort.env.wasm.wasmPaths = APP_BASE + ORT_BASE;
+      ort.env.wasm.numThreads = 1; // no SharedArrayBuffer requirement, works on every host
+      ort.env.logLevel = 'error';
+      const url = APP_BASE + LOCAL_ONNX_MODEL_URL;
+      if (!(await hasLocalAsset(url))) throw new Error(`The bundled model ${LOCAL_ONNX_MODEL_URL} is missing`);
+      return await ort.InferenceSession.create(url, {executionProviders: ['wasm'], graphOptimizationLevel: 'all'});
+    })().catch(error => {
+      onnxSessionPromise = null;
+      throw error;
+    });
+  }
+  return onnxSessionPromise;
+}
+
+async function runOnnxFast(image, targetWidth, targetHeight) {
+  const ort = self.ort;
+  const session = await getOnnxSession();
+  const size = 256;
+  const canvas = new OffscreenCanvas(size, size);
+  const context = canvas.getContext('2d', {willReadFrequently: true});
+  context.drawImage(image, 0, 0, size, size);
+  const pixels = context.getImageData(0, 0, size, size).data;
+  const input = new Float32Array(size * size * 3);
+  for (let i = 0, p = 0; i < input.length; i += 3, p += 4) {
+    input[i] = pixels[p] / 255;
+    input[i + 1] = pixels[p + 1] / 255;
+    input[i + 2] = pixels[p + 2] / 255;
+  }
+  const inputName = session.inputNames[0];
+  const outputName = session.outputNames[0];
+  const feeds = {};
+  feeds[inputName] = new ort.Tensor('float32', input, [1, size, size, 3]);
+  const results = await session.run(feeds);
+  const output = results[outputName];
+  const raw = output.data;
+  if (!raw || raw.length < size * size * 2) throw new Error('The bundled model returned an unusable tensor');
+  const classCount = Math.max(2, Math.round(raw.length / (size * size)));
+  const confidence = stackApi().multiclassForeground(raw, size, size, classCount, {});
+  if (output.dispose) output.dispose();
+  return {width: targetWidth, height: targetHeight, mask: postProcessMask(confidence, size, size, targetWidth, targetHeight)};
 }
 
 function smoothThreshold(value) {
@@ -164,28 +351,266 @@ function segmentImage(segmenter, image, targetWidth, targetHeight, onRefine = ()
   }
 }
 
+/** Confidence masks from the interactive (pick) segmenter to an 8-bit alpha mask. */
+function pickResultToMask(result, targetWidth, targetHeight, onRefine = () => {}) {
+  try {
+    const masks = result?.confidenceMasks || [];
+    if (!masks.length) throw new Error('The interactive segmenter returned no mask');
+    const width = masks[0].width, height = masks[0].height;
+    const confidence = new Float32Array(width * height);
+    for (const mask of masks) {
+      const values = mask.getAsFloat32Array?.();
+      if (!values) continue;
+      for (let i = 0; i < confidence.length; i++) confidence[i] = Math.max(confidence[i], values[i]);
+    }
+    onRefine();
+    return {width: targetWidth, height: targetHeight, mask: postProcessMask(confidence, width, height, targetWidth, targetHeight)};
+  } finally {
+    for (const mask of result?.confidenceMasks || []) mask.close?.();
+    result?.categoryMask?.close?.();
+  }
+}
+
+/** Pick engine: keypoint click. Uses the 1.0.1 keypoint API and the stroke API as a fallback. */
+function getObjectPicker() {
+  if (!pickerPromise) {
+    pickerPromise = (async () => {
+      importVisionBundle();
+      const {InteractiveSegmenterLegacy, InteractiveSegmenter} = resolveVisionApi();
+      const fileset = await getVisionFileset();
+      const paths = await modelPathCandidates(LOCAL_MAGIC_TOUCH_MODEL_URL, REMOTE_MAGIC_TOUCH_MODEL_URL);
+      const failures = [];
+      if (InteractiveSegmenterLegacy) {
+        for (const modelAssetPath of paths) {
+          try {
+            const segmenter = await InteractiveSegmenterLegacy.createFromOptions(fileset, {
+              baseOptions: {modelAssetPath},
+              outputConfidenceMasks: true,
+              outputCategoryMask: true
+            });
+            return {mode: 'keypoint', segmenter};
+          } catch (error) {
+            failures.push(`keypoint API with ${modelAssetPath}: ${error?.message || error}`);
+          }
+        }
+      }
+      if (InteractiveSegmenter) {
+        for (const modelAssetPath of paths) {
+          try {
+            const segmenter = await InteractiveSegmenter.createFromOptions(fileset, {baseOptions: {modelAssetPath}});
+            return {mode: 'stroke', segmenter};
+          } catch (error) {
+            failures.push(`stroke API with ${modelAssetPath}: ${error?.message || error}`);
+          }
+        }
+      }
+      throw new Error(`The MediaPipe Interactive Segmenter could not be initialized. ${failures.join('; ') || 'No interactive model asset was available.'}`);
+    })().catch(error => {
+      pickerPromise = null;
+      throw error;
+    });
+  }
+  return pickerPromise;
+}
+
+const KEYPOINT_PICK_HALF_WINDOW = 0.02;
+
+function runPick(image, point, targetWidth, targetHeight, onRefine) {
+  return getObjectPicker().then(({mode, segmenter}) => {
+    if (mode === 'keypoint') {
+      return new Promise((resolve, reject) => {
+        try {
+          segmenter.segment(image, {keypoint: {x: point.x, y: point.y}}, result => {
+            try { resolve(pickResultToMask(result, targetWidth, targetHeight, onRefine)); }
+            catch (error) { reject(error); }
+          });
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+    // 1.0.1 stroke API: encode the click as a short positive stroke around the point.
+    segmenter.setImage(image);
+    const positive = self.Vision?.BrushMode?.POSITIVE ?? 1;
+    const stroke = {
+      brushMode: positive,
+      point: [
+        {x: Math.max(0, point.x - KEYPOINT_PICK_HALF_WINDOW), y: point.y},
+        {x: point.x, y: point.y},
+        {x: Math.min(1, point.x + KEYPOINT_PICK_HALF_WINDOW), y: point.y}
+      ],
+      isCompleted: true
+    };
+    const mask = segmenter.segment([stroke]);
+    const data = mask?.getAsUint8Array?.() || mask?.getAsFloat32Array?.();
+    if (!data) throw new Error('The interactive segmenter returned no mask data');
+    const confidence = new Float32Array(data.length);
+    for (let i = 0; i < data.length; i++) confidence[i] = data[i] > 1 ? data[i] / 255 : data[i];
+    mask.close?.();
+    onRefine?.();
+    return {width: targetWidth, height: targetHeight, mask: postProcessMask(confidence, mask.width, mask.height, targetWidth, targetHeight)};
+  });
+}
+
+/** Refine: smooth / edge-aware guided filter / feather / expand, on the worker thread. */
+function refineMask(message) {
+  const api = stackApi();
+  const width = Math.max(1, message.width | 0), height = Math.max(1, message.height | 0);
+  let mask = new Uint8ClampedArray(message.mask);
+  if (mask.length !== width * height) throw new Error('The mask buffer does not match its size');
+  const options = message.options || {};
+  if (options.edgeRefine) {
+    const guide = sourceRaster && sourceRaster.width === width && sourceRaster.height === height ? sourceRaster.rgba : null;
+    mask = api.guidedFilter(mask, width, height, guide, options.radius ?? 12, options.strength ?? 0.6);
+  }
+  if (options.smooth > 0) mask = api.smoothMask(mask, width, height, options.smooth);
+  if (options.expand) mask = api.expandContract(mask, width, height, options.expand);
+  if (options.feather > 0) mask = api.blurMask(mask, width, height, options.feather);
+  if (options.invert) mask = api.invertAlpha(mask);
+  return mask;
+}
+
+function compositeRequest(message) {
+  const api = stackApi();
+  const width = Math.max(1, message.width | 0), height = Math.max(1, message.height | 0);
+  const source = sourceRaster && sourceRaster.width === width && sourceRaster.height === height
+    ? sourceRaster
+    : (message.source ? {rgba: new Uint8ClampedArray(message.source), width, height} : null);
+  if (message.source) sourceRaster = source;
+  const layers = (message.layers || []).map(layer => ({
+    ...layer,
+    raster: layer.raster ? {data: new Uint8ClampedArray(layer.raster), width: layer.rasterWidth, height: layer.rasterHeight} : null
+  }));
+  return api.compositeLayers(layers, width, height, source);
+}
+
+/** Fast segmentation with automatic backend fallback. */
+async function runFast(image, targetWidth, targetHeight, report) {
+  const failures = [];
+  if (fastBackend !== 'onnx' && !isDeviceOffline()) {
+    try {
+      const segmenter = await getImageSegmenter();
+      return segmentImage(segmenter, image, targetWidth, targetHeight, () => report('Refining mask edges…'));
+    } catch (error) {
+      failures.push(`MediaPipe selfie model: ${error?.message || error}`);
+      self.console?.warn?.('MediaPipe selfie segmentation unavailable; falling back to the bundled ONNX model.', error);
+      fastBackend = 'onnx';
+    }
+  }
+  try {
+    report('Analyzing image with the bundled model…');
+    return await runOnnxFast(image, targetWidth, targetHeight);
+  } catch (error) {
+    failures.push(`bundled ONNX model: ${error?.message || error}`);
+    throw new Error(`Fast segmentation failed. ${failures.join('; ')}`);
+  }
+}
+
+async function ensureFastModel(report) {
+  const failures = [];
+  if (isDeviceOffline()) {
+    // Nothing remote can succeed while the device is offline; use the bundled model right away.
+    try {
+      await getOnnxSession();
+      fastBackend = 'onnx';
+      report?.('Offline: using the bundled segmentation model.');
+      return 'onnx';
+    } catch (error) {
+      failures.push(`bundled ONNX model: ${error?.message || error}`);
+      throw new Error(`No fast segmentation engine is available offline. ${failures.join('; ')}`);
+    }
+  }
+  try {
+    await getImageSegmenter();
+    fastBackend = 'mediapipe';
+    return 'mediapipe';
+  } catch (error) {
+    failures.push(`MediaPipe selfie model: ${error?.message || error}`);
+  }
+  try {
+    await getOnnxSession();
+    fastBackend = 'onnx';
+    report?.('Using the bundled segmentation model (offline).');
+    return 'onnx';
+  } catch (error) {
+    failures.push(`bundled ONNX model: ${error?.message || error}`);
+  }
+  throw new Error(`No fast segmentation engine is available. ${failures.join('; ')}`);
+}
+
+async function ensurePickModel() {
+  await getObjectPicker();
+  return 'pick';
+}
+
 self.addEventListener('message', async event => {
   const message = event.data || {};
   const requestId = message.requestId;
-  if (message.type === 'init') {
-    try {
-      self.postMessage({type: 'progress', requestId, message: 'Loading AI model… this may take a moment.'});
-      await getImageSegmenter();
-      self.postMessage({type: 'ready', requestId});
-    } catch (error) {
-      self.postMessage({type: 'error', requestId, error: error?.message || 'Could not load the local segmentation model'});
-    }
-    return;
-  }
-  if (message.type !== 'segment') return;
+  const report = text => self.postMessage({type: 'progress', requestId, message: text});
   const image = message.image;
   try {
-    self.postMessage({type: 'progress', requestId, message: 'Analyzing image…'});
-    const segmenter = await getImageSegmenter();
-    const result = segmentImage(segmenter, image, message.width, message.height, () => {
-      self.postMessage({type: 'progress', requestId, message: 'Refining mask edges…'});
-    });
-    self.postMessage({type: 'result', requestId, ...result, mask: result.mask.buffer}, [result.mask.buffer]);
+    switch (message.type) {
+      case 'init': {
+        report('Loading AI model… this may take a moment.');
+        const backend = await ensureFastModel(report);
+        self.postMessage({type: 'ready', requestId, backend});
+        return;
+      }
+      case 'init-pick': {
+        report('Loading the object picker… this may take a moment.');
+        await ensurePickModel();
+        self.postMessage({type: 'ready', requestId});
+        return;
+      }
+      case 'segment': {
+        report('Analyzing image…');
+        const result = await runFast(image, message.width, message.height, report);
+        self.postMessage({type: 'result', requestId, ...result, mask: result.mask.buffer}, [result.mask.buffer]);
+        return;
+      }
+      case 'pick': {
+        report('Finding the object under the click…');
+        const point = message.point || {x: 0.5, y: 0.5};
+        const result = await runPick(image, point, message.width, message.height, () => report('Refining mask edges…'));
+        self.postMessage({type: 'result', requestId, ...result, mask: result.mask.buffer}, [result.mask.buffer]);
+        return;
+      }
+      case 'source': {
+        if (image) {
+          const canvas = new OffscreenCanvas(Math.max(1, message.width | 0), Math.max(1, message.height | 0));
+          const context = canvas.getContext('2d', {willReadFrequently: true});
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          sourceRaster = {rgba: new Uint8ClampedArray(context.getImageData(0, 0, canvas.width, canvas.height).data), width: canvas.width, height: canvas.height};
+        } else {
+          sourceRaster = null;
+        }
+        self.postMessage({type: 'source-ready', requestId, width: sourceRaster?.width || 0, height: sourceRaster?.height || 0});
+        return;
+      }
+      case 'foreground': {
+        // Blur-Fusion style decontamination of the semi-transparent edge band.
+        const api=stackApi();
+        if(!sourceRaster) throw new Error('The photo has not been shared with the mask worker yet');
+        const width=Math.max(1,message.width|0),height=Math.max(1,message.height|0);
+        const alpha=message.mask instanceof Uint8ClampedArray?message.mask:new Uint8ClampedArray(message.mask);
+        const pixels=api.edgeForegroundEstimate(sourceRaster.rgba,width,height,alpha,message.radius??6);
+        self.postMessage({type:'result',requestId,width,height,pixels:pixels.buffer},[pixels.buffer]);
+        return;
+      }
+      case 'refine': {
+        const mask = refineMask(message);
+        self.postMessage({type: 'result', requestId, width: message.width, height: message.height, mask: mask.buffer}, [mask.buffer]);
+        return;
+      }
+      case 'composite': {
+        const mask = compositeRequest(message);
+        const buffer = mask.buffer || new Uint8ClampedArray(mask).buffer;
+        self.postMessage({type: 'result', requestId, width: message.width, height: message.height, mask: buffer}, [buffer]);
+        return;
+      }
+      default:
+        return;
+    }
   } catch (error) {
     self.postMessage({type: 'error', requestId, error: error?.message || 'Image segmentation failed'});
   } finally {

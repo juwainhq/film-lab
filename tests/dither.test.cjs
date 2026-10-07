@@ -41,7 +41,7 @@ test('Dither uses an independent post-composite pass with all requested modes an
   assert.match(ditherShader,/float rank=u_algorithm==1\?bayerRank\(ivec2\(lowPixel\),4\):u_algorithm==2\?bayerRank\(ivec2\(lowPixel\),8\):0\.0/);
   assert.match(ditherShader,/vec2 sampleUV=clamp\(\(lowPixel\+vec2\(0\.5\)\)\*factor\/u_resolution/);
   assert.match(ditherShader,/float area=u_backgroundOnly==1\?1\.0-smoothstep\(0\.05,0\.95,texture\(u_subjectMask,sampleUV\)\.r\):1\.0/);
-  assert.match(ditherShader,/if\(u_splitPreview==1 && v_texCoord\.x<0\.5\)\{ outColor=texture\(u_original,v_texCoord\); return; \}/);
+  assert.match(ditherShader,/if\(u_splitPreview==1 && v_texCoord\.x<u_splitPosition\)\{ outColor=texture\(u_original,geometryUv\(v_texCoord\)\); return; \}/);
   assert.match(ditherShader,/outColor=vec4\(mix\(source,printed,amount\*area\),fullSource\.a\)/);
   assert.match(script,/gl\.activeTexture\(gl\.TEXTURE2\); gl\.bindTexture\(gl\.TEXTURE_2D,subjectMaskTexture\)/);
   assert.match(script,/const subjectProtected=!!autoSubjectMask \|\| maskStrokes\.some\(s=>s\.mode==='protect'\)/);
@@ -159,8 +159,11 @@ test('protect and erase brushes track image coordinates through zoom, including 
 test('still-photo grain remains frozen despite Speed; video grain can still animate', () => {
   assert.match(script, /'u_grainSpeed'\),isVideo \? params\.grainSpeed : 0/);
   assert.match(script, /'u_time'\),isVideo \? \(timeMs\?\?performance\.now\(\)\)\*0\.001 : 0/);
-  assert.match(composite, /float frameIndex=floor\(u_time\*240\.0\)/);
-  assert.match(composite, /float frameSeed=u_grainSeed\+frameIndex\*\(71\.731\+u_grainSpeed\*13\.0\)/);
+  // The pattern is reseeded from the frame index, whose step rate follows Speed; a photo supplies
+  // u_time 0 so its grain is one stable field.
+  assert.match(composite, /float grainSteps=max\(3\.0,26\.0\*clamp\(u_grainSpeed,0\.0,3\.5\)\/\(1\.155\)\)/);
+  assert.match(composite, /float frameIndex=max\(floor\(u_time\*grainSteps\),0\.0\)/);
+  assert.match(composite, /uint frameSeed=uint\(max\(u_grainSeed,0\.0\)\)\+uint\(frameIndex\)\*2654435761u/);
   assert.doesNotMatch(composite, /pixel\+vec2\(t\*7\.3,t\*5\.9\)/);
   assert.match(html, /id="grainSpeedRow" hidden[\s\S]*?<div class="subLabel">Speed<\/div>/);
   assert.ok(script.includes("$('grainSpeedRow').hidden=!isVideo || !hasContent"));

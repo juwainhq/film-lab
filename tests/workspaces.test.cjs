@@ -12,7 +12,7 @@ const multiTimeline = readFileSync(resolve(__dirname, '../multi-timeline.js'), '
 
 test('the existing upload landing routes image and video files without a reload', () => {
   assert.match(html, /id="dropZone"/);
-  assert.match(html, /READY FOR AN IMAGE/);
+  assert.match(html, /READY FOR MEDIA/);
   assert.match(html, /id="fileInput" accept="image\/\*[^\"]*video\/\*" multiple hidden/);
   assert.match(script, /function handleFiles\(fileList/);
   assert.match(script, /if\(document\.readyState==='loading'\)document\.addEventListener\('DOMContentLoaded',startFilmLab,\{once:true\}\)/);
@@ -30,10 +30,11 @@ test('the existing upload landing routes image and video files without a reload'
 
 test('workspace state shows subtle top-bar mode and only exposes video controls in video mode', () => {
   const fn = script.match(/function updateWorkspaceUI\(\)\{[\s\S]*?\n\}/)[0];
+  const formatHelper = script.match(/function exportTypeQualityLabel\(\)\{[\s\S]*?\n\}/)[0];
   const ids=['app','workspacePill','videoPlaybackControls','editorTimeline','grainSpeedRow','backToDropBtn','exportPanelTitle','frameFormatLabel','frameQualityLabel'];
   const elements = Object.fromEntries(ids.map(id => [id, {dataset:{},hidden:false,disabled:false,textContent:''}]));
   const state = vm.createContext({appState:{mode:'empty'},document:{body:{dataset:{}}},hasContent:true,isVideo:false,mediaBusy:false,exportBusy:false,$:id=>elements[id],updateCaptionOverlay(){}});
-  vm.runInContext(`${fn}\nthis.update=updateWorkspaceUI;`,state);
+  vm.runInContext(`${formatHelper}\n${fn}\nthis.update=updateWorkspaceUI;`,state);
   state.update();
   assert.equal(elements.app.dataset.workspace,'photo');
   assert.equal(state.appState.mode,'photo');
@@ -123,6 +124,49 @@ test('photo and video panels switch with appState.mode while the existing DOM st
   assert.match(html, /Show on this clip/);
 });
 
+test('empty and photo workspaces hide irrelevant video chrome and guard header export actions', () => {
+  assert.match(styles, /body\[data-mode="empty"\] #app #content #timeline-module,[\s\S]*?body\[data-mode="photo"\] #app #shortcuts-bar \{ display: none !important; \}/);
+  // Before / Export stay mounted on the landing screen and read as disabled until media loads.
+  assert.doesNotMatch(styles, /body\[data-mode="empty"\] #app #headerActions #hdrBeforeBtn/);
+  assert.match(styles, /#hdrBeforeBtn:disabled,#hdrDownloadBtn:disabled \{ opacity: \.38; cursor: not-allowed;/);
+  const update = script.match(/function updateSocialUI\(\)\{[\s\S]*?\n\}/)[0];
+  assert.match(update, /\$\('hdrBeforeBtn'\)\.disabled=!hasContent\|\|locked/);
+  assert.match(update, /\$\('hdrDownloadBtn'\)\.disabled=!hasContent\|\|locked/);
+  const exportHandler = script.match(/function handleHeaderExport\(\)\{[\s\S]*?\n\}/)[0];
+  assert.match(exportHandler, /if\(!hasContent\|\|exportBusy\|\|mediaBusy\) return/);
+  assert.match(script, /hdrDownloadBtn'\)\.addEventListener\('click',\(\)=>\{if\(hasContent&&!isVideo\)/);
+  assert.match(styles, /body\[data-mode="video"\] #app #timeline-module:not\(\[hidden\]\) \{ display: flex; \}/);
+});
+
+test('the video timeline is wired before its previews and cannot be hidden by a failing preview', () => {
+  const load = script.match(/async function handleVideoFile\(file\)\{[\s\S]*?\n\}/)[0];
+  const adoptAt = load.indexOf('window.multiTimeline?.adoptFirstVideo(file,videoEl,videoObjectUrl,dur,videoTrim)');
+  const legacyAt = load.indexOf('window.filmLabTimeline?.setVideo(dur,videoTrim.start,videoTrim.end)');
+  const filmstripAt = load.indexOf('renderVideoFilmstrip(token)');
+  const waveformAt = load.indexOf('renderAudioWaveform(file,token)');
+  assert.ok(adoptAt > 0 && legacyAt > 0 && filmstripAt > 0 && waveformAt > 0, 'the video load path changed shape');
+  // The timeline is adopted before the preview helpers run, the previews are allowed to fail, and
+  // a stalled helper cannot hold up playback: the timeline shows even when they never finish.
+  assert.ok(adoptAt > legacyAt, 'the legacy timeline is wired before the multi-track timeline');
+  assert.ok(adoptAt < filmstripAt && adoptAt < waveformAt, 'the timeline is still adopted after the previews');
+  assert.match(load, /catch\(error=>console\.warn\('Timeline previews are unavailable for this clip'/);
+  assert.match(load, /settleWithin\(previews,TIMELINE_PREVIEW_LIMIT_MS/);
+  assert.match(script, /function settleWithin\(promise,ms,onTimeout\)\{/);
+  assert.ok(script.indexOf('const TIMELINE_PREVIEW_LIMIT_MS=') > 0);
+  // Video mode opens the shell with its default lanes instead of waiting for a clip.
+  const workspace = script.match(/function setWorkspaceMode\(mode\)\{[\s\S]*?\n\}/)[0];
+  assert.match(workspace, /if\(mode==='video'\)window\.multiTimeline\?\.reveal\?\.\(\)/);
+  assert.match(multiTimeline, /function reveal\(\) \{/);
+  assert.match(multiTimeline, /reveal,\n/);
+  assert.match(multiTimeline, /state\.tracks\.push\([\s\S]*?id: 'main', kind: 'video', label: 'V1'[\s\S]*?id: 'video-2', kind: 'video', label: 'V2'/);
+  assert.match(multiTimeline, /\{ id: 'audio', kind: 'audio', label: 'AUDIO', editable: false \}/);
+  assert.match(multiTimeline, /\{ id: 'text', kind: 'text', label: 'TEXT', editable: false \}/);
+  assert.equal((multiTimeline.match(/id: 'text', kind: 'text', label: 'TEXT'/g) || []).length, 2, 'the text lane is missing from a track seed');
+  assert.match(html, /class="mtl-track mtl-text-row" data-track-id="text"/);
+  assert.match(html, /id="mtl-text-track"/);
+  assert.match(html, /\.mtl-audio-row,\.mtl-text-row \{ min-height: 27px; \}/);
+});
+
 test('video timeline is an additive module with trim, cut, history, zoom, waveform and transition controls', () => {
   assert.match(html, /<section id="timeline-module" class="video-only"/);
   for(const id of ['timeline-skip-start','timeline-play','timeline-skip-end','timeline-timecode','timeline-cut','timeline-delete','timeline-undo','timeline-redo','timeline-zoom-minus','timeline-zoom-plus','timeline-ruler','timeline-clips','timeline-audio','timeline-playhead']) assert.match(html,new RegExp(`id="${id}"`));
@@ -130,7 +174,8 @@ test('video timeline is an additive module with trim, cut, history, zoom, wavefo
   assert.match(html, /src="\.\/timeline-module\.js"/);
   assert.match(timeline, /function splitAt\(time\)/);
   assert.match(timeline, /No clip loaded/);
-  assert.match(styles, /body\[data-mode="empty"\] #app #content #timeline-module:not\(\[hidden\]\)/);
+  assert.match(styles, /body\[data-mode="video"\] #app #timeline-module:not\(\[hidden\]\) \{ display: flex; \}/);
+  assert.doesNotMatch(styles, /body\[data-mode="empty"\] #app #content #timeline-module:not\(\[hidden\]\)/);
   assert.match(timeline, /function getExportPlan\(\)/);
   assert.match(timeline, /function mapOutputTime\(time, plan = getExportPlan\(\)\)/);
   assert.match(timeline, /addEventListener\('timeupdate', onPlaybackTime\)/);
@@ -146,7 +191,7 @@ test('video timeline is an additive module with trim, cut, history, zoom, wavefo
 test('timeline output mapping covers concatenated cuts, dissolves, and black fades', () => {
   const mapper=timeline.match(/function mapOutputTime\(time, plan = getExportPlan\(\)\) \{[\s\S]*?\n  \}/)[0];
   const state=vm.createContext({getExportPlan:()=>({}),clamp:(n,min,max)=>Math.max(min,Math.min(max,n))});
-  vm.runInContext(`${mapper}\nthis.map=mapOutputTime;`,state);
+  vm.runInContext(`const state={clips:[]}; const fx=null; const MIN_CLIP_DURATION=0.1;\n${mapper}\nthis.map=mapOutputTime;`,state);
   const dissolve={transitionSeconds:.5,segments:[{start:0,end:2,transition:'dissolve'},{start:5,end:7,transition:'none'}]};
   assert.deepEqual(JSON.parse(JSON.stringify(state.map(1.75,dissolve))),{sourceTime:1.75,blendTime:5.25,blend:.5});
   const fadeOut={transitionSeconds:.5,segments:[{start:0,end:2,transition:'fade-to-black'},{start:4,end:5,transition:'none'}]};
@@ -388,7 +433,7 @@ test('V2+ composite against the actual preview frame and keep playback running f
 test('multi-timeline export mapping preserves trims, gap frames, transition choices, and configured duration', () => {
   const mapper=multiTimeline.match(/function mapOutputTime\(outputTime, plan\) \{[\s\S]*?\n  \}/)[0];
   const state=vm.createContext({});
-  vm.runInContext(`${mapper}\nthis.map=mapOutputTime;`,state);
+  vm.runInContext(`const state={clips:[]}; const fx=null; const MIN_CLIP_DURATION=0.1;\n${mapper}\nthis.map=mapOutputTime;`,state);
   const a={index:0,start:0,end:2,trimStart:1,trimEnd:3,source:'a.mp4',transition:'dissolve'};
   const b={index:1,start:2,end:4,trimStart:4,trimEnd:6,source:'b.mp4',transition:'none'};
   a.next=b;
@@ -422,7 +467,7 @@ test('multi-timeline export mapping preserves trims, gap frames, transition choi
 test('multi-timeline export plan honors transition duration and only overlaps adjacent dissolves', () => {
   const source=multiTimeline.match(/function getExportPlan\(clips = state\.clips\) \{[\s\S]*?\n  \}/)[0];
   const context=vm.createContext({});
-  vm.runInContext(`const state={media:new Map()}; const clipDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipEnd=c=>c.start+clipDuration(c); const transitionInfo=c=>({type:c?.transitionOut?.type||c?.transition||'none',duration:c?.transitionOut?.duration||0.5}); const getExportManifest=()=>({}); const getOverlaysAt=()=>[]; ${source}; this.setMedia=items=>state.media=new Map(items); this.plan=getExportPlan;`,context);
+  vm.runInContext(`const state={media:new Map()}; const clipDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipOutputDuration=c=>Math.max(0.1,c.trimEnd-c.trimStart); const clipEnd=c=>c.start+clipDuration(c); const transitionInfo=c=>({type:c?.transitionOut?.type||c?.transition||'none',duration:c?.transitionOut?.duration||0.5}); const normalizeSpeed=value=>value||{rate:1,reverse:false,freeze:false,ramp:'none'}; const normalizeBlend=value=>value||'normal'; const normalizeOpacity=(value,fallback=1)=>Number.isFinite(Number(value))?Number(value):fallback; const normalizeChroma=value=>value||{enabled:false}; const normalizeKeyframes=value=>value||{position:[],scale:[],rotation:[],opacity:[]}; const getExportManifest=()=>({}); const getOverlaysAt=()=>[]; ${source}; this.setMedia=items=>state.media=new Map(items); this.plan=getExportPlan;`,context);
   const a={id:'a',mediaId:'ma',track:'main',start:0,trimStart:0,trimEnd:2,transition:'dissolve',transitionOut:{type:'dissolve',duration:1.2}};
   const b={id:'b',mediaId:'mb',track:'main',start:2,trimStart:0,trimEnd:2,transition:'none',transitionOut:{type:'none',duration:0.5}};
   context.setMedia([['ma',{type:'video',src:'a.mp4'}],['mb',{type:'video',src:'b.mp4'}]]);
@@ -462,7 +507,7 @@ test('video export UI exposes only trimmed output, requested sizes, formats and 
   assert.match(html, /Download ready/);
   assert.match(script, /const range='trimmed';[\s\S]*?social\.trimRange\(videoEl\.duration,videoTrim\.start,videoTrim\.end\)/);
   assert.match(script, /function videoOutputSize\(options,position,resolution\)/);
-  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,audio:false,output:segment\}\)/);
+  assert.match(script, /social\.videoArgs\(\{fps,duration:count\/fps,container,quality,crf:delivery\.crf,bitrate:delivery\.mbps,audio:false,output:segment\}\)/);
   assert.match(script, /ff\.on\('progress'/);
   assert.match(script, /setInterval\(updateExportEta,1000\)/);
   assert.match(script, /progressText\.textContent=`Encoding… \$\{pct\}%`/);
