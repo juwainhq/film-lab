@@ -125,7 +125,20 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release delete latest-build --cleanup-tag --yes || true
+        run: |
+          # This job has no checkout, so `gh` needs --repo to know which repository to talk to
+          # (without it gh shells out to git and fails, which used to be swallowed by `|| true`).
+          if gh release delete latest-build --cleanup-tag --yes --repo "$GITHUB_REPOSITORY"; then
+            echo "deleted the latest-build release and its tag"
+          else
+            # No release yet, or the release could not be deleted: clear the assets it does have
+            # so this run's upload cannot collide with a previous build's files.
+            echo "release delete did not go through; clearing its assets instead"
+            for asset in $(gh release view latest-build --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null); do
+              echo "removing stale asset: $asset"
+              gh release delete-asset latest-build "$asset" --yes --repo "$GITHUB_REPOSITORY"
+            done
+          fi
       - name: Publish rolling latest-build release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
         uses: softprops/action-gh-release@v1
