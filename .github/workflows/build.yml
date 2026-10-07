@@ -129,10 +129,12 @@ jobs:
         run: |
           mkdir -p release
           shopt -s nullglob
-          for file in artifacts/*/*.exe; do cp "$file" release/FilmLab-Setup.exe; done
-          for file in artifacts/*/*.dmg; do cp "$file" release/FilmLab.dmg; done
-          for file in artifacts/*/*.AppImage; do cp "$file" release/FilmLab.AppImage; done
-          for file in artifacts/*/*.apk; do cp "$file" release/FilmLab.apk; done
+          # Echo each source name: electron-builder stamps the app version into it
+          # (`Film Lab Setup 2.0.0.exe`), which is the version the installed app reports.
+          for file in artifacts/*/*.exe; do echo "packaging $file -> FilmLab-Setup.exe"; cp "$file" release/FilmLab-Setup.exe; done
+          for file in artifacts/*/*.dmg; do echo "packaging $file -> FilmLab.dmg"; cp "$file" release/FilmLab.dmg; done
+          for file in artifacts/*/*.AppImage; do echo "packaging $file -> FilmLab.AppImage"; cp "$file" release/FilmLab.AppImage; done
+          for file in artifacts/*/*.apk; do echo "packaging $file -> FilmLab.apk"; cp "$file" release/FilmLab.apk; done
           ls -l release
       - name: Reset rolling latest-build release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/arena/01a102e1-film-lab'
@@ -164,7 +166,8 @@ jobs:
           body: |
             Rolling **Film Lab v${{ env.APP_VERSION }}** build from `${{ github.ref_name }}` at commit `${{ env.SHORT_SHA }}` (built ${{ env.BUILD_DATE }}).
 
-            The installers keep fixed file names, so these download links stay valid between versions:
+            The installers carry this version in their own names (for example `Film Lab Setup ${{ env.APP_VERSION }}.exe`),
+            but they are published here under fixed names, so these download links stay valid between versions:
 
             - **Windows:** `FilmLab-Setup.exe`
             - **Mac:** `FilmLab.dmg`
